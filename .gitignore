@@ -1,0 +1,47 @@
+# macOS системные файлы
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Файлы IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Файлы сборки расширения
+dist/
+build/
+*.crx
+*.pem
+*.zip
+
+# Логи и временные файлы
+*.log
+*.tmp
+.temp/
+.cache/
+
+# Личные настройки и конфиги
+config.json
+secrets.json
+credentials.json 
