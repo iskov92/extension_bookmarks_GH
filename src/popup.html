@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GH Bookmarks</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/light-theme.css" id="theme-stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <button id="backButton" class="header-button back-button" style="display: none;">
+                <span class="icon">←</span>
+            </button>
+            <button id="addButton" class="header-button add-button">
+                <span class="icon">+</span>
+            </button>
+            <div class="header-controls">
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider round"></span>
+                </label>
+                <button id="settingsButton" class="header-button settings-button">
+                    <span class="icon">⚙️</span>
+                </button>
+            </div>
+        </header>
+
+        <main id="mainContent" class="main-content">
+            <!-- Здесь будет динамический контент -->
+        </main>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+</body>
+
+</html>
