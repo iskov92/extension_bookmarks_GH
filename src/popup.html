@@ -28,12 +28,18 @@
 <body>
     <div class="app-container">
         <header class="header">
-            <button id="backButton" class="header-button back-button" style="display: none;">
-                <span class="icon">←</span>
-            </button>
-            <button id="addButton" class="header-button add-button">
-                <span class="icon">+</span>
-            </button>
+            <div class="header-left">
+                <button id="backButton" class="header-button back-button" style="display: none;">
+                    <img src="../assets/icons/return_black.svg" alt="Back" class="header-icon dark-theme-icon">
+                    <img src="../assets/icons/return_white.svg" alt="Back" class="header-icon light-theme-icon">
+                </button>
+            </div>
+            <div class="header-center">
+                <button id="addButton" class="header-button add-button">
+                    <img src="../assets/icons/add_boockmarks_black.svg" alt="Add" class="header-icon dark-theme-icon">
+                    <img src="../assets/icons/add_boockmarks_white.svg" alt="Add" class="header-icon light-theme-icon">
+                </button>
+            </div>
             <div class="header-controls">
                 <label class="theme-switch">
                     <input type="checkbox" id="themeToggle">
