@@ -2,7 +2,7 @@
 chrome.runtime.onInstalled.addListener(() => {
   // Инициализация настроек по умолчанию
   chrome.storage.sync.set({
-    isDarkTheme: false,
+    isDarkTheme: true, // Темная тема по умолчанию
   })
 })
 

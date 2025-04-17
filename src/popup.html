@@ -5,8 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GH Bookmarks</title>
-    <link rel="stylesheet" href="styles/main.css">
-    <link rel="stylesheet" href="styles/light-theme.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="stylesheet" href="./styles/light-theme.css" id="theme-stylesheet">
+    <script>
+        // Устанавливаем размер окна при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            // Получаем размеры окна браузера
+            chrome.windows.getCurrent(window => {
+                const width = Math.round(window.width * 0.7); // 70% от ширины окна
+                const height = Math.round(window.height * 0.7); // 70% от высоты окна
+
+                // Устанавливаем размеры для body
+                document.body.style.width = width + 'px';
+                document.body.style.height = height + 'px';
+                document.body.style.minWidth = '600px';
+                document.body.style.minHeight = '400px';
+            });
+        });
+    </script>
 </head>
 
 <body>
@@ -34,7 +50,7 @@
         </main>
     </div>
 
-    <script type="module" src="popup.js"></script>
+    <script type="module" src="./popup.js"></script>
 </body>
 
 </html>

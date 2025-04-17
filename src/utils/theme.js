@@ -2,9 +2,9 @@ export function initTheme() {
   const themeToggle = document.getElementById("themeToggle")
   const themeStylesheet = document.getElementById("theme-stylesheet")
 
-  // Загружаем сохраненную тему
+  // Загружаем сохраненную тему или используем темную по умолчанию
   chrome.storage.sync.get(["isDarkTheme"], function (result) {
-    const isDarkTheme = result.isDarkTheme ?? false
+    const isDarkTheme = result.isDarkTheme ?? true // true = темная тема по умолчанию
     setTheme(isDarkTheme)
     themeToggle.checked = isDarkTheme
   })
@@ -17,7 +17,7 @@ export function initTheme() {
 
 function setTheme(isDark) {
   const themeStylesheet = document.getElementById("theme-stylesheet")
-  themeStylesheet.href = `styles/${isDark ? "dark" : "light"}-theme.css`
+  themeStylesheet.href = `./styles/${isDark ? "dark" : "light"}-theme.css`
 
   // Сохраняем выбор темы
   chrome.storage.sync.set({ isDarkTheme: isDark })

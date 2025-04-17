@@ -17,7 +17,7 @@ export class NestedMenu {
       icon.className = "bookmark-icon"
       icon.src = bookmark.url
         ? `chrome://favicon/${bookmark.url}`
-        : "assets/icons/folder.png"
+        : "./assets/icons/folder.png"
       icon.width = 24
       icon.height = 24
 
