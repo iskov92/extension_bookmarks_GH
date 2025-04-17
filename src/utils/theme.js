@@ -22,6 +22,9 @@ function setTheme(isDark) {
   // Сохраняем выбор темы
   chrome.storage.sync.set({ isDarkTheme: isDark })
 
+  // Устанавливаем атрибут темы
+  document.body.setAttribute("data-theme", isDark ? "dark" : "light")
+
   // Добавляем класс для анимации
   document.body.style.transition =
     "background-color var(--transition-speed), color var(--transition-speed)"

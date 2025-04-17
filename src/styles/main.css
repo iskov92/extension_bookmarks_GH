@@ -6,6 +6,10 @@
   --icon-size: 24px;
   --settings-icon-size: 20px;
 
+  /* Цвета */
+  --dark-accent: #24ffd0;
+  --light-accent: #ff8a24;
+
   /* Анимации */
   --transition-speed: 0.3s;
 }
@@ -65,10 +69,18 @@ body {
   justify-content: center;
   border-radius: var(--border-radius);
   transition: background-color var(--transition-speed);
+  height: calc(var(--header-height) - 6px);
+  width: calc(var(--header-height) - 6px);
 }
 
 .settings-button {
   font-size: var(--settings-icon-size);
+}
+
+.settings-button img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 .header-button:hover {
@@ -116,8 +128,8 @@ body {
 .theme-switch {
   position: relative;
   display: inline-block;
-  width: 36px;
-  height: 20px;
+  width: 28px;
+  height: 16px;
 }
 
 .theme-switch input {
@@ -133,35 +145,30 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: var(--light-accent);
   transition: var(--transition-speed);
+  border-radius: 24px;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
+  height: 12px;
+  width: 12px;
   left: 2px;
   bottom: 2px;
-  background-color: white;
+  background-color: rgb(68, 71, 70);
+  border-radius: 50%;
   transition: var(--transition-speed);
 }
 
-.slider.round {
-  border-radius: 24px;
-}
-
-.slider.round:before {
-  border-radius: 50%;
-}
-
 input:checked + .slider {
-  background-color: var(--accent-color);
+  background-color: #24ffd0;
 }
 
 input:checked + .slider:before {
-  transform: translateX(16px);
+  transform: translateX(12px);
+  background-color: rgb(68, 71, 70);
 }
 
 /* Пустое состояние */
@@ -170,4 +177,57 @@ input:checked + .slider:before {
   text-align: center;
   padding: 32px;
   color: var(--text-secondary);
+}
+
+.settings-icon {
+  width: var(--settings-icon-size);
+  height: var(--settings-icon-size);
+  transition: transform var(--transition-speed);
+}
+
+.settings-button:hover .settings-icon {
+  transform: rotate(90deg);
+}
+
+/* Иконки для разных тем */
+.dark-theme-icon {
+  display: none;
+}
+
+.light-theme-icon {
+  display: block;
+}
+
+[data-theme="dark"] .dark-theme-icon {
+  display: block;
+}
+
+[data-theme="dark"] .light-theme-icon {
+  display: none;
+}
+
+/* Цвета для иконок в шапке */
+.icon {
+  color: var(--light-accent);
+}
+
+[data-theme="dark"] .icon {
+  color: var(--dark-accent);
+}
+
+/* Стили для слайдера */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--light-accent);
+  transition: var(--transition-speed);
+  border-radius: 24px;
+}
+
+[data-theme="dark"] .slider {
+  background-color: rgb(142, 145, 143);
 }
