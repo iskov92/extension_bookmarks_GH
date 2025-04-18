@@ -10,15 +10,21 @@ export class NestedMenu {
 
     this.bookmarks.forEach((bookmark) => {
       const item = document.createElement("div")
-      item.className = "bookmark-item" + (!bookmark.url ? " folder" : " link")
+      item.className =
+        "bookmark-item" + (bookmark.type === "folder" ? " folder" : " link")
       item.dataset.id = bookmark.id
-      if (bookmark.url) item.dataset.url = bookmark.url
+      if (bookmark.url) {
+        item.dataset.url = bookmark.url
+      }
 
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
-      icon.src = bookmark.url
-        ? `chrome://favicon/${bookmark.url}`
-        : "./assets/icons/folder.png"
+      if (bookmark.type === "folder") {
+        icon.src = "../assets/icons/folder.png"
+      } else {
+        icon.src =
+          bookmark.favicon || `chrome://favicon/size/16@2x/${bookmark.url}`
+      }
       icon.width = 24
       icon.height = 24
 

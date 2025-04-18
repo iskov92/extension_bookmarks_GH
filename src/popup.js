@@ -2,7 +2,7 @@ import {
   getAllBookmarks,
   createBookmark,
   createFolder,
-  exportBookmarksToHTML,
+  getBookmarksInFolder,
 } from "./utils/bookmarks.js"
 import { initTheme } from "./utils/theme.js"
 import { MainInterface } from "./components/MainInterface.js"
@@ -35,10 +35,10 @@ async function initializeUI() {
     if (!bookmarkElement) return
 
     const id = bookmarkElement.dataset.id
-    const isFolder = !bookmarkElement.dataset.url
+    const isFolder = bookmarkElement.classList.contains("folder")
 
     if (isFolder) {
-      const nestedBookmarks = await chrome.bookmarks.getChildren(id)
+      const nestedBookmarks = await getBookmarksInFolder(id)
       const folderTitle =
         bookmarkElement.querySelector(".bookmark-title").textContent
       navigationStack.push({ id, title: folderTitle })
@@ -51,7 +51,7 @@ async function initializeUI() {
       // Обновляем заголовок в шапке
       currentFolder.textContent = folderTitle
       backButton.style.display = "block"
-    } else {
+    } else if (bookmarkElement.dataset.url) {
       chrome.tabs.create({ url: bookmarkElement.dataset.url })
     }
   })
@@ -60,6 +60,7 @@ async function initializeUI() {
   backButton.addEventListener("click", async () => {
     navigationStack.pop()
     if (navigationStack.length === 0) {
+      const bookmarks = await getAllBookmarks()
       mainInterface.render()
       mainContent.classList.remove("nested-view")
       // Скрываем только заголовок
@@ -67,7 +68,7 @@ async function initializeUI() {
       backButton.style.display = "none"
     } else {
       const current = navigationStack[navigationStack.length - 1]
-      const bookmarks = await chrome.bookmarks.getChildren(current.id)
+      const bookmarks = await getBookmarksInFolder(current.id)
       const nestedMenu = new NestedMenu(mainContent, bookmarks)
       nestedMenu.render()
       currentFolder.textContent = current.title
@@ -79,7 +80,7 @@ async function initializeUI() {
     const parentId =
       navigationStack.length > 0
         ? navigationStack[navigationStack.length - 1].id
-        : "1"
+        : "0" // Корневая папка
 
     showAddDialog(parentId)
   })

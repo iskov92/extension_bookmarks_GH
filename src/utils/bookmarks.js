@@ -54,36 +54,8 @@ async function processBookmarkTree(bookmarks) {
 
     if (bookmark.url) {
       newBookmark.url = bookmark.url
-      try {
-        // Получаем favicon для URL
-        const response = await fetch(bookmark.url)
-        const text = await response.text()
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(text, "text/html")
-
-        const links = Array.from(doc.getElementsByTagName("link"))
-        const faviconLink = links.find(
-          (link) =>
-            link.rel.toLowerCase().includes("icon") ||
-            link.href.toLowerCase().includes("favicon")
-        )
-
-        if (faviconLink) {
-          newBookmark.favicon = new URL(faviconLink.href, bookmark.url).href
-        } else {
-          // Пробуем стандартный путь
-          const defaultFavicon = new URL("/favicon.ico", bookmark.url).href
-          const defaultResponse = await fetch(defaultFavicon)
-          if (defaultResponse.ok) {
-            newBookmark.favicon = defaultFavicon
-          } else {
-            newBookmark.favicon = "./assets/icons/default_favicon.png"
-          }
-        }
-      } catch (error) {
-        console.error("Ошибка при получении favicon для", bookmark.url, error)
-        newBookmark.favicon = "./assets/icons/default_favicon.png"
-      }
+      // Используем chrome://favicon/ для получения иконки
+      newBookmark.favicon = `chrome://favicon/size/16@2x/${bookmark.url}`
     } else {
       newBookmark.children = await processBookmarkTree(bookmark.children || [])
     }

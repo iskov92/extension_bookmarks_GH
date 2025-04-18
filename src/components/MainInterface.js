@@ -9,15 +9,21 @@ export class MainInterface {
 
     this.bookmarks.forEach((bookmark) => {
       const item = document.createElement("div")
-      item.className = "bookmark-item" + (!bookmark.url ? " folder" : "")
+      item.className =
+        "bookmark-item" + (bookmark.type === "folder" ? " folder" : " link")
       item.dataset.id = bookmark.id
-      if (bookmark.url) item.dataset.url = bookmark.url
+      if (bookmark.url) {
+        item.dataset.url = bookmark.url
+      }
 
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
-      icon.src = bookmark.url
-        ? `chrome://favicon/${bookmark.url}`
-        : "./assets/icons/folder.png"
+      if (bookmark.type === "folder") {
+        icon.src = "../assets/icons/folder.png"
+      } else {
+        icon.src =
+          bookmark.favicon || `chrome://favicon/size/16@2x/${bookmark.url}`
+      }
       icon.width = 24
       icon.height = 24
 
@@ -29,6 +35,13 @@ export class MainInterface {
       item.appendChild(title)
       this.container.appendChild(item)
     })
+
+    // Если нет закладок, показываем сообщение
+    if (this.bookmarks.length === 0) {
+      const empty = document.createElement("div")
+      empty.className = "empty-message"
+      empty.textContent = "Нет закладок"
+      this.container.appendChild(empty)
+    }
   }
 }
-
