@@ -6,10 +6,14 @@
   --icon-size: 24px;
   --settings-icon-size: 20px;
   --header-icon-size: 20px;
+  --button-height: 40px;
+  --button-width: 245px;
+  --scrollbar-width: 8px;
 
   /* Цвета */
   --dark-accent: #24ffd0;
   --light-accent: #ff8a24;
+  --scrollbar-thumb: rgb(68, 71, 70);
 
   /* Анимации */
   --transition-speed: 0.3s;
@@ -115,22 +119,30 @@ body {
 
 .main-content {
   flex: 1;
-  padding: 16px;
+  padding: 10px;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, var(--button-width));
+  gap: 10px;
+  justify-content: start;
+  align-content: start;
 }
 
-/* Стили для закладок */
+/* Стили для закладок и папок */
 .bookmark-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
   border-radius: var(--border-radius);
   cursor: pointer;
   transition: background-color var(--transition-speed);
+  height: var(--button-height);
+  width: var(--button-width);
+  border: 1px solid var(--border-color);
+  box-sizing: border-box;
+  overflow: hidden;
+  margin: 0;
 }
 
 .bookmark-item:hover {
@@ -141,13 +153,22 @@ body {
   width: var(--icon-size);
   height: var(--icon-size);
   object-fit: contain;
+  flex-shrink: 0;
 }
 
 .bookmark-title {
   flex: 1;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 1.2;
+  word-break: break-word;
+  max-height: calc(1.2em * 2);
+  margin: 0;
+  padding: 0;
 }
 
 /* Анимированный переключатель темы */
@@ -294,3 +315,22 @@ input:checked + .slider:before {
   height: 100%;
 }
 
+/* Стили для скролла */
+.main-content::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: var(--light-accent);
+  border-radius: calc(var(--scrollbar-width) / 2);
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: calc(var(--scrollbar-width) / 2);
+}
+
+/* Изменение цвета скролла для темной темы */
+[data-theme="dark"] .main-content::-webkit-scrollbar-track {
+  background: var(--dark-accent);
+}
