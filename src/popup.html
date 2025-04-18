@@ -8,22 +8,7 @@
     <link rel="stylesheet" href="./styles/main.css">
     <link rel="stylesheet" href="./styles/dark-theme.css" id="theme-stylesheet">
     <link rel="stylesheet" href="./styles/settings.css">
-    <script>
-        // Устанавливаем размер окна при загрузке
-        document.addEventListener('DOMContentLoaded', () => {
-            // Получаем размеры окна браузера
-            chrome.windows.getCurrent(window => {
-                const width = Math.round(window.width * 0.85); // 85% от ширины окна
-                const height = Math.round(window.height * 0.85); // 85% от высоты окна
-
-                // Устанавливаем размеры для body
-                document.body.style.width = width + 'px';
-                document.body.style.height = height + 'px';
-                document.body.style.minWidth = '800px';
-                document.body.style.minHeight = '600px';
-            });
-        });
-    </script>
+    <script type="module" src="./utils/window.js"></script>
 </head>
 
 <body data-theme="dark">
@@ -59,7 +44,6 @@
         </main>
     </div>
 
-    <script type="module" src="./utils/window.js"></script>
     <script type="module" src="./popup.js"></script>
 </body>
 

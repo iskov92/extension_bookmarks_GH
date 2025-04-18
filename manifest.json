@@ -3,7 +3,10 @@
   "name": "GH Bookmarks",
   "version": "1.0",
   "description": "Custom bookmarks manager",
-  "permissions": ["storage", "windows"],
+  "permissions": ["storage", "windows", "bookmarks"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": {

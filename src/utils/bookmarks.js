@@ -28,34 +28,70 @@ export async function getBookmarksInFolder(folderId) {
 // Импортировать закладки из браузера
 export async function importFromBrowser() {
   try {
-    // Создаем базовую структуру закладок
-    const defaultBookmarks = [
-      {
-        id: generateUniqueId(),
-        title: "Избранное",
-        type: "folder",
-        children: [],
-      },
-      {
-        id: generateUniqueId(),
-        title: "Работа",
-        type: "folder",
-        children: [],
-      },
-      {
-        id: generateUniqueId(),
-        title: "Личное",
-        type: "folder",
-        children: [],
-      },
-    ]
-
-    await saveBookmarks(defaultBookmarks)
+    // Получаем закладки из браузера
+    const browserBookmarks = await chrome.bookmarks.getTree()
+    const processedBookmarks = await processBookmarkTree(
+      browserBookmarks[0].children
+    )
+    await saveBookmarks(processedBookmarks)
     return true
   } catch (error) {
-    console.error("Ошибка при создании структуры закладок:", error)
+    console.error("Ошибка при импорте закладок из браузера:", error)
     return false
   }
+}
+
+// Рекурсивно обработать дерево закладок
+async function processBookmarkTree(bookmarks) {
+  const processedBookmarks = []
+
+  for (const bookmark of bookmarks) {
+    const newBookmark = {
+      id: generateUniqueId(),
+      title: bookmark.title,
+      type: bookmark.url ? "bookmark" : "folder",
+    }
+
+    if (bookmark.url) {
+      newBookmark.url = bookmark.url
+      try {
+        // Получаем favicon для URL
+        const response = await fetch(bookmark.url)
+        const text = await response.text()
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(text, "text/html")
+
+        const links = Array.from(doc.getElementsByTagName("link"))
+        const faviconLink = links.find(
+          (link) =>
+            link.rel.toLowerCase().includes("icon") ||
+            link.href.toLowerCase().includes("favicon")
+        )
+
+        if (faviconLink) {
+          newBookmark.favicon = new URL(faviconLink.href, bookmark.url).href
+        } else {
+          // Пробуем стандартный путь
+          const defaultFavicon = new URL("/favicon.ico", bookmark.url).href
+          const defaultResponse = await fetch(defaultFavicon)
+          if (defaultResponse.ok) {
+            newBookmark.favicon = defaultFavicon
+          } else {
+            newBookmark.favicon = "./assets/icons/default_favicon.png"
+          }
+        }
+      } catch (error) {
+        console.error("Ошибка при получении favicon для", bookmark.url, error)
+        newBookmark.favicon = "./assets/icons/default_favicon.png"
+      }
+    } else {
+      newBookmark.children = await processBookmarkTree(bookmark.children || [])
+    }
+
+    processedBookmarks.push(newBookmark)
+  }
+
+  return processedBookmarks
 }
 
 function generateUniqueId() {
