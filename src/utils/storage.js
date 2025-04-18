@@ -62,6 +62,19 @@ export async function getStoredBookmarks() {
 // Создать новую закладку в хранилище
 export async function createStoredBookmark(parentId, title, url = "") {
   const bookmarks = await getStoredBookmarks()
+
+  // Если есть URL, проверяем и добавляем протокол если нужно
+  if (url) {
+    // Убираем пробелы в начале и конце
+    url = url.trim()
+
+    // Проверяем наличие протокола
+    if (!url.match(/^https?:\/\//i)) {
+      // Если нет протокола, добавляем https://
+      url = `https://${url}`
+    }
+  }
+
   const newBookmark = {
     id: Date.now().toString(36) + Math.random().toString(36).substr(2),
     title,

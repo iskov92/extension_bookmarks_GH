@@ -116,6 +116,21 @@ function generateBookmarksHTML(bookmarks, level = 0) {
 export async function updateBookmark(id, data) {
   const bookmarks = (await storage.get("gh_bookmarks")) || []
 
+  // Если есть URL, проверяем и добавляем протокол если нужно
+  if (data.url) {
+    // Убираем пробелы в начале и конце
+    data.url = data.url.trim()
+
+    // Проверяем наличие протокола
+    if (!data.url.match(/^https?:\/\//i)) {
+      // Если нет протокола, добавляем https://
+      data.url = `https://${data.url}`
+    }
+
+    // Обновляем favicon для нового URL
+    data.favicon = `chrome://favicon/size/16@2x/${data.url}`
+  }
+
   function updateInTree(items) {
     for (let i = 0; i < items.length; i++) {
       if (items[i].id === id) {
