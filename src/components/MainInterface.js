@@ -1,16 +1,27 @@
 export class MainInterface {
   constructor(container, bookmarks) {
     this.container = container
-    this.bookmarks = bookmarks
+    this.bookmarks = bookmarks || []
   }
 
   render() {
     this.container.innerHTML = ""
+    this.container.className = "main-content"
+
+    if (!Array.isArray(this.bookmarks) || this.bookmarks.length === 0) {
+      this.container.innerHTML = `
+        <div class="empty-message">
+          Нет закладок. Добавьте новую закладку или папку.
+        </div>
+      `
+      return
+    }
 
     this.bookmarks.forEach((bookmark) => {
       const item = document.createElement("div")
-      item.className =
-        "bookmark-item" + (bookmark.type === "folder" ? " folder" : " link")
+      item.className = `bookmark-item ${
+        bookmark.type === "folder" ? "folder" : ""
+      }`
       item.dataset.id = bookmark.id
       if (bookmark.url) {
         item.dataset.url = bookmark.url
@@ -18,16 +29,13 @@ export class MainInterface {
 
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
-      if (bookmark.type === "folder") {
-        icon.src = "../assets/icons/folder.png"
-      } else {
-        icon.src =
-          bookmark.favicon || `chrome://favicon/size/16@2x/${bookmark.url}`
-      }
-      icon.width = 24
-      icon.height = 24
+      icon.src =
+        bookmark.type === "folder"
+          ? "assets/icons/folder.svg"
+          : bookmark.favicon || "assets/icons/default_favicon.png"
+      icon.alt = ""
 
-      const title = document.createElement("span")
+      const title = document.createElement("div")
       title.className = "bookmark-title"
       title.textContent = bookmark.title
 
@@ -35,13 +43,5 @@ export class MainInterface {
       item.appendChild(title)
       this.container.appendChild(item)
     })
-
-    // Если нет закладок, показываем сообщение
-    if (this.bookmarks.length === 0) {
-      const empty = document.createElement("div")
-      empty.className = "empty-message"
-      empty.textContent = "Нет закладок"
-      this.container.appendChild(empty)
-    }
   }
 }

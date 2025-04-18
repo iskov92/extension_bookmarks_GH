@@ -1,73 +1,131 @@
-// Ключ для хранения закладок в storage.local
-const BOOKMARKS_STORAGE_KEY = "gh_bookmarks"
-
-// Получить все закладки из storage.local
-export async function getStoredBookmarks() {
-  try {
-    const data = await chrome.storage.local.get(BOOKMARKS_STORAGE_KEY)
-    return data[BOOKMARKS_STORAGE_KEY]?.children || []
-  } catch (error) {
-    console.error("Ошибка при получении закладок из хранилища:", error)
-    return []
+// Класс для работы с хранилищем
+export class Storage {
+  constructor() {
+    this.storageKey = "gh_bookmarks"
+    this.initializeStorage()
   }
-}
 
-// Сохранить закладки в storage.local
-export async function saveBookmarks(bookmarks) {
-  try {
-    await chrome.storage.local.set({
-      [BOOKMARKS_STORAGE_KEY]: {
-        id: "0",
-        title: "root",
-        children: bookmarks,
-      },
-    })
-  } catch (error) {
-    console.error("Ошибка при сохранении закладок в хранилище:", error)
-    throw error
-  }
-}
-
-// Получить закладки из определенной папки
-export async function getBookmarksFromFolder(folderId) {
-  try {
-    const allBookmarks = await getStoredBookmarks()
-    return findFolderById(allBookmarks, folderId)?.children || []
-  } catch (error) {
-    console.error("Ошибка при получении закладок из папки:", error)
-    return []
-  }
-}
-
-// Создать новую закладку
-export async function createStoredBookmark(
-  parentId,
-  title,
-  url = "",
-  favicon = ""
-) {
-  try {
-    const allBookmarks = await getStoredBookmarks()
-    const newBookmark = {
-      id: generateUniqueId(),
-      title,
-      url,
-      favicon: favicon || (url ? await getFavicon(url) : ""),
-      type: url ? "bookmark" : "folder",
-      children: url ? undefined : [],
+  async initializeStorage() {
+    const bookmarks = await this.get(this.storageKey)
+    if (!bookmarks) {
+      // Создаем начальную структуру с базовыми папками
+      const initialBookmarks = [
+        {
+          id: "favorites",
+          title: "Избранное",
+          type: "folder",
+          children: [],
+        },
+        {
+          id: "work",
+          title: "Работа",
+          type: "folder",
+          children: [],
+        },
+        {
+          id: "personal",
+          title: "Личное",
+          type: "folder",
+          children: [],
+        },
+      ]
+      await this.set(this.storageKey, initialBookmarks)
     }
-
-    const updatedBookmarks = addBookmarkToFolder(
-      allBookmarks,
-      parentId,
-      newBookmark
-    )
-    await saveBookmarks(updatedBookmarks)
-    return newBookmark
-  } catch (error) {
-    console.error("Ошибка при создании закладки:", error)
-    throw error
   }
+
+  async get(key) {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(key, (result) => {
+        resolve(result[key])
+      })
+    })
+  }
+
+  async set(key, value) {
+    return new Promise((resolve) => {
+      chrome.storage.local.set({ [key]: value }, () => {
+        resolve()
+      })
+    })
+  }
+}
+
+// Экспортируем экземпляр класса
+export const storage = new Storage()
+
+// Получить все закладки из хранилища
+export async function getStoredBookmarks() {
+  const bookmarks = await storage.get("gh_bookmarks")
+  return Array.isArray(bookmarks) ? bookmarks : []
+}
+
+// Создать новую закладку в хранилище
+export async function createStoredBookmark(parentId, title, url = "") {
+  const bookmarks = await getStoredBookmarks()
+  const newBookmark = {
+    id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+    title,
+    type: url ? "bookmark" : "folder",
+    children: [],
+  }
+
+  if (url) {
+    newBookmark.url = url
+    newBookmark.favicon = `chrome://favicon/size/16@2x/${url}`
+  }
+
+  if (parentId === "0") {
+    bookmarks.push(newBookmark)
+  } else {
+    function addToFolder(items) {
+      for (const item of items) {
+        if (item.id === parentId) {
+          item.children = item.children || []
+          item.children.push(newBookmark)
+          return true
+        }
+        if (item.type === "folder" && item.children) {
+          if (addToFolder(item.children)) {
+            return true
+          }
+        }
+      }
+      return false
+    }
+    addToFolder(bookmarks)
+  }
+
+  await storage.set("gh_bookmarks", bookmarks)
+  return newBookmark
+}
+
+// Получить закладки из папки
+export async function getBookmarksFromFolder(folderId) {
+  const bookmarks = await getStoredBookmarks()
+
+  if (folderId === "0") {
+    return bookmarks
+  }
+
+  function findFolder(items) {
+    for (const item of items) {
+      if (item.id === folderId) {
+        return item.children || []
+      }
+      if (item.type === "folder" && item.children) {
+        const found = findFolder(item.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  return findFolder(bookmarks) || []
+}
+
+// Сохранить все закладки
+export async function saveBookmarks(bookmarks) {
+  await storage.set("gh_bookmarks", bookmarks)
 }
 
 // Получить favicon для URL

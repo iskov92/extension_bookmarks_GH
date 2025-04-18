@@ -3,6 +3,7 @@ import {
   createStoredBookmark,
   getBookmarksFromFolder,
   saveBookmarks,
+  storage,
 } from "./storage.js"
 
 // Получить все закладки
@@ -105,4 +106,101 @@ function generateBookmarksHTML(bookmarks, level = 0) {
   }
 
   return html
+}
+
+/**
+ * Обновляет существующую закладку или папку
+ * @param {string} id - ID закладки/папки
+ * @param {Object} data - Новые данные (title, url)
+ */
+export async function updateBookmark(id, data) {
+  const bookmarks = (await storage.get("gh_bookmarks")) || []
+
+  function updateInTree(items) {
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].id === id) {
+        items[i] = { ...items[i], ...data }
+        return true
+      }
+      if (items[i].type === "folder" && items[i].children) {
+        if (updateInTree(items[i].children)) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  updateInTree(bookmarks)
+  await storage.set("gh_bookmarks", bookmarks)
+}
+
+/**
+ * Удаляет закладку или папку
+ * @param {string} id - ID закладки/папки
+ */
+export async function deleteBookmark(id) {
+  const bookmarks = (await storage.get("gh_bookmarks")) || []
+
+  function deleteFromTree(items) {
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].id === id) {
+        items.splice(i, 1)
+        return true
+      }
+      if (items[i].type === "folder" && items[i].children) {
+        if (deleteFromTree(items[i].children)) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  deleteFromTree(bookmarks)
+  await storage.set("gh_bookmarks", bookmarks)
+}
+
+/**
+ * Копирует папку или закладку
+ * @param {string} id - ID исходной папки/закладки
+ * @param {string} parentId - ID целевой родительской папки
+ */
+export async function copyBookmark(id) {
+  const bookmarks = (await storage.get("gh_bookmarks")) || []
+
+  function findInTree(items) {
+    for (const item of items) {
+      if (item.id === id) {
+        return item
+      }
+      if (item.type === "folder" && item.children) {
+        const found = findInTree(item.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  function generateNewId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2)
+  }
+
+  function deepClone(item) {
+    const clone = { ...item, id: generateNewId() }
+    if (item.type === "folder" && item.children) {
+      clone.children = item.children.map((child) => deepClone(child))
+    }
+    return clone
+  }
+
+  const itemToCopy = findInTree(bookmarks)
+  if (!itemToCopy) return null
+
+  const copy = deepClone(itemToCopy)
+  copy.title = `${copy.title} (копия)`
+
+  bookmarks.push(copy)
+  await storage.set("gh_bookmarks", bookmarks)
+  return copy
 }

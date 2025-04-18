@@ -388,3 +388,111 @@ input:checked + .slider:before {
   transition: all 0.3s ease;
   margin: 0;
 }
+
+/* Контекстное меню */
+.context-menu {
+  position: fixed;
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text-color);
+  transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+  background-color: var(--hover-color);
+}
+
+.context-menu-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  filter: var(--icon-filter);
+}
+
+/* Модальное окно */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--background-color);
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 300px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+.modal-content {
+  margin-bottom: 16px;
+}
+
+.modal-input-group {
+  margin-bottom: 12px;
+}
+
+.modal-input-group label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-color);
+}
+
+.modal-input-group input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-color);
+  color: var(--text-color);
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modal-button.primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.modal-button.secondary {
+  background: var(--secondary-color);
+  color: var(--text-color);
+}
