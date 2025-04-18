@@ -1,0 +1,76 @@
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-content {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.settings-section {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.settings-section h2 {
+  color: var(--text-primary);
+  font-size: 18px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.settings-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-buttons .settings-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  width: 100%;
+}
+
+.settings-buttons .settings-button:hover {
+  background-color: var(--hover-color);
+}
+
+.settings-buttons .settings-button img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.settings-buttons .settings-button span {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* Стили для активной кнопки настроек */
+.settings-active {
+  background-color: var(--hover-color);
+  cursor: default;
+}
+
+.settings-active:hover {
+  background-color: var(--hover-color);
+}
+
+[data-theme="dark"] .settings-active img {
+  filter: grayscale(100%) brightness(0.8);
+}
+
+[data-theme="light"] .settings-active img {
+  filter: grayscale(100%) brightness(0.3);
+}

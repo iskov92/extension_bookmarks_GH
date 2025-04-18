@@ -7,8 +7,10 @@
   --settings-icon-size: 20px;
   --header-icon-size: 20px;
   --button-height: 40px;
-  --button-width: 245px;
+  --button-width: 240px;
   --scrollbar-width: 8px;
+  --grid-gap: 10px;
+  --container-padding: 10px;
 
   /* Цвета */
   --dark-accent: #24ffd0;
@@ -122,12 +124,12 @@ body {
 
 .main-content {
   flex: 1;
-  padding: 10px;
+  padding: var(--container-padding);
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, var(--button-width));
-  gap: 10px;
-  justify-content: start;
+  grid-template-columns: repeat(3, var(--button-width));
+  gap: var(--grid-gap);
+  justify-content: center;
   align-content: start;
 }
 
@@ -364,4 +366,25 @@ input:checked + .slider:before {
 /* Обновляем стили для кнопки добавления */
 .add-button {
   margin-left: 4px;
+}
+
+.bookmarks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, var(--button-width));
+  gap: var(--grid-gap);
+  padding: var(--container-padding);
+  justify-content: center;
+}
+
+.bookmark-button {
+  width: var(--button-width);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 0;
 }

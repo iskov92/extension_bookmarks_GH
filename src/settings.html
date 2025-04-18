@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GH Bookmarks Settings</title>
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="stylesheet" href="./styles/light-theme.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="./styles/settings.css">
+    <script type="module" src="./utils/window.js"></script>
+</head>
+
+<body>
+    <div class="app-container settings-container">
+        <header class="header">
+            <div class="header-left">
+                <button id="backButton" class="header-button back-button">
+                    <img src="../assets/icons/return_black.svg" alt="Back" class="header-icon dark-theme-icon">
+                    <img src="../assets/icons/return_white.svg" alt="Back" class="header-icon light-theme-icon">
+                </button>
+            </div>
+            <div class="header-center">
+                <span class="current-folder">Настройки</span>
+            </div>
+            <div class="header-controls">
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider round"></span>
+                </label>
+                <button id="settingsButton" class="header-button settings-button">
+                    <img src="../assets/icons/settings.svg" alt="Settings" class="settings-icon dark-theme-icon">
+                    <img src="../assets/icons/settings_wt.svg" alt="Settings" class="settings-icon light-theme-icon">
+                </button>
+            </div>
+        </header>
+
+        <main class="settings-content">
+            <div class="settings-section">
+                <h2>Управление закладками</h2>
+                <div class="settings-buttons">
+                    <button id="importBookmarks" class="settings-button">
+                        <img src="../assets/icons/import.svg" alt="Import" class="settings-icon">
+                        <span>Установить в расширение закладки из браузера</span>
+                    </button>
+                    <button id="exportBookmarks" class="settings-button">
+                        <img src="../assets/icons/export.svg" alt="Export" class="settings-icon">
+                        <span>Создать файл экспорта закладок из расширения</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="./settings.js"></script>
+</body>
+
+</html>

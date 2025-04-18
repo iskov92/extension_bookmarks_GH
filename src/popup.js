@@ -85,7 +85,9 @@ async function initializeUI() {
   })
 
   // Кнопка настроек
-  settingsButton.addEventListener("click", showSettings)
+  settingsButton.addEventListener("click", () => {
+    window.location.href = "settings.html"
+  })
 }
 
 function showAddDialog(parentId) {
