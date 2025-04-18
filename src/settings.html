@@ -6,12 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GH Bookmarks Settings</title>
     <link rel="stylesheet" href="./styles/main.css">
-    <link rel="stylesheet" href="./styles/light-theme.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="./styles/dark-theme.css" id="theme-stylesheet">
     <link rel="stylesheet" href="./styles/settings.css">
     <script type="module" src="./utils/window.js"></script>
 </head>
 
-<body>
+<body data-theme="dark">
     <div class="app-container settings-container">
         <header class="header">
             <div class="header-left">
@@ -25,7 +25,7 @@
             </div>
             <div class="header-controls">
                 <label class="theme-switch">
-                    <input type="checkbox" id="themeToggle">
+                    <input type="checkbox" id="themeToggle" checked>
                     <span class="slider round"></span>
                 </label>
                 <button id="settingsButton" class="header-button settings-button">
