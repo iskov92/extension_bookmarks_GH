@@ -9,8 +9,8 @@ chrome.runtime.onInstalled.addListener(() => {
 // Обработка сообщений от popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "EXPORT_BOOKMARKS") {
-    chrome.bookmarks.getTree((bookmarkTreeNodes) => {
-      sendResponse({ bookmarks: bookmarkTreeNodes[0].children })
+    chrome.storage.local.get("gh_bookmarks", (data) => {
+      sendResponse({ bookmarks: data.gh_bookmarks?.children || [] })
     })
     return true // Для асинхронного ответа
   }

@@ -3,19 +3,17 @@
   "name": "GH Bookmarks",
   "version": "1.0",
   "description": "Custom bookmarks manager",
-  "permissions": ["bookmarks", "storage", "windows"],
+  "permissions": ["storage", "windows"],
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": {
       "16": "assets/logo/icon16.png",
-      "32": "assets/logo/icon32.png",
       "48": "assets/logo/icon48.png",
       "128": "assets/logo/icon128.png"
     }
   },
   "icons": {
     "16": "assets/logo/icon16.png",
-    "32": "assets/logo/icon32.png",
     "48": "assets/logo/icon48.png",
     "128": "assets/logo/icon128.png"
   },

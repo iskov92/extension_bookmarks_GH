@@ -1,4 +1,6 @@
 import { initTheme } from "./utils/theme.js"
+import { importFromBrowser } from "./utils/bookmarks.js"
+import { getStoredBookmarks } from "./utils/storage.js"
 
 // Инициализация UI
 document.addEventListener("DOMContentLoaded", () => {
@@ -23,12 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Функция импорта закладок из браузера
 async function importBookmarksFromBrowser() {
   try {
-    const bookmarks = await chrome.bookmarks.getTree()
-    const processedBookmarks = processBookmarkTree(bookmarks[0])
-
-    // Сохраняем закладки в storage.local
-    await chrome.storage.local.set({ gh_bookmarks: processedBookmarks })
-
+    await importFromBrowser()
     alert("Закладки успешно импортированы!")
   } catch (error) {
     console.error("Ошибка при импорте закладок:", error)
@@ -36,36 +33,12 @@ async function importBookmarksFromBrowser() {
   }
 }
 
-// Функция обработки дерева закладок
-function processBookmarkTree(node) {
-  const result = {
-    id: node.id,
-    title: node.title,
-    type: node.url ? "bookmark" : "folder",
-    children: [],
-  }
-
-  if (node.url) {
-    result.url = node.url
-  }
-
-  if (node.children) {
-    result.children = node.children
-      .filter((child) => child.title) // Фильтруем элементы без названия
-      .map((child) => processBookmarkTree(child))
-  }
-
-  return result
-}
-
 // Функция экспорта закладок в файл
 async function exportBookmarksToFile() {
   try {
-    // Получаем закладки из storage.local
-    const data = await chrome.storage.local.get("gh_bookmarks")
-    const bookmarks = data.gh_bookmarks
+    const bookmarks = await getStoredBookmarks()
 
-    if (!bookmarks) {
+    if (!bookmarks || bookmarks.length === 0) {
       alert("Нет сохраненных закладок для экспорта")
       return
     }
@@ -119,7 +92,7 @@ function generateBookmarksHTML(bookmarks) {
   }
 
   let content = ""
-  bookmarks.children.forEach((item) => {
+  bookmarks.forEach((item) => {
     content += generateBookmarkItem(item, "    ")
   })
 
