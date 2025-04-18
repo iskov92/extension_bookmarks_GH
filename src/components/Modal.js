@@ -6,7 +6,7 @@ export class Modal {
     this.onClose = null
   }
 
-  create(title, type, initialData = {}) {
+  create(title, type, initialData = {}, customContent = null) {
     this.overlay = document.createElement("div")
     this.overlay.className = "modal-overlay"
 
@@ -20,7 +20,9 @@ export class Modal {
     const content = document.createElement("div")
     content.className = "modal-content"
 
-    if (type === "link") {
+    if (customContent) {
+      content.appendChild(customContent)
+    } else if (type === "link") {
       content.appendChild(
         this.createInputGroup("name", "Название", initialData.title || "")
       )
@@ -36,18 +38,19 @@ export class Modal {
     const buttons = document.createElement("div")
     buttons.className = "modal-buttons"
 
-    const saveButton = document.createElement("button")
-    saveButton.className = "modal-button primary"
-    saveButton.textContent = "Сохранить"
-    saveButton.onclick = () => this.handleSave(type)
+    if (!customContent) {
+      const saveButton = document.createElement("button")
+      saveButton.className = "modal-button primary"
+      saveButton.textContent = "Сохранить"
+      saveButton.onclick = () => this.handleSave(type)
+      buttons.appendChild(saveButton)
+    }
 
     const cancelButton = document.createElement("button")
     cancelButton.className = "modal-button secondary"
     cancelButton.textContent = "Отмена"
     cancelButton.onclick = () => this.close()
-
     buttons.appendChild(cancelButton)
-    buttons.appendChild(saveButton)
 
     this.modal.appendChild(header)
     this.modal.appendChild(content)
@@ -110,9 +113,9 @@ export class Modal {
     }
   }
 
-  show(title, type, initialData = {}, onSave, onClose) {
+  show(title, type, initialData = {}, onSave, onClose, customContent = null) {
     this.onSave = onSave
     this.onClose = onClose
-    this.create(title, type, initialData)
+    this.create(title, type, initialData, customContent)
   }
 }

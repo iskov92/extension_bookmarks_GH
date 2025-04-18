@@ -13,6 +13,11 @@ import { NestedMenu } from "./components/NestedMenu.js"
 import { ContextMenu } from "./components/ContextMenu.js"
 import { Modal } from "./components/Modal.js"
 
+// Глобальные переменные для доступа из всех функций
+let mainInterface
+let mainContent
+let navigationStack = []
+
 // Инициализация темы
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -24,7 +29,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 })
 
 async function initializeUI() {
-  const mainContent = document.getElementById("mainContent")
+  mainContent = document.getElementById("mainContent")
   const backButton = document.getElementById("backButton")
   const addButton = document.getElementById("addButton")
   const settingsButton = document.getElementById("settingsButton")
@@ -34,220 +39,256 @@ async function initializeUI() {
     throw new Error("Элемент mainContent не найден")
   }
 
-  // Создаем экземпляры меню и модального окна
-  const contextMenu = new ContextMenu()
-  const modal = new Modal()
+  // Загрузка корневых закладок
+  const bookmarks = await getAllBookmarks()
+  mainInterface = new MainInterface(mainContent, bookmarks)
+  mainInterface.render()
 
-  // История навигации
-  const navigationStack = []
+  // Обработчик правого клика
+  mainContent.addEventListener("contextmenu", async (e) => {
+    e.preventDefault()
+    const bookmarkElement = e.target.closest(".bookmark-item")
+    if (!bookmarkElement) return
 
-  try {
-    // Загрузка корневых закладок
-    const bookmarks = await getAllBookmarks()
-    const mainInterface = new MainInterface(mainContent, bookmarks)
-    mainInterface.render()
+    const isFolder = bookmarkElement.classList.contains("folder")
+    const id = bookmarkElement.dataset.id
+    const title = bookmarkElement.querySelector(".bookmark-title").textContent
+    const url = bookmarkElement.dataset.url
 
-    // Обработчик правого клика
-    mainContent.addEventListener("contextmenu", async (e) => {
-      e.preventDefault()
-      const bookmarkElement = e.target.closest(".bookmark-item")
-      if (!bookmarkElement) return
+    const items = isFolder
+      ? [
+          {
+            text: "Переименовать",
+            icon: "/assets/icons/edit.svg",
+            action: "rename",
+          },
+          {
+            text: "Удалить",
+            icon: "/assets/icons/delete.svg",
+            action: "delete",
+          },
+          {
+            text: "Копировать",
+            icon: "/assets/icons/move.svg",
+            action: "copy",
+          },
+        ]
+      : [
+          {
+            text: "Изменить",
+            icon: "/assets/icons/edit.svg",
+            action: "edit",
+          },
+          {
+            text: "Удалить",
+            icon: "/assets/icons/delete.svg",
+            action: "delete",
+          },
+        ]
 
-      const isFolder = bookmarkElement.classList.contains("folder")
-      const id = bookmarkElement.dataset.id
-      const title = bookmarkElement.querySelector(".bookmark-title").textContent
-      const url = bookmarkElement.dataset.url
-
-      const items = isFolder
-        ? [
-            {
-              text: "Переименовать",
-              icon: "assets/icons/edit.svg",
-              action: "rename",
-            },
-            {
-              text: "Удалить",
-              icon: "assets/icons/delete.svg",
-              action: "delete",
-            },
-            {
-              text: "Копировать",
-              icon: "assets/icons/move.svg",
-              action: "copy",
-            },
-          ]
-        : [
-            {
-              text: "Изменить",
-              icon: "assets/icons/edit.svg",
-              action: "edit",
-            },
-            {
-              text: "Удалить",
-              icon: "assets/icons/delete.svg",
-              action: "delete",
-            },
-          ]
-
-      contextMenu.show(
-        e.pageX,
-        e.pageY,
-        items,
-        bookmarkElement,
-        async (action) => {
-          try {
-            switch (action) {
-              case "rename":
-              case "edit":
-                modal.show(
-                  isFolder ? "Переименовать папку" : "Изменить закладку",
-                  isFolder ? "folder" : "link",
-                  { title, url },
-                  async (data) => {
-                    try {
-                      await updateBookmark(id, data)
-                      // Перерисовываем текущий вид
-                      if (navigationStack.length === 0) {
-                        const bookmarks = await getAllBookmarks()
-                        mainInterface.render()
-                      } else {
-                        const current =
-                          navigationStack[navigationStack.length - 1]
-                        const bookmarks = await getBookmarksInFolder(current.id)
-                        const nestedMenu = new NestedMenu(
-                          mainContent,
-                          bookmarks
-                        )
-                        nestedMenu.render()
-                      }
-                    } catch (error) {
-                      console.error("Ошибка при обновлении:", error)
-                      alert("Не удалось сохранить изменения")
-                    }
-                  }
-                )
-                break
-
-              case "delete":
-                if (confirm("Вы уверены, что хотите удалить этот элемент?")) {
+    const contextMenu = new ContextMenu()
+    contextMenu.show(
+      e.pageX,
+      e.pageY,
+      items,
+      bookmarkElement,
+      async (action) => {
+        try {
+          switch (action) {
+            case "rename":
+            case "edit":
+              const modal = new Modal()
+              modal.show(
+                isFolder ? "Переименовать папку" : "Изменить закладку",
+                isFolder ? "folder" : "link",
+                { title, url },
+                async (data) => {
                   try {
-                    await deleteBookmark(id)
+                    await updateBookmark(id, data)
                     // Перерисовываем текущий вид
-                    if (navigationStack.length === 0) {
-                      const bookmarks = await getAllBookmarks()
-                      mainInterface.render()
-                    } else {
-                      const current =
-                        navigationStack[navigationStack.length - 1]
-                      const bookmarks = await getBookmarksInFolder(current.id)
-                      const nestedMenu = new NestedMenu(mainContent, bookmarks)
-                      nestedMenu.render()
-                    }
+                    await refreshCurrentView()
                   } catch (error) {
-                    console.error("Ошибка при удалении:", error)
-                    alert("Не удалось удалить элемент")
+                    console.error("Ошибка при обновлении:", error)
+                    alert("Не удалось сохранить изменения")
                   }
                 }
-                break
+              )
+              break
 
-              case "copy":
+            case "delete":
+              if (confirm("Вы уверены, что хотите удалить этот элемент?")) {
                 try {
-                  const copy = await copyBookmark(id)
-                  if (copy) {
-                    // Перерисовываем текущий вид
-                    if (navigationStack.length === 0) {
-                      const bookmarks = await getAllBookmarks()
-                      mainInterface.render()
-                    } else {
-                      const current =
-                        navigationStack[navigationStack.length - 1]
-                      const bookmarks = await getBookmarksInFolder(current.id)
-                      const nestedMenu = new NestedMenu(mainContent, bookmarks)
-                      nestedMenu.render()
-                    }
-                  }
+                  await deleteBookmark(id)
+                  await refreshCurrentView()
                 } catch (error) {
-                  console.error("Ошибка при копировании:", error)
-                  alert("Не удалось скопировать элемент")
+                  console.error("Ошибка при удалении:", error)
+                  alert("Не удалось удалить элемент")
                 }
-                break
-            }
-          } catch (error) {
-            console.error("Ошибка в обработчике контекстного меню:", error)
-            alert("Произошла ошибка при выполнении действия")
+              }
+              break
+
+            case "copy":
+              try {
+                await copyBookmark(id)
+                await refreshCurrentView()
+              } catch (error) {
+                console.error("Ошибка при копировании:", error)
+                alert("Не удалось скопировать элемент")
+              }
+              break
           }
+        } catch (error) {
+          console.error("Ошибка в обработчике контекстного меню:", error)
+          alert("Произошла ошибка при выполнении действия")
         }
-      )
-    })
-
-    // Обработчик клика по папке
-    mainContent.addEventListener("click", async (e) => {
-      const bookmarkElement = e.target.closest(".bookmark-item")
-      if (!bookmarkElement) return
-
-      const id = bookmarkElement.dataset.id
-      const isFolder = bookmarkElement.classList.contains("folder")
-
-      if (isFolder) {
-        const nestedBookmarks = await getBookmarksInFolder(id)
-        const folderTitle =
-          bookmarkElement.querySelector(".bookmark-title").textContent
-        navigationStack.push({ id, title: folderTitle })
-
-        const nestedMenu = new NestedMenu(mainContent, nestedBookmarks)
-        nestedMenu.render()
-
-        // Показываем только заголовок
-        currentFolder.style.display = "block"
-        // Обновляем заголовок в шапке
-        currentFolder.textContent = folderTitle
-        backButton.style.display = "block"
-      } else if (bookmarkElement.dataset.url) {
-        chrome.tabs.create({ url: bookmarkElement.dataset.url })
       }
-    })
+    )
+  })
 
-    // Кнопка "Назад"
-    backButton.addEventListener("click", async () => {
-      navigationStack.pop()
-      if (navigationStack.length === 0) {
-        const bookmarks = await getAllBookmarks()
-        mainInterface.render()
-        mainContent.classList.remove("nested-view")
-        // Скрываем только заголовок
-        currentFolder.style.display = "none"
-        backButton.style.display = "none"
-      } else {
-        const current = navigationStack[navigationStack.length - 1]
-        const bookmarks = await getBookmarksInFolder(current.id)
-        const nestedMenu = new NestedMenu(mainContent, bookmarks)
-        nestedMenu.render()
-        currentFolder.textContent = current.title
-      }
-    })
+  // Обработчик клика по папке
+  mainContent.addEventListener("click", async (e) => {
+    const bookmarkElement = e.target.closest(".bookmark-item")
+    if (!bookmarkElement) return
 
-    // Кнопка добавления
-    addButton.addEventListener("click", () => {
-      const parentId =
-        navigationStack.length > 0
-          ? navigationStack[navigationStack.length - 1].id
-          : "0" // Корневая папка
+    const id = bookmarkElement.dataset.id
+    const isFolder = bookmarkElement.classList.contains("folder")
 
-      showAddDialog(parentId)
-    })
+    if (isFolder) {
+      const nestedBookmarks = await getBookmarksInFolder(id)
+      const folderTitle =
+        bookmarkElement.querySelector(".bookmark-title").textContent
+      navigationStack.push({ id, title: folderTitle })
 
-    // Кнопка настроек
-    settingsButton.addEventListener("click", () => {
-      window.location.href = "settings.html"
-    })
-  } catch (error) {
-    console.error("Ошибка при инициализации интерфейса:", error)
-    mainContent.innerHTML = `<div class="error-message">Произошла ошибка при загрузке закладок</div>`
+      const nestedMenu = new NestedMenu(mainContent, nestedBookmarks)
+      nestedMenu.render()
+
+      currentFolder.style.display = "block"
+      currentFolder.textContent = folderTitle
+      backButton.style.display = "block"
+    } else if (bookmarkElement.dataset.url) {
+      chrome.tabs.create({ url: bookmarkElement.dataset.url })
+    }
+  })
+
+  // Кнопка "Назад"
+  backButton.addEventListener("click", async () => {
+    navigationStack.pop()
+    if (navigationStack.length === 0) {
+      const bookmarks = await getAllBookmarks()
+      mainInterface.render()
+      mainContent.classList.remove("nested-view")
+      currentFolder.style.display = "none"
+      backButton.style.display = "none"
+    } else {
+      const current = navigationStack[navigationStack.length - 1]
+      const bookmarks = await getBookmarksInFolder(current.id)
+      const nestedMenu = new NestedMenu(mainContent, bookmarks)
+      nestedMenu.render()
+      currentFolder.textContent = current.title
+    }
+  })
+
+  // Кнопка добавления
+  addButton.addEventListener("click", () => {
+    const parentId =
+      navigationStack.length > 0
+        ? navigationStack[navigationStack.length - 1].id
+        : "0"
+
+    showAddDialog(parentId)
+  })
+
+  // Кнопка настроек
+  settingsButton.addEventListener("click", () => {
+    window.location.href = "settings.html"
+  })
+}
+
+// Функция для обновления текущего вида
+async function refreshCurrentView() {
+  if (navigationStack.length === 0) {
+    const bookmarks = await getAllBookmarks()
+    mainInterface.render()
+  } else {
+    const current = navigationStack[navigationStack.length - 1]
+    const bookmarks = await getBookmarksInFolder(current.id)
+    const nestedMenu = new NestedMenu(mainContent, bookmarks)
+    nestedMenu.render()
   }
 }
 
 function showAddDialog(parentId) {
-  // TODO: Реализовать диалог добавления закладки/папки
+  const addModal = new Modal()
+  const items = [
+    {
+      text: "Добавить папку",
+      icon: "/assets/icons/folder.svg",
+      action: "folder",
+    },
+    {
+      text: "Добавить закладку",
+      icon: "/assets/icons/link.svg",
+      action: "link",
+    },
+  ]
+
+  const content = document.createElement("div")
+  content.className = "add-type-selector"
+
+  items.forEach((item) => {
+    const button = document.createElement("button")
+    button.className = "add-type-button"
+
+    const icon = document.createElement("img")
+    icon.src = item.icon
+    icon.alt = ""
+    icon.className = "add-type-icon"
+
+    const text = document.createElement("span")
+    text.textContent = item.text
+
+    button.appendChild(icon)
+    button.appendChild(text)
+
+    button.onclick = () => {
+      addModal.close()
+      if (item.action === "folder") {
+        showCreateFolderDialog(parentId)
+      } else {
+        showCreateBookmarkDialog(parentId)
+      }
+    }
+
+    content.appendChild(button)
+  })
+
+  addModal.show("Выберите тип", "select", {}, null, null, content)
+}
+
+function showCreateFolderDialog(parentId) {
+  const modal = new Modal()
+  modal.show("Создать папку", "folder", {}, async (data) => {
+    try {
+      await createFolder(parentId, data.title)
+      await refreshCurrentView()
+    } catch (error) {
+      console.error("Ошибка при создании папки:", error)
+      alert("Не удалось создать папку")
+    }
+  })
+}
+
+function showCreateBookmarkDialog(parentId) {
+  const modal = new Modal()
+  modal.show("Добавить закладку", "link", {}, async (data) => {
+    try {
+      await createBookmark(parentId, data.title, data.url)
+      await refreshCurrentView()
+    } catch (error) {
+      console.error("Ошибка при создании закладки:", error)
+      alert("Не удалось создать закладку")
+    }
+  })
 }
 
 function showSettings() {
