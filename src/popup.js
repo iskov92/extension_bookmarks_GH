@@ -84,3 +84,4 @@ function showAddDialog(parentId) {
 function showSettings() {
   // TODO: Реализовать окно настроек
 }
+

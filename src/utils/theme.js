@@ -29,3 +29,4 @@ function setTheme(isDark) {
   document.body.style.transition =
     "background-color var(--transition-speed), color var(--transition-speed)"
 }
+

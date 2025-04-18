@@ -56,3 +56,4 @@ export function exportBookmarksToHTML(bookmarks) {
 
   return html
 }
+
