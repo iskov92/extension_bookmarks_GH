@@ -5,8 +5,19 @@ export function initTheme() {
   // Загружаем сохраненную тему или используем темную по умолчанию
   chrome.storage.sync.get(["isDarkTheme"], function (result) {
     const isDarkTheme = result.isDarkTheme ?? true // true = темная тема по умолчанию
-    setTheme(isDarkTheme)
+
+    // Устанавливаем тему сразу при загрузке
+    document.body.setAttribute("data-theme", isDarkTheme ? "dark" : "light")
+    themeStylesheet.href = `./styles/${
+      isDarkTheme ? "dark" : "light"
+    }-theme.css`
     themeToggle.checked = isDarkTheme
+
+    // Добавляем анимацию только после установки начальной темы
+    setTimeout(() => {
+      document.body.style.transition =
+        "background-color var(--transition-speed), color var(--transition-speed)"
+    }, 100)
   })
 
   // Обработчик переключения темы
@@ -24,9 +35,4 @@ function setTheme(isDark) {
 
   // Устанавливаем атрибут темы
   document.body.setAttribute("data-theme", isDark ? "dark" : "light")
-
-  // Добавляем класс для анимации
-  document.body.style.transition =
-    "background-color var(--transition-speed), color var(--transition-speed)"
 }
-
