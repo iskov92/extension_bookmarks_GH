@@ -6,6 +6,7 @@ export class NestedMenu {
 
   render() {
     this.container.innerHTML = ""
+    this.container.classList.add("nested-view")
 
     this.bookmarks.forEach((bookmark) => {
       const item = document.createElement("div")
@@ -39,4 +40,3 @@ export class NestedMenu {
     }
   }
 }
-

@@ -19,6 +19,7 @@ async function initializeUI() {
   const backButton = document.getElementById("backButton")
   const addButton = document.getElementById("addButton")
   const settingsButton = document.getElementById("settingsButton")
+  const currentFolder = document.getElementById("currentFolder")
 
   // История навигации
   const navigationStack = []
@@ -38,11 +39,17 @@ async function initializeUI() {
 
     if (isFolder) {
       const nestedBookmarks = await chrome.bookmarks.getChildren(id)
-      navigationStack.push({ id, title: bookmarkElement.textContent })
+      const folderTitle =
+        bookmarkElement.querySelector(".bookmark-title").textContent
+      navigationStack.push({ id, title: folderTitle })
 
       const nestedMenu = new NestedMenu(mainContent, nestedBookmarks)
       nestedMenu.render()
 
+      // Показываем только заголовок
+      currentFolder.style.display = "block"
+      // Обновляем заголовок в шапке
+      currentFolder.textContent = folderTitle
       backButton.style.display = "block"
     } else {
       chrome.tabs.create({ url: bookmarkElement.dataset.url })
@@ -54,12 +61,16 @@ async function initializeUI() {
     navigationStack.pop()
     if (navigationStack.length === 0) {
       mainInterface.render()
+      mainContent.classList.remove("nested-view")
+      // Скрываем только заголовок
+      currentFolder.style.display = "none"
       backButton.style.display = "none"
     } else {
       const current = navigationStack[navigationStack.length - 1]
       const bookmarks = await chrome.bookmarks.getChildren(current.id)
       const nestedMenu = new NestedMenu(mainContent, bookmarks)
       nestedMenu.render()
+      currentFolder.textContent = current.title
     }
   })
 
@@ -84,4 +95,3 @@ function showAddDialog(parentId) {
 function showSettings() {
   // TODO: Реализовать окно настроек
 }
-

@@ -64,6 +64,9 @@ body {
 
 .header-center {
   justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .header-controls {
@@ -126,6 +129,21 @@ body {
   gap: 10px;
   justify-content: start;
   align-content: start;
+}
+
+/* Стили для заголовка папки */
+.folder-title {
+  display: none;
+}
+
+/* Показываем заголовок только во вложенных меню */
+.nested-view .folder-title {
+  display: block;
+}
+
+/* В режиме вложенного меню добавляем отступ сверху */
+.nested-view.main-content {
+  padding-top: 10px;
 }
 
 /* Стили для закладок и папок */
@@ -333,4 +351,17 @@ input:checked + .slider:before {
 /* Изменение цвета скролла для темной темы */
 [data-theme="dark"] .main-content::-webkit-scrollbar-track {
   background: var(--dark-accent);
+}
+
+.current-folder {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+/* Обновляем стили для кнопки добавления */
+.add-button {
+  margin-left: 4px;
 }
