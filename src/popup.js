@@ -69,7 +69,7 @@ async function initializeUI() {
     const items = isFolder
       ? [
           {
-            text: "Переименовать",
+            text: "Изменить",
             icon: "/assets/icons/edit_white.svg",
             iconDark: "/assets/icons/edit_black.svg",
             action: "rename",
@@ -113,21 +113,28 @@ async function initializeUI() {
         switch (action) {
           case "rename":
           case "edit":
-            const modal = new Modal()
-            modal.show(
-              isFolder ? "Переименовать папку" : "Изменить закладку",
-              isFolder ? "folder" : "link",
-              { title, url },
-              async (data) => {
-                try {
-                  await updateBookmark(id, data)
-                  await refreshCurrentView()
-                } catch (error) {
-                  console.error("Ошибка при обновлении:", error)
-                  alert("Не удалось сохранить изменения")
+            if (isFolder) {
+              showFolderEditDialog({
+                id: id,
+                title: title,
+              })
+            } else {
+              const modal = new Modal()
+              modal.show(
+                "Изменить закладку",
+                "link",
+                { title, url },
+                async (data) => {
+                  try {
+                    await updateBookmark(id, data)
+                    await refreshCurrentView()
+                  } catch (error) {
+                    console.error("Ошибка при обновлении:", error)
+                    alert("Не удалось сохранить изменения")
+                  }
                 }
-              }
-            )
+              )
+            }
             break
 
           case "delete":
@@ -315,4 +322,134 @@ function showCreateBookmarkDialog(parentId) {
 
 function showSettings() {
   // TODO: Реализовать окно настроек
+}
+
+async function showFolderEditDialog(folder) {
+  // Получаем текущую иконку папки, если она есть
+  const customIcon = await chrome.storage.local.get(`folder_icon_${folder.id}`)
+  const iconSrc =
+    customIcon[`folder_icon_${folder.id}`] || "/assets/icons/folder.svg"
+
+  // Создаем кастомный контент как DOM элементы
+  const container = document.createElement("div")
+  container.className = "edit-folder"
+
+  // Группа для названия папки
+  const titleGroup = document.createElement("div")
+  titleGroup.className = "form-group"
+
+  const titleLabel = document.createElement("label")
+  titleLabel.htmlFor = "folderTitle"
+  titleLabel.textContent = "Название папки"
+
+  const titleInput = document.createElement("input")
+  titleInput.type = "text"
+  titleInput.id = "folderTitle"
+  titleInput.value = folder.title
+  titleInput.required = true
+
+  titleGroup.appendChild(titleLabel)
+  titleGroup.appendChild(titleInput)
+
+  // Группа для иконки
+  const iconGroup = document.createElement("div")
+  iconGroup.className = "form-group"
+
+  const iconLabel = document.createElement("label")
+  iconLabel.htmlFor = "folderIcon"
+  iconLabel.textContent = "Иконка папки"
+
+  const iconInputGroup = document.createElement("div")
+  iconInputGroup.className = "icon-input-group"
+
+  const fileInput = document.createElement("input")
+  fileInput.type = "file"
+  fileInput.id = "folderIcon"
+  fileInput.accept = "image/*"
+
+  const urlInput = document.createElement("input")
+  urlInput.type = "text"
+  urlInput.id = "folderIconUrl"
+  urlInput.placeholder = "Или введите URL иконки"
+
+  iconInputGroup.appendChild(fileInput)
+  iconInputGroup.appendChild(urlInput)
+
+  const previewContainer = document.createElement("div")
+  previewContainer.className = "icon-preview"
+
+  const previewImg = document.createElement("img")
+  previewImg.src = iconSrc
+  previewImg.alt = "Preview"
+  previewImg.id = "iconPreview"
+
+  previewContainer.appendChild(previewImg)
+
+  iconGroup.appendChild(iconLabel)
+  iconGroup.appendChild(iconInputGroup)
+  iconGroup.appendChild(previewContainer)
+
+  // Добавляем все элементы в контейнер
+  container.appendChild(titleGroup)
+  container.appendChild(iconGroup)
+
+  const modal = new Modal()
+  modal.show(
+    "Изменить папку",
+    "folder",
+    {},
+    async (data) => {
+      try {
+        const newTitle = titleInput.value.trim()
+        if (!newTitle) {
+          alert("Введите название папки")
+          return
+        }
+
+        await chrome.bookmarks.update(folder.id, { title: newTitle })
+
+        const iconPreview = document.getElementById("iconPreview")
+        if (iconPreview && iconPreview.src !== "/assets/icons/folder.svg") {
+          await chrome.storage.local.set({
+            [`folder_icon_${folder.id}`]: iconPreview.src,
+          })
+        }
+
+        await refreshCurrentView()
+        modal.close()
+      } catch (error) {
+        console.error("Ошибка при обновлении папки:", error)
+        alert("Не удалось обновить папку")
+      }
+    },
+    null,
+    container
+  )
+
+  // Добавляем обработчики после создания модального окна
+  const iconInput = document.getElementById("folderIcon")
+  const iconUrlInput = document.getElementById("folderIconUrl")
+  const iconPreview = document.getElementById("iconPreview")
+
+  if (iconInput && iconUrlInput && iconPreview) {
+    iconInput.onchange = (e) => {
+      const file = e.target.files[0]
+      if (file) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          iconPreview.src = e.target.result
+          iconUrlInput.value = ""
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+
+    iconUrlInput.onchange = (e) => {
+      const url = e.target.value.trim()
+      if (url) {
+        iconPreview.src = url
+        iconInput.value = ""
+      }
+    }
+  }
 }
