@@ -2,20 +2,57 @@ export class MainInterface {
   constructor(container, bookmarks) {
     this.container = container
     this.bookmarks = bookmarks || []
+
+    // Подписываемся на изменение темы
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === "sync" && changes.isDarkTheme) {
+        this.render() // Перерисовываем интерфейс при смене темы
+      }
+    })
+  }
+
+  // Получить текущую тему
+  async getCurrentTheme() {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get("isDarkTheme", (result) => {
+        const isDark = result.isDarkTheme ?? true // true = темная тема по умолчанию
+        console.log("isDarkTheme:", isDark)
+        resolve(isDark ? "dark" : "light")
+      })
+    })
   }
 
   // Получить кастомную иконку папки из хранилища
   async getCustomFolderIcon(folderId) {
     try {
-      return await new Promise((resolve) => {
+      const result = await new Promise((resolve) => {
         chrome.storage.local.get(`folder_icon_${folderId}`, (result) => {
+          console.log(
+            "Кастомная иконка для папки",
+            folderId,
+            ":",
+            result[`folder_icon_${folderId}`]
+          )
           resolve(result[`folder_icon_${folderId}`])
         })
       })
+      return result
     } catch (error) {
       console.error("Ошибка при получении иконки папки:", error)
       return null
     }
+  }
+
+  // Получить дефолтную иконку папки в зависимости от темы
+  async getDefaultFolderIcon() {
+    const theme = await this.getCurrentTheme()
+    // Для темной темы - черную иконку, для светлой - белую
+    const iconPath = `/assets/icons/folder_${
+      theme === "dark" ? "black" : "white"
+    }.svg`
+    console.log("Текущая тема:", theme)
+    console.log("Путь к дефолтной иконке:", iconPath)
+    return iconPath
   }
 
   async render() {
@@ -32,6 +69,8 @@ export class MainInterface {
     }
 
     for (const bookmark of this.bookmarks) {
+      console.log("Обработка закладки:", bookmark)
+
       const item = document.createElement("div")
       item.className = `bookmark-item ${
         bookmark.type === "folder" ? "folder" : ""
@@ -44,12 +83,22 @@ export class MainInterface {
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
 
-      // Если это папка, пробуем получить кастомную иконку
+      // Если это папка, пробуем получить кастомную иконку или используем дефолтную по теме
       if (bookmark.type === "folder") {
+        console.log("Это папка:", bookmark.title)
         const customIcon = await this.getCustomFolderIcon(bookmark.id)
-        icon.src = customIcon || "/src/assets/icons/folder.svg"
+        const defaultIcon = await this.getDefaultFolderIcon()
+        console.log("Выбранная иконка:", customIcon || defaultIcon)
+        icon.src = customIcon || defaultIcon
+
+        // Добавляем обработчик ошибки загрузки изображения
+        icon.onerror = () => {
+          console.error("Ошибка загрузки иконки:", icon.src)
+          // Пробуем использовать запасной вариант
+          icon.src = "/assets/icons/folder.svg"
+        }
       } else {
-        icon.src = bookmark.favicon || "/src/assets/icons/default_favicon.png"
+        icon.src = bookmark.favicon || "/assets/icons/default_favicon.png"
       }
 
       icon.alt = ""

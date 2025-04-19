@@ -19,5 +19,11 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: chrome://favicon/"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/icons/*.svg", "assets/icons/*.png"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
