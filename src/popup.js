@@ -6,12 +6,14 @@ import {
   updateBookmark,
   deleteBookmark,
   copyBookmark,
+  updateFolder,
 } from "./utils/bookmarks.js"
 import { initTheme } from "./utils/theme.js"
 import { MainInterface } from "./components/MainInterface.js"
 import { NestedMenu } from "./components/NestedMenu.js"
 import { ContextMenu } from "./components/ContextMenu.js"
 import { Modal } from "./components/Modal.js"
+import { storage } from "./utils/storage.js"
 
 // Глобальные переменные для доступа из всех функций
 let mainInterface
@@ -325,10 +327,10 @@ function showSettings() {
 }
 
 async function showFolderEditDialog(folder) {
-  // Получаем текущую иконку папки, если она есть
-  const customIcon = await chrome.storage.local.get(`folder_icon_${folder.id}`)
+  // Получаем текущую иконку папки из локального хранилища
   const iconSrc =
-    customIcon[`folder_icon_${folder.id}`] || "/assets/icons/folder.svg"
+    (await storage.get(`folder_icon_${folder.id}`)) ||
+    "/assets/icons/folder.svg"
 
   // Создаем кастомный контент как DOM элементы
   const container = document.createElement("div")
@@ -398,7 +400,7 @@ async function showFolderEditDialog(folder) {
     "Изменить папку",
     "folder",
     {},
-    async (data) => {
+    async () => {
       try {
         const newTitle = titleInput.value.trim()
         if (!newTitle) {
@@ -406,15 +408,16 @@ async function showFolderEditDialog(folder) {
           return
         }
 
-        await chrome.bookmarks.update(folder.id, { title: newTitle })
-
         const iconPreview = document.getElementById("iconPreview")
-        if (iconPreview && iconPreview.src !== "/assets/icons/folder.svg") {
-          await chrome.storage.local.set({
-            [`folder_icon_${folder.id}`]: iconPreview.src,
-          })
+        const updateData = {
+          title: newTitle,
         }
 
+        if (iconPreview && iconPreview.src !== "/assets/icons/folder.svg") {
+          updateData.iconUrl = iconPreview.src
+        }
+
+        await updateFolder(folder.id, updateData)
         await refreshCurrentView()
         modal.close()
       } catch (error) {
@@ -422,7 +425,9 @@ async function showFolderEditDialog(folder) {
         alert("Не удалось обновить папку")
       }
     },
-    null,
+    () => {
+      modal.close()
+    },
     container
   )
 

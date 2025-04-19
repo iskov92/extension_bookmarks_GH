@@ -238,3 +238,45 @@ export async function copyBookmark(id) {
   await storage.set("gh_bookmarks", bookmarks)
   return copy
 }
+
+/**
+ * Обновляет папку в локальном хранилище
+ * @param {string} id - ID папки
+ * @param {Object} data - Данные для обновления {title: string, iconUrl?: string}
+ */
+export async function updateFolder(id, data) {
+  try {
+    const bookmarks = (await storage.get("gh_bookmarks")) || []
+
+    function updateInTree(items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].id === id) {
+          // Обновляем название папки
+          if (data.title) {
+            items[i].title = data.title
+          }
+          return true
+        }
+        if (items[i].type === "folder" && items[i].children) {
+          if (updateInTree(items[i].children)) {
+            return true
+          }
+        }
+      }
+      return false
+    }
+
+    updateInTree(bookmarks)
+    await storage.set("gh_bookmarks", bookmarks)
+
+    // Сохраняем иконку отдельно
+    if (data.iconUrl) {
+      await storage.set(`folder_icon_${id}`, data.iconUrl)
+    }
+
+    return true
+  } catch (error) {
+    console.error("Ошибка при обновлении папки:", error)
+    throw error
+  }
+}

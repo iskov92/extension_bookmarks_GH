@@ -36,21 +36,34 @@ export class Modal {
     }
 
     const buttons = document.createElement("div")
-    buttons.className = "modal-buttons"
-
-    if (!customContent) {
-      const saveButton = document.createElement("button")
-      saveButton.className = "modal-button primary"
-      saveButton.textContent = "Сохранить"
-      saveButton.onclick = () => this.handleSave(type)
-      buttons.appendChild(saveButton)
-    }
+    buttons.className = "modal-footer"
 
     const cancelButton = document.createElement("button")
-    cancelButton.className = "modal-button secondary"
+    cancelButton.className = "cancel"
     cancelButton.textContent = "Отмена"
-    cancelButton.onclick = () => this.close()
+    cancelButton.onclick = () => {
+      if (this.onClose) {
+        this.onClose()
+      } else {
+        this.close()
+      }
+    }
+
+    const saveButton = document.createElement("button")
+    saveButton.className = "save-button"
+    saveButton.textContent = "Сохранить"
+    saveButton.onclick = () => {
+      if (this.onSave) {
+        if (customContent) {
+          this.onSave()
+        } else {
+          this.handleSave(type)
+        }
+      }
+    }
+
     buttons.appendChild(cancelButton)
+    buttons.appendChild(saveButton)
 
     this.modal.appendChild(header)
     this.modal.appendChild(content)
@@ -98,7 +111,6 @@ export class Modal {
     if (this.onSave) {
       this.onSave(data)
     }
-    this.close()
   }
 
   close() {
@@ -106,10 +118,6 @@ export class Modal {
       document.body.removeChild(this.overlay)
       this.overlay = null
       this.modal = null
-
-      if (this.onClose) {
-        this.onClose()
-      }
     }
   }
 
