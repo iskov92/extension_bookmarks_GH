@@ -18,6 +18,14 @@ let mainInterface
 let mainContent
 let navigationStack = []
 
+// Создаем единый экземпляр контекстного меню
+const contextMenu = new ContextMenu()
+
+// Предотвращаем стандартное контекстное меню браузера
+document.addEventListener("contextmenu", (e) => {
+  e.preventDefault()
+})
+
 // Инициализация темы
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -48,7 +56,10 @@ async function initializeUI() {
   mainContent.addEventListener("contextmenu", async (e) => {
     e.preventDefault()
     const bookmarkElement = e.target.closest(".bookmark-item")
-    if (!bookmarkElement) return
+    if (!bookmarkElement) {
+      contextMenu.close()
+      return
+    }
 
     const isFolder = bookmarkElement.classList.contains("folder")
     const id = bookmarkElement.dataset.id
@@ -86,60 +97,58 @@ async function initializeUI() {
           },
         ]
 
-    const contextMenu = new ContextMenu()
     contextMenu.show(
       e.pageX,
       e.pageY,
       items,
       bookmarkElement,
       async (action) => {
-        try {
-          switch (action) {
-            case "rename":
-            case "edit":
-              const modal = new Modal()
-              modal.show(
-                isFolder ? "Переименовать папку" : "Изменить закладку",
-                isFolder ? "folder" : "link",
-                { title, url },
-                async (data) => {
-                  try {
-                    await updateBookmark(id, data)
-                    // Перерисовываем текущий вид
-                    await refreshCurrentView()
-                  } catch (error) {
-                    console.error("Ошибка при обновлении:", error)
-                    alert("Не удалось сохранить изменения")
-                  }
-                }
-              )
-              break
+        console.log("Выбрано действие:", action) // Отладочный вывод
 
-            case "delete":
-              if (confirm("Вы уверены, что хотите удалить этот элемент?")) {
+        switch (action) {
+          case "rename":
+          case "edit":
+            const modal = new Modal()
+            modal.show(
+              isFolder ? "Переименовать папку" : "Изменить закладку",
+              isFolder ? "folder" : "link",
+              { title, url },
+              async (data) => {
                 try {
-                  await deleteBookmark(id)
+                  await updateBookmark(id, data)
                   await refreshCurrentView()
                 } catch (error) {
-                  console.error("Ошибка при удалении:", error)
-                  alert("Не удалось удалить элемент")
+                  console.error("Ошибка при обновлении:", error)
+                  alert("Не удалось сохранить изменения")
                 }
               }
-              break
+            )
+            break
 
-            case "copy":
+          case "delete":
+            if (confirm("Вы уверены, что хотите удалить этот элемент?")) {
               try {
-                await copyBookmark(id)
+                await deleteBookmark(id)
                 await refreshCurrentView()
               } catch (error) {
-                console.error("Ошибка при копировании:", error)
-                alert("Не удалось скопировать элемент")
+                console.error("Ошибка при удалении:", error)
+                alert("Не удалось удалить элемент")
               }
-              break
-          }
-        } catch (error) {
-          console.error("Ошибка в обработчике контекстного меню:", error)
-          alert("Произошла ошибка при выполнении действия")
+            }
+            break
+
+          case "copy":
+            try {
+              await copyBookmark(id)
+              await refreshCurrentView()
+            } catch (error) {
+              console.error("Ошибка при копировании:", error)
+              alert("Не удалось скопировать элемент")
+            }
+            break
+
+          default:
+            console.error("Неизвестное действие:", action)
         }
       }
     )

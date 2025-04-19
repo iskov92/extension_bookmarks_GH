@@ -1,12 +1,43 @@
 export class ContextMenu {
   constructor() {
     this.menu = null
-    this.visible = false
-    this.targetElement = null
-    this.onAction = null
+    this.onItemClick = null
+
+    // Закрываем меню при клике вне его
+    document.addEventListener("click", (e) => {
+      if (this.menu && !this.menu.contains(e.target)) {
+        this.close()
+      }
+    })
+
+    // Закрываем меню при скролле
+    document.addEventListener("scroll", () => {
+      this.close()
+    })
+
+    // Закрываем меню при нажатии Escape
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        this.close()
+      }
+    })
   }
 
-  create(items) {
+  close() {
+    if (this.menu && this.menu.parentNode) {
+      document.body.removeChild(this.menu)
+      this.menu = null
+      this.onItemClick = null
+    }
+  }
+
+  show(x, y, items, target, onClick) {
+    // Закрываем предыдущее меню, если оно открыто
+    if (this.menu) {
+      this.close()
+    }
+
+    this.onItemClick = onClick
     this.menu = document.createElement("div")
     this.menu.className = "context-menu"
 
@@ -17,6 +48,7 @@ export class ContextMenu {
       if (item.icon) {
         const icon = document.createElement("img")
         icon.src = item.icon
+        icon.alt = ""
         icon.className = "context-menu-icon"
         menuItem.appendChild(icon)
       }
@@ -25,28 +57,22 @@ export class ContextMenu {
       text.textContent = item.text
       menuItem.appendChild(text)
 
-      menuItem.onclick = () => {
-        if (this.onAction) {
-          this.onAction(item.action, this.targetElement)
+      // Добавляем обработчик клика напрямую
+      menuItem.onclick = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (this.onItemClick) {
+          this.onItemClick(item.action)
         }
-        this.hide()
+        this.close()
       }
 
       this.menu.appendChild(menuItem)
     })
 
     document.body.appendChild(this.menu)
-  }
 
-  show(x, y, items, targetElement, onAction) {
-    if (this.visible) {
-      this.hide()
-    }
-
-    this.targetElement = targetElement
-    this.onAction = onAction
-    this.create(items)
-
+    // Позиционируем меню
     const menuRect = this.menu.getBoundingClientRect()
     const windowWidth = window.innerWidth
     const windowHeight = window.innerHeight
@@ -55,35 +81,11 @@ export class ContextMenu {
     if (x + menuRect.width > windowWidth) {
       x = windowWidth - menuRect.width
     }
-
     if (y + menuRect.height > windowHeight) {
       y = windowHeight - menuRect.height
     }
 
     this.menu.style.left = x + "px"
     this.menu.style.top = y + "px"
-    this.visible = true
-
-    // Закрытие по клику вне меню
-    setTimeout(() => {
-      document.addEventListener("click", this.handleOutsideClick)
-    }, 0)
-  }
-
-  handleOutsideClick = (e) => {
-    if (this.menu && !this.menu.contains(e.target)) {
-      this.hide()
-    }
-  }
-
-  hide() {
-    if (this.menu) {
-      document.body.removeChild(this.menu)
-      document.removeEventListener("click", this.handleOutsideClick)
-      this.menu = null
-      this.visible = false
-      this.targetElement = null
-      this.onAction = null
-    }
   }
 }

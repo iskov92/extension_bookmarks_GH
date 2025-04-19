@@ -392,22 +392,24 @@ input:checked + .slider:before {
 /* Контекстное меню */
 .context-menu {
   position: fixed;
-  background: var(--background-color);
+  background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 4px 0;
-  min-width: 180px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  border-radius: var(--border-radius);
+  padding: 8px 0;
+  min-width: 200px;
+  box-shadow: var(--shadow);
   z-index: 1000;
 }
 
 .context-menu-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 8px 16px;
   cursor: pointer;
-  color: var(--text-color);
-  transition: background-color 0.2s;
+  gap: 8px;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  transition: background-color var(--transition-speed);
 }
 
 .context-menu-item:hover {
@@ -417,8 +419,7 @@ input:checked + .slider:before {
 .context-menu-icon {
   width: 16px;
   height: 16px;
-  margin-right: 8px;
-  filter: var(--icon-filter);
+  object-fit: contain;
 }
 
 /* Модальное окно */
@@ -428,7 +429,7 @@ input:checked + .slider:before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -436,11 +437,12 @@ input:checked + .slider:before {
 }
 
 .modal {
-  background: var(--background-color);
-  border-radius: 8px;
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius);
   padding: 20px;
   min-width: 300px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  box-shadow: var(--shadow);
 }
 
 .modal-header {
