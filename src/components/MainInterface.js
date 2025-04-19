@@ -1,7 +1,9 @@
+import { storage } from "../utils/storage.js"
+
 export class MainInterface {
   constructor(container, bookmarks) {
     this.container = container
-    this.bookmarks = bookmarks || []
+    this.bookmarks = bookmarks
 
     // Подписываемся на изменение темы
     chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -55,61 +57,50 @@ export class MainInterface {
     return iconPath
   }
 
+  async getFolderIcon(folderId) {
+    try {
+      const customIcon = await storage.get(`folder_icon_${folderId}`)
+      return customIcon || "/assets/icons/folder_black.svg"
+    } catch (error) {
+      console.error("Error getting folder icon:", error)
+      return "/assets/icons/folder_black.svg"
+    }
+  }
+
   async render() {
     this.container.innerHTML = ""
-    this.container.className = "main-content"
 
-    if (!Array.isArray(this.bookmarks) || this.bookmarks.length === 0) {
+    if (!this.bookmarks || this.bookmarks.length === 0) {
       this.container.innerHTML = `
         <div class="empty-message">
-          Нет закладок. Добавьте новую закладку или папку.
+          Нет закладок. Нажмите "+" чтобы добавить.
         </div>
       `
       return
     }
 
     for (const bookmark of this.bookmarks) {
-      console.log("Обработка закладки:", bookmark)
-
-      const item = document.createElement("div")
-      item.className = `bookmark-item ${
+      const bookmarkElement = document.createElement("div")
+      bookmarkElement.className = `bookmark-item ${
         bookmark.type === "folder" ? "folder" : ""
       }`
-      item.dataset.id = bookmark.id
+      bookmarkElement.dataset.id = bookmark.id
+
       if (bookmark.url) {
-        item.dataset.url = bookmark.url
+        bookmarkElement.dataset.url = bookmark.url
       }
 
-      const icon = document.createElement("img")
-      icon.className = "bookmark-icon"
+      const iconSrc =
+        bookmark.type === "folder"
+          ? await this.getFolderIcon(bookmark.id)
+          : bookmark.favicon || "/assets/icons/link.svg"
 
-      // Если это папка, пробуем получить кастомную иконку или используем дефолтную по теме
-      if (bookmark.type === "folder") {
-        console.log("Это папка:", bookmark.title)
-        const customIcon = await this.getCustomFolderIcon(bookmark.id)
-        const defaultIcon = await this.getDefaultFolderIcon()
-        console.log("Выбранная иконка:", customIcon || defaultIcon)
-        icon.src = customIcon || defaultIcon
+      bookmarkElement.innerHTML = `
+        <img src="${iconSrc}" alt="${bookmark.type}" class="bookmark-icon" />
+        <span class="bookmark-title">${bookmark.title}</span>
+      `
 
-        // Добавляем обработчик ошибки загрузки изображения
-        icon.onerror = () => {
-          console.error("Ошибка загрузки иконки:", icon.src)
-          // Пробуем использовать запасной вариант
-          icon.src = "/assets/icons/folder.svg"
-        }
-      } else {
-        icon.src = bookmark.favicon || "/assets/icons/default_favicon.png"
-      }
-
-      icon.alt = ""
-
-      const title = document.createElement("div")
-      title.className = "bookmark-title"
-      title.textContent = bookmark.title
-
-      item.appendChild(icon)
-      item.appendChild(title)
-      this.container.appendChild(item)
+      this.container.appendChild(bookmarkElement)
     }
   }
 }

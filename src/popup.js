@@ -327,134 +327,134 @@ function showSettings() {
 }
 
 async function showFolderEditDialog(folder) {
-  // Получаем текущую иконку папки из локального хранилища
-  const iconSrc =
-    (await storage.get(`folder_icon_${folder.id}`)) ||
-    "/assets/icons/folder.svg"
+  // Получаем сохраненную иконку
+  const savedIcon = await storage.get(`folder_icon_${folder.id}`)
 
-  // Создаем кастомный контент как DOM элементы
-  const container = document.createElement("div")
-  container.className = "edit-folder"
-
-  // Группа для названия папки
-  const titleGroup = document.createElement("div")
-  titleGroup.className = "form-group"
-
-  const titleLabel = document.createElement("label")
-  titleLabel.htmlFor = "folderTitle"
-  titleLabel.textContent = "Название папки"
-
-  const titleInput = document.createElement("input")
-  titleInput.type = "text"
-  titleInput.id = "folderTitle"
-  titleInput.value = folder.title
-  titleInput.required = true
-
-  titleGroup.appendChild(titleLabel)
-  titleGroup.appendChild(titleInput)
-
-  // Группа для иконки
-  const iconGroup = document.createElement("div")
-  iconGroup.className = "form-group"
-
-  const iconLabel = document.createElement("label")
-  iconLabel.htmlFor = "folderIcon"
-  iconLabel.textContent = "Иконка папки"
-
-  const iconInputGroup = document.createElement("div")
-  iconInputGroup.className = "icon-input-group"
-
-  const fileInput = document.createElement("input")
-  fileInput.type = "file"
-  fileInput.id = "folderIcon"
-  fileInput.accept = "image/*"
-
-  const urlInput = document.createElement("input")
-  urlInput.type = "text"
-  urlInput.id = "folderIconUrl"
-  urlInput.placeholder = "Или введите URL иконки"
-
-  iconInputGroup.appendChild(fileInput)
-  iconInputGroup.appendChild(urlInput)
-
-  const previewContainer = document.createElement("div")
-  previewContainer.className = "icon-preview"
-
-  const previewImg = document.createElement("img")
-  previewImg.src = iconSrc
-  previewImg.alt = "Preview"
-  previewImg.id = "iconPreview"
-
-  previewContainer.appendChild(previewImg)
-
-  iconGroup.appendChild(iconLabel)
-  iconGroup.appendChild(iconInputGroup)
-  iconGroup.appendChild(previewContainer)
-
-  // Добавляем все элементы в контейнер
-  container.appendChild(titleGroup)
-  container.appendChild(iconGroup)
+  const customContent = document.createElement("div")
+  customContent.className = "edit-folder"
+  customContent.innerHTML = `
+    <div class="form-group">
+      <label for="folderTitle">Название папки</label>
+      <input type="text" id="folderTitle" value="${folder.title}" />
+    </div>
+    <div class="form-group">
+      <label for="iconFile">Загрузить иконку</label>
+      <input type="file" id="iconFile" accept="image/*" />
+    </div>
+    <div class="form-group">
+      <label for="iconUrl">URL иконки</label>
+      <input type="text" id="iconUrl" placeholder="https://example.com/icon.png" />
+    </div>
+    <div class="icon-preview">
+      <div class="preview-content">
+        ${
+          savedIcon
+            ? `<img src="${savedIcon}" alt="Icon preview" />`
+            : "Preview"
+        }
+      </div>
+    </div>
+  `
 
   const modal = new Modal()
   modal.show(
     "Изменить папку",
     "folder",
     {},
-    async () => {
+    async (data) => {
+      const newTitle = customContent.querySelector("#folderTitle").value.trim()
+      if (!newTitle) {
+        alert("Название папки не может быть пустым")
+        return false
+      }
+
+      const previewContent = customContent.querySelector(".preview-content")
+      const previewImg = previewContent.querySelector("img")
+      const iconUrl = previewImg ? previewImg.src : null
+
       try {
-        const newTitle = titleInput.value.trim()
-        if (!newTitle) {
-          alert("Введите название папки")
-          return
+        // Сначала обновляем название папки
+        await updateFolder(folder.id, { title: newTitle })
+
+        // Затем сохраняем иконку если она есть
+        if (iconUrl) {
+          await storage.set(`folder_icon_${folder.id}`, iconUrl)
         }
 
-        const iconPreview = document.getElementById("iconPreview")
-        const updateData = {
-          title: newTitle,
-        }
-
-        if (iconPreview && iconPreview.src !== "/assets/icons/folder.svg") {
-          updateData.iconUrl = iconPreview.src
-        }
-
-        await updateFolder(folder.id, updateData)
         await refreshCurrentView()
         modal.close()
+        return true
       } catch (error) {
-        console.error("Ошибка при обновлении папки:", error)
-        alert("Не удалось обновить папку")
+        console.error("Error updating folder:", error)
+        alert("Ошибка при обновлении папки")
+        return false
       }
     },
     () => {
       modal.close()
     },
-    container
+    customContent
   )
 
-  // Добавляем обработчики после создания модального окна
-  const iconInput = document.getElementById("folderIcon")
-  const iconUrlInput = document.getElementById("folderIconUrl")
-  const iconPreview = document.getElementById("iconPreview")
+  // Обработчик для загрузки файла
+  const fileInput = customContent.querySelector("#iconFile")
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Проверяем, что это изображение
+      if (!file.type.startsWith("image/")) {
+        alert("Пожалуйста, выберите изображение")
+        return
+      }
 
-  if (iconInput && iconUrlInput && iconPreview) {
-    iconInput.onchange = (e) => {
-      const file = e.target.files[0]
-      if (file) {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          iconPreview.src = e.target.result
-          iconUrlInput.value = ""
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const previewContent = customContent.querySelector(".preview-content")
+        let previewImg = previewContent.querySelector("img")
+
+        if (!previewImg) {
+          previewImg = document.createElement("img")
+          previewContent.textContent = ""
+          previewContent.appendChild(previewImg)
         }
-        reader.readAsDataURL(file)
-      }
-    }
 
-    iconUrlInput.onchange = (e) => {
-      const url = e.target.value.trim()
-      if (url) {
-        iconPreview.src = url
-        iconInput.value = ""
+        // Устанавливаем data URL как источник изображения
+        previewImg.src = event.target.result
+
+        // Очищаем поле URL, так как загружен файл
+        customContent.querySelector("#iconUrl").value = ""
+      }
+      reader.readAsDataURL(file)
+    }
+  })
+
+  // Обработчик для URL
+  const urlInput = customContent.querySelector("#iconUrl")
+  urlInput.addEventListener("change", async (e) => {
+    const url = e.target.value.trim()
+    if (url) {
+      try {
+        // Проверяем, что URL действителен
+        const response = await fetch(url)
+        if (!response.ok) throw new Error("Invalid URL")
+
+        const previewContent = customContent.querySelector(".preview-content")
+        let previewImg = previewContent.querySelector("img")
+
+        if (!previewImg) {
+          previewImg = document.createElement("img")
+          previewContent.textContent = ""
+          previewContent.appendChild(previewImg)
+        }
+
+        previewImg.src = url
+
+        // Очищаем поле файла, так как указан URL
+        customContent.querySelector("#iconFile").value = ""
+      } catch (error) {
+        alert("Не удалось загрузить изображение по указанному URL")
+        urlInput.value = ""
       }
     }
-  }
+  })
 }
