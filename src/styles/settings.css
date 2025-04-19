@@ -6,55 +6,105 @@
 .settings-content {
   padding: 20px;
   overflow-y: auto;
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-section {
-  background-color: var(--bg-secondary);
-  border-radius: var(--border-radius);
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border-color);
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
 }
 
 .settings-section h2 {
+  margin-bottom: 1rem;
   color: var(--text-primary);
   font-size: 18px;
-  margin-bottom: 20px;
-  font-weight: 500;
 }
 
 .settings-buttons {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 1rem;
 }
 
 .settings-buttons .settings-button {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: var(--border-radius);
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
+  border-radius: 4px;
   cursor: pointer;
-  transition: all var(--transition-speed);
+  transition: all 0.2s ease;
   width: 100%;
 }
 
 .settings-buttons .settings-button:hover {
-  background-color: var(--hover-color);
+  background: var(--bg-hover);
 }
 
 .settings-buttons .settings-button img {
   width: 24px;
   height: 24px;
-  object-fit: contain;
 }
 
 .settings-buttons .settings-button span {
   color: var(--text-primary);
   font-size: 14px;
+}
+
+.author-section {
+  margin-top: auto;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.author-info {
+  color: var(--text-secondary);
+}
+
+/* Стили для ссылки в зависимости от темы */
+[data-theme="dark"] .author-info a {
+  color: #24ffd0;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+[data-theme="dark"] .author-info a:hover {
+  color: #20e6bc;
+  text-decoration: underline;
+}
+
+[data-theme="light"] .author-info a {
+  color: #ff8a24;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+[data-theme="light"] .author-info a:hover {
+  color: #e67d20;
+  text-decoration: underline;
+}
+
+/* Стили для кнопки настроек в хедере */
+.header-button.settings-button {
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}
+
+.header-button.settings-button img {
+  width: 20px;
+  height: 20px;
 }
 
 /* Стили для активной кнопки настроек */

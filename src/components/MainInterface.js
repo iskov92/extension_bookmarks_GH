@@ -18,7 +18,6 @@ export class MainInterface {
     return new Promise((resolve) => {
       chrome.storage.sync.get("isDarkTheme", (result) => {
         const isDark = result.isDarkTheme ?? true // true = темная тема по умолчанию
-        console.log("isDarkTheme:", isDark)
         resolve(isDark ? "dark" : "light")
       })
     })
@@ -59,11 +58,19 @@ export class MainInterface {
 
   async getFolderIcon(folderId) {
     try {
+      // Сначала пробуем получить кастомную иконку
       const customIcon = await storage.get(`folder_icon_${folderId}`)
-      return customIcon || "/assets/icons/folder_black.svg"
+      if (customIcon) {
+        return customIcon
+      }
+
+      // Если кастомной иконки нет, возвращаем дефолтную в зависимости от темы
+      const theme = await this.getCurrentTheme()
+      return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
     } catch (error) {
       console.error("Error getting folder icon:", error)
-      return "/assets/icons/folder_black.svg"
+      const theme = await this.getCurrentTheme()
+      return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
     }
   }
 
