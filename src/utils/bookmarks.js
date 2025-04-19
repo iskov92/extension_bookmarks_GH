@@ -31,10 +31,23 @@ export async function importFromBrowser() {
   try {
     // Получаем закладки из браузера
     const browserBookmarks = await chrome.bookmarks.getTree()
-    const processedBookmarks = await processBookmarkTree(
-      browserBookmarks[0].children
-    )
-    await saveBookmarks(processedBookmarks)
+
+    // Получаем содержимое корневой папки (обычно это первый элемент)
+    const rootFolder = browserBookmarks[0]
+
+    // Находим системные папки (обычно это "Панель закладок" и "Другие закладки")
+    const systemFolders = rootFolder.children || []
+
+    // Собираем все закладки из системных папок в один массив
+    let allBookmarks = []
+    for (const folder of systemFolders) {
+      if (folder.children) {
+        const processedBookmarks = await processBookmarkTree(folder.children)
+        allBookmarks = [...allBookmarks, ...processedBookmarks]
+      }
+    }
+
+    await saveBookmarks(allBookmarks)
     return true
   } catch (error) {
     console.error("Ошибка при импорте закладок из браузера:", error)
@@ -47,6 +60,9 @@ async function processBookmarkTree(bookmarks) {
   const processedBookmarks = []
 
   for (const bookmark of bookmarks) {
+    // Пропускаем пустые папки и закладки без названия
+    if (!bookmark.title.trim()) continue
+
     const newBookmark = {
       id: generateUniqueId(),
       title: bookmark.title,
@@ -57,8 +73,11 @@ async function processBookmarkTree(bookmarks) {
       newBookmark.url = bookmark.url
       // Используем chrome://favicon/ для получения иконки
       newBookmark.favicon = `chrome://favicon/size/16@2x/${bookmark.url}`
-    } else {
-      newBookmark.children = await processBookmarkTree(bookmark.children || [])
+    } else if (bookmark.children && bookmark.children.length > 0) {
+      // Добавляем папку только если в ней есть содержимое
+      newBookmark.children = await processBookmarkTree(bookmark.children)
+      // Если после обработки в папке нет содержимого, пропускаем её
+      if (newBookmark.children.length === 0) continue
     }
 
     processedBookmarks.push(newBookmark)
