@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M3 4H13V14H3V4Z" fill="currentColor" fill-opacity="0.3"/>
-  <path d="M6 2H10L11 3H13V4H3V3H5L6 2Z" fill="currentColor"/>
-  <path d="M6 6V12" stroke="currentColor" stroke-width="1"/>
-  <path d="M8 6V12" stroke="currentColor" stroke-width="1"/>
-  <path d="M10 6V12" stroke="currentColor" stroke-width="1"/>
-</svg> 

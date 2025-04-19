@@ -232,52 +232,51 @@ async function refreshCurrentView() {
 }
 
 function showAddDialog(parentId) {
-  const addModal = new Modal()
-  const items = [
-    {
-      text: "Добавить папку",
-      icon: "/assets/icons/folder_white.svg",
-      iconDark: "/assets/icons/folder_black.svg",
-      action: "folder",
+  const addTypeContent = document.createElement("div")
+  addTypeContent.className = "add-type-selector"
+
+  const folderButton = document.createElement("button")
+  folderButton.className = "add-type-button"
+  folderButton.dataset.type = "folder"
+  folderButton.innerHTML = `
+    <img src="/assets/icons/folder_white.svg" class="add-type-icon" alt="Folder">
+    <img src="/assets/icons/folder_black.svg" class="add-type-icon" alt="Folder">
+    Создать папку
+  `
+
+  const linkButton = document.createElement("button")
+  linkButton.className = "add-type-button"
+  linkButton.dataset.type = "link"
+  linkButton.innerHTML = `
+    <img src="/assets/icons/link.svg" class="add-type-icon" alt="Link">
+    Добавить закладку
+  `
+
+  addTypeContent.appendChild(folderButton)
+  addTypeContent.appendChild(linkButton)
+
+  const modal = new Modal()
+  modal.show(
+    "Выберите тип",
+    "select",
+    {},
+    null,
+    () => {
+      modal.close()
     },
-    {
-      text: "Добавить закладку",
-      icon: "/assets/icons/link.svg",
-      action: "link",
-    },
-  ]
+    addTypeContent
+  )
 
-  const content = document.createElement("div")
-  content.className = "add-type-selector"
-
-  items.forEach((item) => {
-    const button = document.createElement("button")
-    button.className = "add-type-button"
-
-    const icon = document.createElement("img")
-    icon.src = item.icon
-    icon.alt = ""
-    icon.className = "add-type-icon"
-
-    const text = document.createElement("span")
-    text.textContent = item.text
-
-    button.appendChild(icon)
-    button.appendChild(text)
-
-    button.onclick = () => {
-      addModal.close()
-      if (item.action === "folder") {
-        showCreateFolderDialog(parentId)
-      } else {
-        showCreateBookmarkDialog(parentId)
-      }
-    }
-
-    content.appendChild(button)
+  // Добавляем обработчики после создания модального окна
+  folderButton.addEventListener("click", () => {
+    modal.close()
+    showCreateFolderDialog(parentId)
   })
 
-  addModal.show("Выберите тип", "select", {}, null, null, content)
+  linkButton.addEventListener("click", () => {
+    modal.close()
+    showCreateBookmarkDialog(parentId)
+  })
 }
 
 function showCreateFolderDialog(parentId) {

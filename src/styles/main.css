@@ -518,3 +518,55 @@ input:checked + .slider:before {
   background: var(--secondary-color);
   color: var(--text-color);
 }
+
+/* Стили для диалога добавления */
+.add-type-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-type-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color var(--transition-speed);
+}
+
+.add-type-button:hover {
+  background-color: var(--hover-color);
+}
+
+.add-type-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+/* Обновляем стили для иконок в зависимости от темы */
+.add-type-icon[src*="_white"] {
+  display: block;
+}
+
+.add-type-icon[src*="_black"] {
+  display: none;
+}
+
+[data-theme="dark"] .add-type-icon[src*="_white"] {
+  display: none;
+}
+
+[data-theme="dark"] .add-type-icon[src*="_black"] {
+  display: block;
+}
+
+/* Для иконок без суффикса темы показываем всегда */
+.add-type-icon:not([src*="_white"]):not([src*="_black"]) {
+  display: block !important;
+}
