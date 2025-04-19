@@ -4,7 +4,21 @@ export class MainInterface {
     this.bookmarks = bookmarks || []
   }
 
-  render() {
+  // Получить кастомную иконку папки из хранилища
+  async getCustomFolderIcon(folderId) {
+    try {
+      return await new Promise((resolve) => {
+        chrome.storage.local.get(`folder_icon_${folderId}`, (result) => {
+          resolve(result[`folder_icon_${folderId}`])
+        })
+      })
+    } catch (error) {
+      console.error("Ошибка при получении иконки папки:", error)
+      return null
+    }
+  }
+
+  async render() {
     this.container.innerHTML = ""
     this.container.className = "main-content"
 
@@ -17,7 +31,7 @@ export class MainInterface {
       return
     }
 
-    this.bookmarks.forEach((bookmark) => {
+    for (const bookmark of this.bookmarks) {
       const item = document.createElement("div")
       item.className = `bookmark-item ${
         bookmark.type === "folder" ? "folder" : ""
@@ -29,10 +43,15 @@ export class MainInterface {
 
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
-      icon.src =
-        bookmark.type === "folder"
-          ? "assets/icons/folder.svg"
-          : bookmark.favicon || "assets/icons/default_favicon.png"
+
+      // Если это папка, пробуем получить кастомную иконку
+      if (bookmark.type === "folder") {
+        const customIcon = await this.getCustomFolderIcon(bookmark.id)
+        icon.src = customIcon || "/src/assets/icons/folder.svg"
+      } else {
+        icon.src = bookmark.favicon || "/src/assets/icons/default_favicon.png"
+      }
+
       icon.alt = ""
 
       const title = document.createElement("div")
@@ -42,6 +61,6 @@ export class MainInterface {
       item.appendChild(icon)
       item.appendChild(title)
       this.container.appendChild(item)
-    })
+    }
   }
 }
