@@ -302,9 +302,12 @@ function showCreateFolderDialog(parentId) {
     try {
       await createFolder(parentId, data.title)
       await refreshCurrentView()
+      modal.close()
+      return true
     } catch (error) {
       console.error("Ошибка при создании папки:", error)
       alert("Не удалось создать папку")
+      return false
     }
   })
 }
@@ -315,9 +318,12 @@ function showCreateBookmarkDialog(parentId) {
     try {
       await createBookmark(parentId, data.title, data.url)
       await refreshCurrentView()
+      modal.close()
+      return true
     } catch (error) {
       console.error("Ошибка при создании закладки:", error)
       alert("Не удалось создать закладку")
+      return false
     }
   })
 }
