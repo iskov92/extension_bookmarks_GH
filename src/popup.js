@@ -341,10 +341,6 @@ async function showFolderEditDialog(folder) {
       <label for="iconFile">Загрузить иконку</label>
       <input type="file" id="iconFile" accept="image/*" />
     </div>
-    <div class="form-group">
-      <label for="iconUrl">URL иконки</label>
-      <input type="text" id="iconUrl" placeholder="https://example.com/icon.png" />
-    </div>
     <div class="icon-preview">
       <div class="preview-content">
         ${
@@ -373,10 +369,10 @@ async function showFolderEditDialog(folder) {
       const iconUrl = previewImg ? previewImg.src : null
 
       try {
-        // Сначала обновляем название папки
+        // Обновляем название папки
         await updateFolder(folder.id, { title: newTitle })
 
-        // Затем сохраняем иконку если она есть
+        // Сохраняем иконку если она есть
         if (iconUrl) {
           await storage.set(`folder_icon_${folder.id}`, iconUrl)
         }
@@ -418,43 +414,14 @@ async function showFolderEditDialog(folder) {
           previewContent.appendChild(previewImg)
         }
 
-        // Устанавливаем data URL как источник изображения
         previewImg.src = event.target.result
-
-        // Очищаем поле URL, так как загружен файл
-        customContent.querySelector("#iconUrl").value = ""
+        previewImg.onerror = () => {
+          console.error("Failed to load image")
+          previewImg.src = "/assets/icons/folder_black.svg"
+          alert("Не удалось загрузить изображение")
+        }
       }
       reader.readAsDataURL(file)
-    }
-  })
-
-  // Обработчик для URL
-  const urlInput = customContent.querySelector("#iconUrl")
-  urlInput.addEventListener("change", async (e) => {
-    const url = e.target.value.trim()
-    if (url) {
-      try {
-        // Проверяем, что URL действителен
-        const response = await fetch(url)
-        if (!response.ok) throw new Error("Invalid URL")
-
-        const previewContent = customContent.querySelector(".preview-content")
-        let previewImg = previewContent.querySelector("img")
-
-        if (!previewImg) {
-          previewImg = document.createElement("img")
-          previewContent.textContent = ""
-          previewContent.appendChild(previewImg)
-        }
-
-        previewImg.src = url
-
-        // Очищаем поле файла, так как указан URL
-        customContent.querySelector("#iconFile").value = ""
-      } catch (error) {
-        alert("Не удалось загрузить изображение по указанному URL")
-        urlInput.value = ""
-      }
     }
   })
 }
