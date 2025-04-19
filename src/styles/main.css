@@ -570,3 +570,105 @@ input:checked + .slider:before {
 .add-type-icon:not([src*="_white"]):not([src*="_black"]) {
   display: block !important;
 }
+
+/* Стили для формы редактирования папки */
+.edit-folder {
+  padding: 20px;
+  width: 100%;
+}
+
+.edit-folder .form-group {
+  margin-bottom: 20px;
+}
+
+.edit-folder label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.edit-folder input[type="text"],
+.edit-folder input[type="file"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--input-background);
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.edit-folder input[type="file"] {
+  padding: 6px;
+  cursor: pointer;
+}
+
+.edit-folder .icon-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.edit-folder .icon-preview {
+  margin-top: 15px;
+  padding: 10px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.edit-folder .icon-preview img {
+  max-width: 48px;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+/* Общие стили для модального окна */
+.modal-content {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.modal-header {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-footer {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-footer button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  background-color: var(--button-background);
+  color: var(--button-text-color);
+}
+
+.modal-footer button:hover {
+  background-color: var(--button-hover-color);
+}
+
+.modal-footer button:active {
+  background-color: var(--button-active-color);
+}
+
+.modal-footer button.cancel {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+}
+
+.modal-footer button.cancel:hover {
+  background-color: var(--bg-secondary);
+}
