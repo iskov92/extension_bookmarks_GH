@@ -220,13 +220,21 @@ async function initializeUI() {
 
 // Функция для обновления текущего вида
 async function refreshCurrentView() {
+  const bookmarks = await getAllBookmarks()
+
   if (navigationStack.length === 0) {
-    const bookmarks = await getAllBookmarks()
+    // Обновляем корневой интерфейс
+    if (!mainInterface) {
+      mainInterface = new MainInterface(mainContent, bookmarks)
+    } else {
+      mainInterface.bookmarks = bookmarks
+    }
     mainInterface.render()
   } else {
+    // Обновляем вложенное меню
     const current = navigationStack[navigationStack.length - 1]
-    const bookmarks = await getBookmarksInFolder(current.id)
-    const nestedMenu = new NestedMenu(mainContent, bookmarks)
+    const folderBookmarks = await getBookmarksInFolder(current.id)
+    const nestedMenu = new NestedMenu(mainContent, folderBookmarks)
     nestedMenu.render()
   }
 }
