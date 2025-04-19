@@ -46,18 +46,27 @@ export class ContextMenu {
       menuItem.className = "context-menu-item"
 
       if (item.icon) {
-        const icon = document.createElement("img")
-        icon.src = item.icon
-        icon.alt = ""
-        icon.className = "context-menu-icon"
-        menuItem.appendChild(icon)
+        // Создаем иконку для светлой темы
+        const iconLight = document.createElement("img")
+        iconLight.src = item.icon
+        iconLight.alt = ""
+        iconLight.className = "context-menu-icon"
+        menuItem.appendChild(iconLight)
+
+        // Создаем иконку для темной темы, если она есть
+        if (item.iconDark) {
+          const iconDark = document.createElement("img")
+          iconDark.src = item.iconDark
+          iconDark.alt = ""
+          iconDark.className = "context-menu-icon"
+          menuItem.appendChild(iconDark)
+        }
       }
 
       const text = document.createElement("span")
       text.textContent = item.text
       menuItem.appendChild(text)
 
-      // Добавляем обработчик клика напрямую
       menuItem.onclick = (e) => {
         e.preventDefault()
         e.stopPropagation()

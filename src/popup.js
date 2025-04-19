@@ -70,29 +70,34 @@ async function initializeUI() {
       ? [
           {
             text: "Переименовать",
-            icon: "/assets/icons/edit.svg",
+            icon: "/assets/icons/edit_white.svg",
+            iconDark: "/assets/icons/edit_black.svg",
             action: "rename",
           },
           {
             text: "Удалить",
-            icon: "/assets/icons/delete.svg",
+            icon: "/assets/icons/delete_white.svg",
+            iconDark: "/assets/icons/delete_black.svg",
             action: "delete",
           },
           {
             text: "Копировать",
-            icon: "/assets/icons/move.svg",
+            icon: "/assets/icons/move_white.svg",
+            iconDark: "/assets/icons/move_black.svg",
             action: "copy",
           },
         ]
       : [
           {
             text: "Изменить",
-            icon: "/assets/icons/edit.svg",
+            icon: "/assets/icons/edit_white.svg",
+            iconDark: "/assets/icons/edit_black.svg",
             action: "edit",
           },
           {
             text: "Удалить",
-            icon: "/assets/icons/delete.svg",
+            icon: "/assets/icons/delete_white.svg",
+            iconDark: "/assets/icons/delete_black.svg",
             action: "delete",
           },
         ]
@@ -231,7 +236,8 @@ function showAddDialog(parentId) {
   const items = [
     {
       text: "Добавить папку",
-      icon: "/assets/icons/folder.svg",
+      icon: "/assets/icons/folder_white.svg",
+      iconDark: "/assets/icons/folder_black.svg",
       action: "folder",
     },
     {

@@ -408,18 +408,38 @@ input:checked + .slider:before {
   cursor: pointer;
   gap: 8px;
   color: var(--text-primary);
+  opacity: 0.8;
   background-color: var(--bg-primary);
-  transition: background-color var(--transition-speed);
+  transition: background-color var(--transition-speed),
+    opacity var(--transition-speed);
 }
 
 .context-menu-item:hover {
   background-color: var(--hover-color);
+  opacity: 1;
 }
 
 .context-menu-icon {
   width: 16px;
   height: 16px;
   object-fit: contain;
+}
+
+/* Скрываем/показываем иконки в зависимости от темы */
+.context-menu-icon[src*="_white"] {
+  display: block;
+}
+
+.context-menu-icon[src*="_black"] {
+  display: none;
+}
+
+[data-theme="dark"] .context-menu-icon[src*="_white"] {
+  display: none;
+}
+
+[data-theme="dark"] .context-menu-icon[src*="_black"] {
+  display: block;
 }
 
 /* Модальное окно */
