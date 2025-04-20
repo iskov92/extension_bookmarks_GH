@@ -1,4 +1,5 @@
 import { storage } from "../utils/storage.js"
+import { iconStorage } from "../services/IconStorage.js"
 
 export class MainInterface {
   constructor(container, bookmarks) {
@@ -44,9 +45,9 @@ export class MainInterface {
 
   async getFolderIcon(folderId) {
     try {
-      const customIcon = await storage.get(`folder_icon_${folderId}`)
-      if (customIcon) {
-        return customIcon
+      const iconBlob = await iconStorage.getIcon(folderId)
+      if (iconBlob) {
+        return URL.createObjectURL(iconBlob)
       }
       return await this.getDefaultFolderIcon()
     } catch (error) {

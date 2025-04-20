@@ -26,6 +26,7 @@ import {
   DOM_IDS,
   CSS_CLASSES,
 } from "./config/constants.js"
+import { iconStorage } from "./services/IconStorage.js"
 
 // Глобальные переменные для доступа из всех функций
 let mainInterface
@@ -42,6 +43,8 @@ document.addEventListener("contextmenu", (e) => {
 // Инициализация темы
 document.addEventListener("DOMContentLoaded", async () => {
   try {
+    await iconStorage.init()
+    await iconStorage.migrateFromStorage()
     initTheme()
 
     // Обработка параметра path из URL
@@ -427,18 +430,20 @@ function showCreateBookmarkDialog(parentId) {
 }
 
 // Функция для оптимизации изображения
-async function optimizeImage(base64String) {
-  return new Promise((resolve) => {
+async function optimizeImage(file) {
+  return new Promise((resolve, reject) => {
     const img = new Image()
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+
     img.onload = () => {
-      const canvas = document.createElement("canvas")
-      const MAX_WIDTH = 128 // Максимальная ширина иконки
-      const MAX_HEIGHT = 128 // Максимальная высота иконки
+      // Максимальные размеры
+      const MAX_WIDTH = 128
+      const MAX_HEIGHT = 128
 
       let width = img.width
       let height = img.height
 
-      // Вычисляем новые размеры, сохраняя пропорции
       if (width > height) {
         if (width > MAX_WIDTH) {
           height *= MAX_WIDTH / width
@@ -454,44 +459,42 @@ async function optimizeImage(base64String) {
       canvas.width = width
       canvas.height = height
 
-      const ctx = canvas.getContext("2d")
       ctx.drawImage(img, 0, 0, width, height)
 
-      // Конвертируем в WebP с качеством 0.8
-      resolve(canvas.toDataURL("image/webp", 0.8))
+      canvas.toBlob(
+        (blob) => resolve(blob),
+        "image/png",
+        0.8 // качество
+      )
     }
 
-    img.src = base64String
+    img.onerror = () => reject(new Error("Failed to load image"))
+    img.src = URL.createObjectURL(file)
   })
 }
 
 // Обновляем функцию сохранения иконки
 async function handleIconUpload(file, folderId) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const originalBase64 = e.target.result
-        // Оптимизируем изображение перед сохранением
-        const optimizedBase64 = await optimizeImage(originalBase64)
+  try {
+    if (!file || !folderId) return null
 
-        // Проверяем размер оптимизированного изображения
-        const sizeInBytes = Math.ceil((optimizedBase64.length * 3) / 4)
-        if (sizeInBytes > 4 * 1024 * 1024) {
-          // 4MB limit
-          throw new Error("Изображение слишком большое даже после оптимизации")
-        }
-
-        await storage.set(`folder_icon_${folderId}`, optimizedBase64)
-        resolve(optimizedBase64)
-      } catch (error) {
-        console.error("Ошибка при сохранении иконки:", error)
-        reject(error)
-      }
+    // Проверяем размер файла (4MB максимум)
+    if (file.size > 4 * 1024 * 1024) {
+      throw new Error("File size exceeds 4MB limit")
     }
-    reader.onerror = () => reject(new Error("Ошибка при чтении файла"))
-    reader.readAsDataURL(file)
-  })
+
+    // Оптимизируем изображение
+    const optimizedBlob = await optimizeImage(file)
+
+    // Сохраняем в IndexedDB
+    await iconStorage.saveIcon(folderId, optimizedBlob)
+
+    // Возвращаем URL для отображения
+    return URL.createObjectURL(optimizedBlob)
+  } catch (error) {
+    console.error("Error handling icon upload:", error)
+    throw error
+  }
 }
 
 function setupFileInput(customContent, folder) {
