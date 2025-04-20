@@ -352,6 +352,107 @@ function showCreateBookmarkDialog(parentId) {
   })
 }
 
+// Функция для оптимизации изображения
+async function optimizeImage(base64String) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      const MAX_WIDTH = 128 // Максимальная ширина иконки
+      const MAX_HEIGHT = 128 // Максимальная высота иконки
+
+      let width = img.width
+      let height = img.height
+
+      // Вычисляем новые размеры, сохраняя пропорции
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width
+          width = MAX_WIDTH
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height
+          height = MAX_HEIGHT
+        }
+      }
+
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext("2d")
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Конвертируем в WebP с качеством 0.8
+      resolve(canvas.toDataURL("image/webp", 0.8))
+    }
+
+    img.src = base64String
+  })
+}
+
+// Обновляем функцию сохранения иконки
+async function handleIconUpload(file, folderId) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const originalBase64 = e.target.result
+        // Оптимизируем изображение перед сохранением
+        const optimizedBase64 = await optimizeImage(originalBase64)
+
+        // Проверяем размер оптимизированного изображения
+        const sizeInBytes = Math.ceil((optimizedBase64.length * 3) / 4)
+        if (sizeInBytes > 4 * 1024 * 1024) {
+          // 4MB limit
+          throw new Error("Изображение слишком большое даже после оптимизации")
+        }
+
+        await storage.set(`folder_icon_${folderId}`, optimizedBase64)
+        resolve(optimizedBase64)
+      } catch (error) {
+        console.error("Ошибка при сохранении иконки:", error)
+        reject(error)
+      }
+    }
+    reader.onerror = () => reject(new Error("Ошибка при чтении файла"))
+    reader.readAsDataURL(file)
+  })
+}
+
+function setupFileInput(customContent, folder) {
+  const fileInput = customContent.querySelector("#iconFile")
+  const previewContent = customContent.querySelector(".preview-content")
+  let previewImg = previewContent.querySelector("img")
+
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      alert("Пожалуйста, выберите изображение")
+      fileInput.value = ""
+      return
+    }
+
+    try {
+      const optimizedIcon = await handleIconUpload(file, folder.id)
+      if (!previewImg) {
+        previewImg = document.createElement("img")
+        previewImg.alt = "Icon preview"
+      }
+      previewImg.src = optimizedIcon
+      previewContent.textContent = ""
+      previewContent.appendChild(previewImg)
+    } catch (error) {
+      alert(error.message)
+      fileInput.value = ""
+      previewContent.textContent = "Preview"
+      previewImg = null
+    }
+  }
+}
+
 async function showFolderEditDialog(folder) {
   const savedIcon = await storage.get(`folder_icon_${folder.id}`)
   const customContent = createFolderEditContent(folder, savedIcon)
@@ -366,7 +467,7 @@ async function showFolderEditDialog(folder) {
     customContent
   )
 
-  setupFileInput(customContent)
+  setupFileInput(customContent, folder) // Передаем folder в setupFileInput
 }
 
 function createFolderEditContent(folder, savedIcon) {
@@ -384,7 +485,7 @@ function createFolderEditContent(folder, savedIcon) {
     <div class="icon-preview">
       <div class="preview-content">
         ${
-          savedIcon
+          savedIcon && savedIcon.startsWith("data:image/")
             ? `<img src="${savedIcon}" alt="Icon preview" />`
             : "Preview"
         }
@@ -420,37 +521,4 @@ async function handleFolderEdit(folder, customContent, modal) {
     return true
   }
   return false
-}
-
-function setupFileInput(customContent) {
-  const fileInput = customContent.querySelector("#iconFile")
-  fileInput.addEventListener("change", async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    if (!file.type.startsWith("image/")) {
-      alert("Пожалуйста, выберите изображение")
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const previewContent = customContent.querySelector(".preview-content")
-      let previewImg = previewContent.querySelector("img")
-
-      if (!previewImg) {
-        previewImg = document.createElement("img")
-        previewContent.textContent = ""
-        previewContent.appendChild(previewImg)
-      }
-
-      previewImg.src = event.target.result
-      previewImg.onerror = () => {
-        console.error("Failed to load image")
-        previewImg.src = "/assets/icons/folder_black.svg"
-        alert("Не удалось загрузить изображение")
-      }
-    }
-    reader.readAsDataURL(file)
-  })
 }
