@@ -58,5 +58,8 @@ export default {
     CONFIRM_CLEAR: "Are you sure you want to clear the trash?",
     RESTORE: "Restore",
     CLEAR: "Clear trash",
+    WAIT_RESTORE: "Please wait, restoration in progress...",
+    ROOT_FOLDER: "Root folder",
+    RESTORED_TO: "Item has been restored to: {path}",
   },
 }

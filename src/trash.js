@@ -156,6 +156,15 @@ async function renderTrashItems() {
 
 async function handleRestore(item) {
   try {
+    // Блокируем кнопку восстановления
+    const restoreButton = document.querySelector(
+      `[data-id="${item.id}"] .restore-button`
+    )
+    if (restoreButton) {
+      restoreButton.disabled = true
+      restoreButton.style.opacity = "0.5"
+    }
+
     // Восстанавливаем элемент из корзины
     const restoredItem = await trashStorage.restoreItem(item.id)
 
@@ -165,13 +174,24 @@ async function handleRestore(item) {
         ? restoredItem.navigationPath[restoredItem.navigationPath.length - 1].id
         : "0"
 
+    // Получаем путь восстановления
+    const restorePath =
+      restoredItem.navigationPath && restoredItem.navigationPath.length > 0
+        ? restoredItem.navigationPath.map((folder) => folder.title).join(" → ")
+        : i18n.t("TRASH.ROOT_FOLDER")
+
+    let restoredItemId
+
     // Создаем элемент в закладках
     if (item.type === "folder") {
       const newFolder = await ErrorHandler.wrapAsync(
         createFolder(parentId, item.title),
         ErrorType.RESTORE,
-        "folder"
+        "folder",
+        i18n.t("TRASH.WAIT_RESTORE")
       )
+
+      restoredItemId = newFolder.id
 
       // Если у папки есть содержимое, восстанавливаем его
       if (restoredItem.contents && restoredItem.contents.length > 0) {
@@ -180,24 +200,31 @@ async function handleRestore(item) {
             await ErrorHandler.wrapAsync(
               createFolder(newFolder.id, content.title),
               ErrorType.RESTORE,
-              "folder"
+              "folder",
+              i18n.t("TRASH.WAIT_RESTORE")
             )
           } else {
             await ErrorHandler.wrapAsync(
               createBookmark(newFolder.id, content.title, content.url),
               ErrorType.RESTORE,
-              "bookmark"
+              "bookmark",
+              i18n.t("TRASH.WAIT_RESTORE")
             )
           }
         }
       }
     } else {
-      await ErrorHandler.wrapAsync(
+      const newBookmark = await ErrorHandler.wrapAsync(
         createBookmark(parentId, item.title, item.url),
         ErrorType.RESTORE,
-        "bookmark"
+        "bookmark",
+        i18n.t("TRASH.WAIT_RESTORE")
       )
+      restoredItemId = newBookmark.id
     }
+
+    // Показываем сообщение об успешном восстановлении
+    alert(i18n.t("TRASH.RESTORED_TO", { path: restorePath }))
 
     // Обновляем отображение
     await renderTrashItems()
