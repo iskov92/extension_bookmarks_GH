@@ -27,6 +27,7 @@ import {
   CSS_CLASSES,
 } from "./config/constants.js"
 import { iconStorage } from "./services/IconStorage.js"
+import { trashStorage } from "./services/TrashStorage.js"
 
 // Глобальные переменные для доступа из всех функций
 let mainInterface
@@ -209,12 +210,33 @@ async function handleContextMenu(e) {
         break
 
       case "delete":
-        if (confirm("Вы уверены, что хотите удалить эту закладку?")) {
-          const deleted = await deleteBookmark(id)
-          if (deleted) {
-            await refreshCurrentView()
-          } else {
-            alert("Не удалось удалить закладку")
+        if (confirm(i18n.t("CONFIRM_DELETE"))) {
+          try {
+            // Сохраняем в корзину перед удалением
+            await trashStorage.moveToTrash(
+              {
+                id,
+                type: isFolder ? "folder" : "bookmark",
+                title,
+                url,
+              },
+              navigation.getStack()
+            )
+
+            // Удаляем из закладок
+            const deleted = await deleteBookmark(id)
+            if (deleted) {
+              await refreshCurrentView()
+            } else {
+              alert(i18n.t("ERROR.DELETE_FAILED"))
+            }
+          } catch (error) {
+            console.error("Error deleting item:", error)
+            ErrorHandler.handle(
+              error,
+              ErrorType.DELETE,
+              isFolder ? "folder" : "bookmark"
+            )
           }
         }
         break
@@ -293,6 +315,7 @@ async function initializeUI() {
   const backButton = document.getElementById("backButton")
   const addButton = document.getElementById("addButton")
   const settingsButton = document.getElementById("settingsButton")
+  const trashButton = document.getElementById("trashButton")
   const currentFolder = document.getElementById("currentFolder")
 
   if (!mainContent) {
@@ -332,6 +355,16 @@ async function initializeUI() {
     }
     chrome.storage.local.set({ navigationState }, () => {
       window.location.href = "settings.html"
+    })
+  })
+
+  trashButton.addEventListener("click", () => {
+    // Сохраняем текущий путь навигации
+    const navigationState = {
+      stack: navigation.getStack(),
+    }
+    chrome.storage.local.set({ navigationState }, () => {
+      window.location.href = "trash.html"
     })
   })
 

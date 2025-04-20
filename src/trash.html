@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Корзина</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/dark-theme.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-left">
+                <button id="backButton" class="header-button back-button" style="display: none;">
+                    <img src="assets/icons/return_white.svg" class="header-icon light-theme-icon" alt="Назад">
+                    <img src="assets/icons/return_black.svg" class="header-icon dark-theme-icon" alt="Назад">
+                </button>
+            </div>
+            <div class="header-center">
+                <span class="current-folder" data-translate="TRASH.TITLE">Корзина</span>
+            </div>
+            <div class="header-controls">
+                <button id="clearTrashButton" class="header-button clear-trash-button">
+                    <img src="assets/icons/Trash_Empty_white.svg" class="header-icon light-theme-icon"
+                        alt="Очистить корзину">
+                    <img src="assets/icons/Trash_Empty_black.svg" class="header-icon dark-theme-icon"
+                        alt="Очистить корзину">
+                </button>
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </header>
+        <main id="mainContent" class="main-content"></main>
+    </div>
+    <script type="module" src="trash.js"></script>
+</body>
+
+</html>

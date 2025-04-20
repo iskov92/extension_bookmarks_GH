@@ -796,3 +796,76 @@ input:checked + .slider:before {
   background-position: center;
   background-size: contain;
 }
+
+/* Стили для корзины */
+.empty-message {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-color);
+  font-style: italic;
+}
+
+.restore-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.restore-button:hover {
+  background-color: var(--hover-color);
+}
+
+.restore-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.clear-trash-button {
+  margin-right: 8px;
+}
+
+/* В корзине делаем элементы немного прозрачными */
+.trash-view .bookmark-item {
+  opacity: 0.8;
+  transition: opacity var(--transition-speed);
+}
+
+.trash-view .bookmark-item:hover {
+  opacity: 1;
+}
+
+/* Стили для кнопки очистки корзины */
+.clear-trash-button {
+  margin-right: 8px;
+}
+
+.clear-trash-button img {
+  width: 24px;
+  height: 24px;
+}
+
+/* Ensure icons are properly shown based on theme */
+body[data-theme="light"] .light-theme-icon {
+  display: block;
+}
+
+body[data-theme="light"] .dark-theme-icon {
+  display: none;
+}
+
+body[data-theme="dark"] .light-theme-icon {
+  display: none;
+}
+
+body[data-theme="dark"] .dark-theme-icon {
+  display: block;
+}
