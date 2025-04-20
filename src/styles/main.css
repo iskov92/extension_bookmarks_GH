@@ -607,65 +607,55 @@ input:checked + .slider:before {
 
 .file-input-wrapper {
   position: relative;
+  width: 100%;
+  height: 40px;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  width: 100%;
 }
 
 .file-select-button {
-  flex-shrink: 0;
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
   background-color: var(--bg-secondary);
-  color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 14px;
   transition: all var(--transition-speed);
-  position: relative;
-  z-index: 1;
-  white-space: nowrap;
+  font-size: 14px;
+  min-width: 120px;
 }
 
 .file-select-button:hover {
   background-color: var(--hover-color);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.file-select-button:active {
-  transform: translateY(0);
-  box-shadow: none;
 }
 
 .file-status {
-  flex: 0 1 120px;
-  color: var(--text-secondary);
+  margin-left: 10px;
   font-size: 14px;
-  margin-left: 8px;
+  color: var(--text-color);
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
-  width: 120px;
-}
-
-input[type="file"] {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 115px;
-  height: 31px;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 2;
 }
 
 .file-input-wrapper input[type="file"] {
-  width: 115px;
-  height: 31px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* Удаляем дублирующие стили */
+input[type="file"] {
+  display: none;
 }
 
 .edit-folder .icon-preview {
@@ -790,4 +780,42 @@ input[type="file"] {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* Стили для языкового селектора */
+.language-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.language-selector {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 2px;
+  height: 32px;
+}
+
+.language-option {
+  padding: 4px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all var(--transition-speed);
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+}
+
+.language-option.active {
+  background: var(--dark-accent);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .language-option.active {
+  background: var(--light-accent);
 }

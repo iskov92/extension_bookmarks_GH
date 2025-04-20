@@ -31,62 +31,76 @@
 }
 
 .settings-group {
-  margin-top: 40px;
+  margin-bottom: 20px;
 }
 
 .settings-group label {
   display: block;
-  font-size: 18px;
-  margin-bottom: 15px;
+  font-size: 16px;
   color: var(--text-primary);
+  margin-bottom: 10px;
 }
 
-/* Стили для языкового переключателя */
+/* Стили для переключателя языка */
 .language-switch-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 10px;
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+}
+
+#languageToggle {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
 .language-toggle-label {
   display: flex;
-  align-items: center;
-  background-color: var(--bg-secondary);
+  width: 100%;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 25px;
+  border-radius: 30px;
   padding: 4px;
   cursor: pointer;
   position: relative;
-  min-width: 200px;
+  overflow: hidden;
 }
 
 .language-toggle-label span {
   flex: 1;
-  padding: 8px 16px;
   text-align: center;
-  border-radius: 20px;
-  transition: all var(--transition-speed);
-  z-index: 1;
-  font-size: 16px;
+  padding: 8px 16px;
+  border-radius: 25px;
+  transition: all 0.3s ease;
+  color: var(--text-secondary);
+  font-size: 14px;
+  user-select: none;
 }
 
-#languageToggle {
-  display: none;
-}
-
-#languageToggle:not(:checked) + .language-toggle-label .ru {
-  background-color: var(--dark-accent);
+/* Стили для активного состояния */
+#languageToggle:not(:checked) ~ .language-toggle-label .ru {
+  background: var(--dark-accent);
   color: var(--bg-primary);
 }
 
-#languageToggle:checked + .language-toggle-label .en {
-  background-color: var(--dark-accent);
+#languageToggle:checked ~ .language-toggle-label .en {
+  background: var(--dark-accent);
   color: var(--bg-primary);
 }
 
-[data-theme="light"] #languageToggle:not(:checked) + .language-toggle-label .ru,
-[data-theme="light"] #languageToggle:checked + .language-toggle-label .en {
-  background-color: var(--light-accent);
+/* Стили для светлой темы */
+[data-theme="light"]
+  #languageToggle:not(:checked)
+  ~ .language-toggle-label
+  .ru {
+  background: var(--light-accent);
+  color: var(--bg-primary);
+}
+
+[data-theme="light"] #languageToggle:checked ~ .language-toggle-label .en {
+  background: var(--light-accent);
+  color: var(--bg-primary);
 }
 
 .settings-section {
