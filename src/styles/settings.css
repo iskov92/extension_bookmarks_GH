@@ -44,8 +44,8 @@
 /* Стили для переключателя языка */
 .language-switch-wrapper {
   position: relative;
-  width: 100%;
-  max-width: 300px;
+  display: inline-flex;
+  margin-left: auto;
 }
 
 #languageToggle {
@@ -56,51 +56,58 @@
 }
 
 .language-toggle-label {
-  display: flex;
-  width: 100%;
+  display: inline-flex;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 30px;
-  padding: 4px;
+  border-radius: 4px;
+  padding: 0;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  width: 160px;
 }
 
 .language-toggle-label span {
-  flex: 1;
-  text-align: center;
-  padding: 8px 16px;
-  border-radius: 25px;
-  transition: all 0.3s ease;
+  padding: 6px 12px;
+  transition: all var(--transition-speed);
   color: var(--text-secondary);
   font-size: 14px;
   user-select: none;
+  flex: 1;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  min-width: 80px;
 }
 
 /* Стили для активного состояния */
 #languageToggle:not(:checked) ~ .language-toggle-label .ru {
-  background: var(--dark-accent);
   color: var(--bg-primary);
 }
 
 #languageToggle:checked ~ .language-toggle-label .en {
-  background: var(--dark-accent);
   color: var(--bg-primary);
+}
+
+/* Добавляем фоновый элемент для анимации */
+.language-toggle-label::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: var(--dark-accent);
+  transition: transform var(--transition-speed);
+}
+
+#languageToggle:checked ~ .language-toggle-label::after {
+  transform: translateX(100%);
 }
 
 /* Стили для светлой темы */
-[data-theme="light"]
-  #languageToggle:not(:checked)
-  ~ .language-toggle-label
-  .ru {
+[data-theme="light"] .language-toggle-label::after {
   background: var(--light-accent);
-  color: var(--bg-primary);
-}
-
-[data-theme="light"] #languageToggle:checked ~ .language-toggle-label .en {
-  background: var(--light-accent);
-  color: var(--bg-primary);
 }
 
 .settings-section {
@@ -220,4 +227,19 @@
 
 [data-theme="light"] .settings-active img {
   filter: grayscale(100%) brightness(0.3);
+}
+
+.file-select-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  font-size: 14px;
+  min-width: 120px;
+  color: var(--text-primary);
 }
