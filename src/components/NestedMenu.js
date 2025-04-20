@@ -1,3 +1,5 @@
+import { storage } from "../utils/storage.js"
+
 export class NestedMenu {
   constructor(container, bookmarks) {
     this.container = container
@@ -21,9 +23,15 @@ export class NestedMenu {
 
   async getFolderIcon(folderId) {
     try {
-      const customIcon = await storage.get(`folder_icon_${folderId}`)
-      if (customIcon) {
-        return customIcon
+      // Получаем кастомную иконку из локального хранилища
+      const result = await new Promise((resolve) => {
+        chrome.storage.local.get(`folder_icon_${folderId}`, (result) => {
+          resolve(result[`folder_icon_${folderId}`])
+        })
+      })
+
+      if (result) {
+        return result
       }
       return await this.getDefaultFolderIcon()
     } catch (error) {

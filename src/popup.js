@@ -412,7 +412,20 @@ async function showFolderEditDialog(folder) {
           await storage.set(`folder_icon_${folder.id}`, iconUrl)
         }
 
-        await refreshCurrentView()
+        // Обновляем все представления
+        if (navigationStack.length === 0) {
+          const bookmarks = await getAllBookmarks()
+          mainInterface.bookmarks = bookmarks
+          await mainInterface.render()
+        } else {
+          const current = navigationStack[navigationStack.length - 1]
+          const folderBookmarks = await getBookmarksInFolder(current.id)
+          if (currentNestedMenu) {
+            currentNestedMenu.bookmarks = folderBookmarks
+            await currentNestedMenu.render()
+          }
+        }
+
         modal.close()
         return true
       } catch (error) {
