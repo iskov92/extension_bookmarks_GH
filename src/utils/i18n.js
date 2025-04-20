@@ -1,7 +1,7 @@
 import ruLocale from "../locales/ru.js"
 import enLocale from "../locales/en.js"
 
-class I18n {
+export class I18n {
   constructor() {
     this.currentLocale = "ru"
     this.translations = {
@@ -25,16 +25,26 @@ class I18n {
     this._notifyListeners()
   }
 
-  t(key) {
+  t(key, params = {}) {
     const keys = key.split(".")
     let value = this.translations[this.currentLocale]
 
+    // Проходим по всем частям ключа
     for (const k of keys) {
       value = value?.[k]
       if (!value) break
     }
 
-    return value || key
+    if (!value) return key
+
+    // Если есть параметры для замены, заменяем их
+    if (Object.keys(params).length > 0) {
+      return value.replace(/\{(\w+)\}/g, (match, param) => {
+        return params[param] !== undefined ? params[param] : match
+      })
+    }
+
+    return value
   }
 
   addListener(callback) {

@@ -192,11 +192,18 @@ async function handleRestore(item) {
         ? restoredItem.navigationPath[restoredItem.navigationPath.length - 1].id
         : "0"
 
-    // Получаем путь восстановления
-    const restorePath =
-      restoredItem.navigationPath && restoredItem.navigationPath.length > 0
-        ? restoredItem.navigationPath.map((folder) => folder.title).join(" → ")
-        : i18n.t("TRASH.ROOT_FOLDER")
+    // Получаем путь восстановления и форматируем его
+    let restorePath
+    if (restoredItem.navigationPath && restoredItem.navigationPath.length > 0) {
+      const pathTitles = restoredItem.navigationPath.map(
+        (folder) => folder.title
+      )
+      // Добавляем название восстанавливаемого элемента в путь
+      pathTitles.push(item.title)
+      restorePath = pathTitles.join(" → ")
+    } else {
+      restorePath = `${i18n.t("TRASH.ROOT_FOLDER")} → ${item.title}`
+    }
 
     let restoredItemId
 
@@ -225,7 +232,7 @@ async function handleRestore(item) {
       restoredItemId = newBookmark.id
     }
 
-    // Показываем сообщение об успешном восстановлении
+    // Показываем сообщение об успешном восстановлении с полным путем
     alert(i18n.t("TRASH.RESTORED_TO", { path: restorePath }))
 
     // Обновляем отображение

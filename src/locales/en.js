@@ -60,6 +60,6 @@ export default {
     CLEAR: "Clear trash",
     WAIT_RESTORE: "Please wait, restoration in progress...",
     ROOT_FOLDER: "Root folder",
-    RESTORED_TO: "Item has been restored to: {path}",
+    RESTORED_TO: "Item has been restored to path: {path}",
   },
 }
