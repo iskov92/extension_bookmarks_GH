@@ -498,7 +498,13 @@ function setupFileInput(customContent, folder) {
   const fileInput = customContent.querySelector("#iconFile")
   const previewContent = customContent.querySelector(".preview-content")
   const fileStatus = customContent.querySelector(".file-status")
+  const fileSelectButton = customContent.querySelector(".file-select-button")
   let previewImg = previewContent.querySelector("img")
+
+  // Добавляем обработчик клика по кнопке выбора файла
+  fileSelectButton.addEventListener("click", () => {
+    fileInput.click()
+  })
 
   fileInput.onchange = async (e) => {
     const file = e.target.files[0]
