@@ -635,6 +635,10 @@ input:checked + .slider:before {
   flex: 1;
   color: var(--text-secondary);
   font-size: 14px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Стили для предпросмотра */
@@ -648,12 +652,18 @@ input:checked + .slider:before {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background-image: url("/assets/icons/Show.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 32px;
+  color: transparent;
 }
 
 .preview-content img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  background: none;
 }
 
 /* Общие стили для модального окна */
@@ -769,4 +779,13 @@ input:checked + .slider:before {
 
 [data-theme="light"] .language-option.active {
   background: var(--light-accent);
+}
+
+.preview-placeholder {
+  width: 32px;
+  height: 32px;
+  background-image: url("/assets/icons/Show.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
 }

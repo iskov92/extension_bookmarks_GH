@@ -591,12 +591,8 @@ function createFolderEditContent(folder, savedIcon) {
       <div class="preview-content">
         ${
           savedIcon && savedIcon.startsWith("data:image/")
-            ? `<img src="${savedIcon}" alt="${i18n.t(
-                "LABELS.PREVIEW"
-              )}" class="preview-image" />`
-            : `<div class="preview-placeholder" data-translate="LABELS.PREVIEW">${i18n.t(
-                "LABELS.PREVIEW"
-              )}</div>`
+            ? `<img src="${savedIcon}" alt="${i18n.t("LABELS.PREVIEW")}" />`
+            : `<div class="preview-placeholder"></div>`
         }
       </div>
     </div>
