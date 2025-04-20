@@ -58,7 +58,7 @@ export const CONTEXT_MENU_CONFIG = {
       text: UI_TEXTS.BUTTONS.EDIT,
       icon: ICONS.EDIT.LIGHT,
       iconDark: ICONS.EDIT.DARK,
-      action: "rename",
+      action: "edit",
     },
     {
       text: UI_TEXTS.BUTTONS.DELETE,

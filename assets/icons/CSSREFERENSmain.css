@@ -595,7 +595,8 @@ input:checked + .slider:before {
   color: var(--text-primary);
 }
 
-.edit-folder input[type="text"] {
+.edit-folder input[type="text"],
+.edit-folder input[type="file"] {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--border-color);
@@ -605,114 +606,29 @@ input:checked + .slider:before {
   margin-bottom: 10px;
 }
 
-.file-input-wrapper {
-  position: relative;
+.edit-folder input[type="file"] {
+  padding: 6px;
+  cursor: pointer;
+}
+
+.edit-folder .icon-input-group {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.file-select-button {
-  flex-shrink: 0;
-  padding: 6px 12px;
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all var(--transition-speed);
-  position: relative;
-  z-index: 1;
-  white-space: nowrap;
-}
-
-.file-select-button:hover {
-  background-color: var(--hover-color);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.file-select-button:active {
-  transform: translateY(0);
-  box-shadow: none;
-}
-
-.file-status {
-  flex: 1;
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-left: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-input[type="file"] {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 115px;
-  height: 31px;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 2;
-}
-
-.file-input-wrapper input[type="file"] {
-  width: 115px;
-  height: 31px;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
 }
 
 .edit-folder .icon-preview {
-  margin: 15px auto;
+  margin-top: 15px;
   padding: 10px;
   border: 1px dashed var(--border-color);
   border-radius: 4px;
   text-align: center;
-  width: 120px;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .edit-folder .icon-preview img {
-  max-width: 100px;
-  max-height: 100px;
-  object-fit: contain;
-}
-
-.preview-content {
-  width: 100%;
-  height: 100%;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  background: var(--bg-secondary);
-}
-
-.preview-placeholder {
-  width: 32px;
-  height: 32px;
-  background-image: url("/assets/icons/Show.svg");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  color: transparent;
-}
-
-.preview-content img {
-  width: 100%;
-  height: 100%;
+  max-width: 48px;
+  max-height: 48px;
   object-fit: contain;
 }
 

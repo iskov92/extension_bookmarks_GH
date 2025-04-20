@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GH Bookmarks Settings</title>
+    <title>Настройки</title>
     <link rel="stylesheet" href="./styles/main.css">
     <link rel="stylesheet" href="./styles/dark-theme.css" id="theme-stylesheet">
     <link rel="stylesheet" href="./styles/settings.css">
@@ -21,7 +21,7 @@
                 </button>
             </div>
             <div class="header-center">
-                <span class="current-folder">Настройки</span>
+                <span class="current-folder" data-translate="SETTINGS.TITLE">Настройки</span>
             </div>
             <div class="header-controls">
                 <label class="theme-switch">
@@ -37,32 +37,45 @@
 
         <main class="settings-content">
             <div class="settings-section">
-                <h2>Управление закладками</h2>
+                <h2 data-translate="SETTINGS.BOOKMARKS_MANAGEMENT">Управление закладками</h2>
                 <div class="settings-buttons">
                     <button id="importBookmarks" class="settings-button">
                         <img src="../assets/icons/import.svg" alt="Import" class="settings-icon light-theme-icon">
                         <img src="../assets/icons/import_dark.svg" alt="Import" class="settings-icon dark-theme-icon">
-                        <span>Установить в расширение закладки из браузера</span>
+                        <span data-translate="SETTINGS.IMPORT_BROWSER">Установить в расширение закладки из
+                            браузера</span>
                     </button>
                     <button id="importFromFile" class="settings-button">
                         <img src="../assets/icons/File_Add_white.svg" alt="Import from file"
                             class="settings-icon light-theme-icon">
                         <img src="../assets/icons/File_Add_black.svg" alt="Import from file"
                             class="settings-icon dark-theme-icon">
-                        <span>Импортировать закладки из HTML файла</span>
+                        <span data-translate="SETTINGS.IMPORT_FILE">Импортировать закладки из HTML файла</span>
                     </button>
                     <button id="exportBookmarks" class="settings-button">
                         <img src="../assets/icons/export.svg" alt="Export" class="settings-icon light-theme-icon">
                         <img src="../assets/icons/export_dark.svg" alt="Export" class="settings-icon dark-theme-icon">
-                        <span>Создать файл экспорта закладок из расширения</span>
+                        <span data-translate="SETTINGS.EXPORT">Создать файл экспорта закладок из расширения</span>
                     </button>
                 </div>
             </div>
 
             <div class="settings-section author-section">
-                <h2>Контакты</h2>
+                <h2 data-translate="SETTINGS.CONTACTS">Контакты</h2>
                 <div class="author-info">
-                    <p>Автор расширения: <a href="https://t.me/iskov92" target="_blank">@iskov92</a></p>
+                    <p><span data-translate="SETTINGS.AUTHOR">Автор расширения</span>: <a href="https://t.me/iskov92"
+                            target="_blank">@iskov92</a></p>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <label data-translate="LABELS.LANGUAGE">Язык</label>
+                <div class="language-switch-wrapper">
+                    <input type="checkbox" id="languageToggle">
+                    <label for="languageToggle" class="language-toggle-label">
+                        <span class="ru" data-translate="SETTINGS.LANGUAGE_RU">Русский</span>
+                        <span class="en" data-translate="SETTINGS.LANGUAGE_EN">English</span>
+                    </label>
                 </div>
             </div>
         </main>

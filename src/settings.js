@@ -1,17 +1,35 @@
 import { initTheme } from "./utils/theme.js"
 import { importFromBrowser } from "./utils/bookmarks.js"
 import { getStoredBookmarks, saveBookmarks } from "./utils/storage.js"
+import { i18n } from "./utils/i18n.js"
 
 // Инициализация UI
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   // Инициализируем тему
   initTheme()
+
+  // Инициализируем язык
+  await i18n.initLocale()
+  updateLanguageToggle()
+  translatePage()
 
   // Обработчик кнопки "Назад"
   const backButton = document.getElementById("backButton")
   backButton.addEventListener("click", () => {
     window.location.href = "popup.html"
   })
+
+  // Обработчик переключения языка
+  const languageToggle = document.getElementById("languageToggle")
+  languageToggle.addEventListener("change", async () => {
+    const newLocale = languageToggle.checked ? "en" : "ru"
+    await i18n.setLocale(newLocale)
+    translatePage()
+  })
+
+  // Обработчик переключения темы
+  const themeToggle = document.getElementById("themeToggle")
+  themeToggle.addEventListener("change", handleThemeToggle)
 
   // Обработчик импорта закладок
   const importButton = document.getElementById("importBookmarks")
@@ -36,6 +54,30 @@ document.addEventListener("DOMContentLoaded", () => {
     input.click()
   })
 })
+
+// Обновление состояния переключателя языка
+function updateLanguageToggle() {
+  const languageToggle = document.getElementById("languageToggle")
+  languageToggle.checked = i18n.currentLocale === "en"
+}
+
+// Перевод всех элементов на странице
+function translatePage() {
+  const elements = document.querySelectorAll("[data-translate]")
+  elements.forEach((element) => {
+    const key = element.dataset.translate
+    element.textContent = i18n.t(key)
+  })
+}
+
+// Обработчик переключения темы
+function handleThemeToggle(e) {
+  const isDark = e.target.checked
+  document.body.classList.toggle("dark-theme", isDark)
+  const themeStylesheet = document.getElementById("theme-stylesheet")
+  themeStylesheet.href = `./styles/${isDark ? "dark" : "light"}-theme.css`
+  chrome.storage.sync.set({ isDarkTheme: isDark })
+}
 
 // Функция импорта закладок из браузера
 async function importBookmarksFromBrowser() {

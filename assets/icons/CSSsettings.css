@@ -11,84 +11,6 @@
   flex-direction: column;
 }
 
-/* Добавляем кастомный скролл как в основном окне */
-.settings-content::-webkit-scrollbar {
-  width: var(--scrollbar-width);
-}
-
-.settings-content::-webkit-scrollbar-track {
-  background: var(--light-accent);
-  border-radius: calc(var(--scrollbar-width) / 2);
-}
-
-.settings-content::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: calc(var(--scrollbar-width) / 2);
-}
-
-[data-theme="dark"] .settings-content::-webkit-scrollbar-track {
-  background: var(--dark-accent);
-}
-
-.settings-group {
-  margin-top: 40px;
-}
-
-.settings-group label {
-  display: block;
-  font-size: 18px;
-  margin-bottom: 15px;
-  color: var(--text-primary);
-}
-
-/* Стили для языкового переключателя */
-.language-switch-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 10px;
-}
-
-.language-toggle-label {
-  display: flex;
-  align-items: center;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 25px;
-  padding: 4px;
-  cursor: pointer;
-  position: relative;
-  min-width: 200px;
-}
-
-.language-toggle-label span {
-  flex: 1;
-  padding: 8px 16px;
-  text-align: center;
-  border-radius: 20px;
-  transition: all var(--transition-speed);
-  z-index: 1;
-  font-size: 16px;
-}
-
-#languageToggle {
-  display: none;
-}
-
-#languageToggle:not(:checked) + .language-toggle-label .ru {
-  background-color: var(--dark-accent);
-  color: var(--bg-primary);
-}
-
-#languageToggle:checked + .language-toggle-label .en {
-  background-color: var(--dark-accent);
-  color: var(--bg-primary);
-}
-
-[data-theme="light"] #languageToggle:not(:checked) + .language-toggle-label .ru,
-[data-theme="light"] #languageToggle:checked + .language-toggle-label .en {
-  background-color: var(--light-accent);
-}
-
 .settings-section {
   margin-bottom: 2rem;
   padding: 1rem;
@@ -131,6 +53,7 @@
   transition: transform 0.2s ease;
 }
 
+/* Увеличение иконок при наведении */
 #importFromFile:hover img,
 #exportBookmarks:hover img {
   transform: scale(1.2);
@@ -151,6 +74,7 @@
   color: var(--text-secondary);
 }
 
+/* Стили для ссылки в зависимости от темы */
 [data-theme="dark"] .author-info a {
   color: #24ffd0;
   text-decoration: none;
@@ -175,9 +99,9 @@
 
 /* Стили для кнопки настроек в хедере */
 .header-button.settings-button {
-  width: calc(var(--header-height) - 6px);
-  height: calc(var(--header-height) - 6px);
-  padding: 0;
+  width: 24px;
+  height: 24px;
+  padding: 2px;
   display: flex;
   align-items: center;
   justify-content: center;

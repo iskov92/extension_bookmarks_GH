@@ -1,3 +1,5 @@
+import { i18n } from "../utils/i18n.js"
+
 export class Modal {
   constructor() {
     this.modal = null
@@ -16,6 +18,7 @@ export class Modal {
     const header = document.createElement("div")
     header.className = "modal-header"
     header.textContent = title
+    header.dataset.translate = `MODALS.${type.toUpperCase()}`
 
     const content = document.createElement("div")
     content.className = "modal-content"
@@ -24,14 +27,26 @@ export class Modal {
       content.appendChild(customContent)
     } else if (type === "link") {
       content.appendChild(
-        this.createInputGroup("name", "Название", initialData.title || "")
+        this.createInputGroup(
+          "name",
+          i18n.t("LABELS.BOOKMARK_NAME"),
+          initialData.title || ""
+        )
       )
       content.appendChild(
-        this.createInputGroup("url", "URL", initialData.url || "")
+        this.createInputGroup(
+          "url",
+          i18n.t("LABELS.BOOKMARK_URL"),
+          initialData.url || ""
+        )
       )
     } else if (type === "folder") {
       content.appendChild(
-        this.createInputGroup("name", "Название папки", initialData.title || "")
+        this.createInputGroup(
+          "name",
+          i18n.t("LABELS.FOLDER_NAME"),
+          initialData.title || ""
+        )
       )
     }
 
@@ -40,7 +55,8 @@ export class Modal {
 
     const cancelButton = document.createElement("button")
     cancelButton.className = "cancel"
-    cancelButton.textContent = "Отмена"
+    cancelButton.textContent = i18n.t("BUTTONS.CANCEL")
+    cancelButton.dataset.translate = "BUTTONS.CANCEL"
     cancelButton.onclick = () => {
       if (this.onClose) {
         this.onClose()
@@ -51,7 +67,8 @@ export class Modal {
 
     const saveButton = document.createElement("button")
     saveButton.className = "save-button"
-    saveButton.textContent = "Сохранить"
+    saveButton.textContent = i18n.t("BUTTONS.SAVE")
+    saveButton.dataset.translate = "BUTTONS.SAVE"
     saveButton.onclick = () => {
       if (this.onSave) {
         if (customContent) {
@@ -87,6 +104,7 @@ export class Modal {
     const labelElement = document.createElement("label")
     labelElement.htmlFor = id
     labelElement.textContent = label
+    labelElement.dataset.translate = `LABELS.${id.toUpperCase()}`
 
     const input = document.createElement("input")
     input.id = id

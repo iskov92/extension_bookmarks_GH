@@ -16,6 +16,7 @@ import { Modal } from "./components/Modal.js"
 import { storage } from "./utils/storage.js"
 import { Navigation } from "./utils/navigation.js"
 import { ErrorHandler, ErrorType } from "./utils/errorHandler.js"
+import { i18n } from "./utils/i18n.js"
 import {
   ICONS,
   UI_TEXTS,
@@ -42,11 +43,28 @@ document.addEventListener("contextmenu", (e) => {
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     initTheme()
+    await i18n.initLocale()
     await initializeUI()
+    translatePage()
+
+    // Подписываемся на изменения языка
+    i18n.addListener(() => {
+      translatePage()
+      refreshCurrentView()
+    })
   } catch (error) {
     console.error("Ошибка инициализации:", error)
   }
 })
+
+// Функция перевода страницы
+function translatePage() {
+  const elements = document.querySelectorAll("[data-translate]")
+  elements.forEach((element) => {
+    const key = element.dataset.translate
+    element.textContent = i18n.t(key)
+  })
+}
 
 // Обработчики событий
 async function handleFolderClick(bookmarkElement) {
@@ -288,17 +306,31 @@ function showAddDialog(parentId) {
     const buttonElement = document.createElement("button")
     buttonElement.className = "add-type-button"
     buttonElement.dataset.type = button.type
+    buttonElement.dataset.translate =
+      button.type === "folder"
+        ? "BUTTONS.CREATE_FOLDER"
+        : "BUTTONS.ADD_BOOKMARK"
 
     buttonElement.innerHTML =
       button.type === "folder"
         ? `
-      <img src="${button.icons.light}" class="add-type-icon light-theme-icon" alt="${button.text}">
-      <img src="${button.icons.dark}" class="add-type-icon dark-theme-icon" alt="${button.text}">
-      ${button.text}
+      <img src="${
+        button.icons.light
+      }" class="add-type-icon light-theme-icon" alt="${i18n.t(
+            "BUTTONS.CREATE_FOLDER"
+          )}">
+      <img src="${
+        button.icons.dark
+      }" class="add-type-icon dark-theme-icon" alt="${i18n.t(
+            "BUTTONS.CREATE_FOLDER"
+          )}">
+      ${i18n.t("BUTTONS.CREATE_FOLDER")}
     `
         : `
-      <img src="${button.icon}" class="add-type-icon" alt="${button.text}">
-      ${button.text}
+      <img src="${button.icon}" class="add-type-icon" alt="${i18n.t(
+            "BUTTONS.ADD_BOOKMARK"
+          )}">
+      ${i18n.t("BUTTONS.ADD_BOOKMARK")}
     `
 
     buttonElement.addEventListener("click", () => {
@@ -312,7 +344,7 @@ function showAddDialog(parentId) {
 
   const modal = new Modal()
   modal.show(
-    UI_TEXTS.MODALS.SELECT_TYPE,
+    i18n.t("MODALS.SELECT_TYPE"),
     "select",
     {},
     null,
@@ -323,7 +355,7 @@ function showAddDialog(parentId) {
 
 function showCreateFolderDialog(parentId) {
   const modal = new Modal()
-  modal.show(UI_TEXTS.MODALS.CREATE_FOLDER, "folder", {}, async (data) => {
+  modal.show(i18n.t("MODALS.CREATE_FOLDER"), "folder", {}, async (data) => {
     const result = await ErrorHandler.wrapAsync(
       createFolder(parentId, data.title),
       ErrorType.CREATE,
@@ -340,7 +372,7 @@ function showCreateFolderDialog(parentId) {
 
 function showCreateBookmarkDialog(parentId) {
   const modal = new Modal()
-  modal.show(UI_TEXTS.MODALS.ADD_BOOKMARK, "link", {}, async (data) => {
+  modal.show(i18n.t("MODALS.ADD_BOOKMARK"), "link", {}, async (data) => {
     const result = await ErrorHandler.wrapAsync(
       createBookmark(parentId, data.title, data.url),
       ErrorType.CREATE,
@@ -426,23 +458,33 @@ async function handleIconUpload(file, folderId) {
 function setupFileInput(customContent, folder) {
   const fileInput = customContent.querySelector("#iconFile")
   const previewContent = customContent.querySelector(".preview-content")
+  const fileStatus = customContent.querySelector(".file-status")
   let previewImg = previewContent.querySelector("img")
 
   fileInput.onchange = async (e) => {
     const file = e.target.files[0]
-    if (!file) return
-
-    if (!file.type.startsWith("image/")) {
-      alert("Пожалуйста, выберите изображение")
-      fileInput.value = ""
+    if (!file) {
+      fileStatus.textContent = i18n.t("LABELS.FILE_NOT_SELECTED")
+      fileStatus.dataset.translate = "LABELS.FILE_NOT_SELECTED"
       return
     }
+
+    if (!file.type.startsWith("image/")) {
+      alert(i18n.t("VALIDATIONS.INVALID_IMAGE"))
+      fileInput.value = ""
+      fileStatus.textContent = i18n.t("LABELS.FILE_NOT_SELECTED")
+      fileStatus.dataset.translate = "LABELS.FILE_NOT_SELECTED"
+      return
+    }
+
+    fileStatus.textContent = file.name
+    fileStatus.removeAttribute("data-translate")
 
     try {
       const optimizedIcon = await handleIconUpload(file, folder.id)
       if (!previewImg) {
         previewImg = document.createElement("img")
-        previewImg.alt = "Icon preview"
+        previewImg.alt = i18n.t("LABELS.PREVIEW")
       }
       previewImg.src = optimizedIcon
       previewContent.textContent = ""
@@ -450,7 +492,9 @@ function setupFileInput(customContent, folder) {
     } catch (error) {
       alert(error.message)
       fileInput.value = ""
-      previewContent.textContent = "Preview"
+      fileStatus.textContent = i18n.t("LABELS.FILE_NOT_SELECTED")
+      fileStatus.dataset.translate = "LABELS.FILE_NOT_SELECTED"
+      previewContent.textContent = i18n.t("LABELS.PREVIEW")
       previewImg = null
     }
   }
@@ -462,7 +506,7 @@ async function showFolderEditDialog(folder) {
 
   const modal = new Modal()
   modal.show(
-    "Изменить папку",
+    i18n.t("MODALS.EDIT_FOLDER"),
     "folder",
     {},
     async (data) => await handleFolderEdit(folder, customContent, modal),
@@ -470,7 +514,7 @@ async function showFolderEditDialog(folder) {
     customContent
   )
 
-  setupFileInput(customContent, folder) // Передаем folder в setupFileInput
+  setupFileInput(customContent, folder)
 }
 
 function createFolderEditContent(folder, savedIcon) {
@@ -478,19 +522,36 @@ function createFolderEditContent(folder, savedIcon) {
   customContent.className = "edit-folder"
   customContent.innerHTML = `
     <div class="form-group">
-      <label for="folderTitle">Название папки</label>
+      <label for="folderTitle" data-translate="LABELS.FOLDER_NAME">${i18n.t(
+        "LABELS.FOLDER_NAME"
+      )}</label>
       <input type="text" id="folderTitle" value="${folder.title}" />
     </div>
     <div class="form-group">
-      <label for="iconFile">Загрузить иконку</label>
-      <input type="file" id="iconFile" accept="image/*" />
+      <label for="iconFile" data-translate="LABELS.UPLOAD_ICON">${i18n.t(
+        "LABELS.UPLOAD_ICON"
+      )}</label>
+      <div class="file-input-wrapper">
+        <input type="file" id="iconFile" accept="image/*" />
+        <button class="file-select-button" data-translate="LABELS.CHOOSE_FILE">${i18n.t(
+          "LABELS.CHOOSE_FILE"
+        )}</button>
+        <span class="file-status" data-translate="LABELS.FILE_NOT_SELECTED">${i18n.t(
+          "LABELS.FILE_NOT_SELECTED"
+        )}</span>
+      </div>
     </div>
-    <div class="icon-preview">
+    <div class="form-group">
+      <label data-translate="LABELS.PREVIEW">${i18n.t("LABELS.PREVIEW")}</label>
       <div class="preview-content">
         ${
           savedIcon && savedIcon.startsWith("data:image/")
-            ? `<img src="${savedIcon}" alt="Icon preview" />`
-            : "Preview"
+            ? `<img src="${savedIcon}" alt="${i18n.t(
+                "LABELS.PREVIEW"
+              )}" class="preview-image" />`
+            : `<div class="preview-placeholder" data-translate="LABELS.PREVIEW">${i18n.t(
+                "LABELS.PREVIEW"
+              )}</div>`
         }
       </div>
     </div>
