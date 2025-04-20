@@ -4,21 +4,13 @@ export class MainInterface {
   constructor(container, bookmarks) {
     this.container = container
     this.bookmarks = bookmarks
-
-    // Подписываемся на изменение темы
-    chrome.storage.onChanged.addListener((changes, namespace) => {
-      if (namespace === "sync" && changes.isDarkTheme) {
-        this.render() // Перерисовываем интерфейс при смене темы
-      }
-    })
   }
 
   // Получить текущую тему
   async getCurrentTheme() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get("isDarkTheme", (result) => {
-        const isDark = result.isDarkTheme ?? true // true = темная тема по умолчанию
-        resolve(isDark ? "dark" : "light")
+      chrome.storage.sync.get("theme", (result) => {
+        resolve(result.theme || "light")
       })
     })
   }
@@ -47,46 +39,51 @@ export class MainInterface {
   // Получить дефолтную иконку папки в зависимости от темы
   async getDefaultFolderIcon() {
     const theme = await this.getCurrentTheme()
-    // Для темной темы - черную иконку, для светлой - белую
-    const iconPath = `/assets/icons/folder_${
-      theme === "dark" ? "black" : "white"
-    }.svg`
-    console.log("Текущая тема:", theme)
-    console.log("Путь к дефолтной иконке:", iconPath)
-    return iconPath
+    return `/assets/icons/folder_${theme === "dark" ? "white" : "black"}.svg`
   }
 
   async getFolderIcon(folderId) {
     try {
-      // Сначала пробуем получить кастомную иконку
       const customIcon = await storage.get(`folder_icon_${folderId}`)
       if (customIcon) {
         return customIcon
       }
-
-      // Если кастомной иконки нет, возвращаем дефолтную в зависимости от темы
-      const theme = await this.getCurrentTheme()
-      return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
+      return await this.getDefaultFolderIcon()
     } catch (error) {
       console.error("Error getting folder icon:", error)
-      const theme = await this.getCurrentTheme()
-      return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
+      return await this.getDefaultFolderIcon()
     }
   }
 
   async render() {
+    // Очищаем контейнер перед рендером
     this.container.innerHTML = ""
+    this.container.classList.add("main-view")
 
+    console.log("MainInterface render bookmarks:", this.bookmarks)
+
+    // Проверяем, что у нас есть закладки для рендера
     if (!this.bookmarks || this.bookmarks.length === 0) {
-      this.container.innerHTML = `
-        <div class="empty-message">
-          Нет закладок. Нажмите "+" чтобы добавить.
-        </div>
-      `
+      const empty = document.createElement("div")
+      empty.className = "empty-message"
+      empty.textContent = "Нет закладок"
+      this.container.appendChild(empty)
       return
     }
 
+    // Создаем Set для отслеживания уже отрендеренных ID
+    const renderedIds = new Set()
+
     for (const bookmark of this.bookmarks) {
+      // Пропускаем дубликаты
+      if (renderedIds.has(bookmark.id)) {
+        console.warn(
+          `Дубликат найден в MainInterface: ${bookmark.title} (${bookmark.id})`
+        )
+        continue
+      }
+      renderedIds.add(bookmark.id)
+
       const bookmarkElement = document.createElement("div")
       bookmarkElement.className = `bookmark-item ${
         bookmark.type === "folder" ? "folder" : ""
@@ -97,16 +94,25 @@ export class MainInterface {
         bookmarkElement.dataset.url = bookmark.url
       }
 
-      const iconSrc =
-        bookmark.type === "folder"
-          ? await this.getFolderIcon(bookmark.id)
-          : bookmark.favicon || "/assets/icons/link.svg"
+      const icon = document.createElement("img")
+      icon.className = "bookmark-icon"
+      icon.alt = bookmark.type
 
-      bookmarkElement.innerHTML = `
-        <img src="${iconSrc}" alt="${bookmark.type}" class="bookmark-icon" />
-        <span class="bookmark-title">${bookmark.title}</span>
-      `
+      if (bookmark.type === "folder") {
+        icon.src = await this.getFolderIcon(bookmark.id)
+        icon.onerror = async () => {
+          icon.src = await this.getDefaultFolderIcon()
+        }
+      } else {
+        icon.src = "/assets/icons/link.svg"
+      }
 
+      const title = document.createElement("span")
+      title.className = "bookmark-title"
+      title.textContent = bookmark.title
+
+      bookmarkElement.appendChild(icon)
+      bookmarkElement.appendChild(title)
       this.container.appendChild(bookmarkElement)
     }
   }

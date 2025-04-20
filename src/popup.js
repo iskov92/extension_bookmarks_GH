@@ -19,6 +19,7 @@ import { storage } from "./utils/storage.js"
 let mainInterface
 let mainContent
 let navigationStack = []
+let currentNestedMenu = null
 
 // Создаем единый экземпляр контекстного меню
 const contextMenu = new ContextMenu()
@@ -182,8 +183,14 @@ async function initializeUI() {
         bookmarkElement.querySelector(".bookmark-title").textContent
       navigationStack.push({ id, title: folderTitle })
 
-      const nestedMenu = new NestedMenu(mainContent, nestedBookmarks)
-      nestedMenu.render()
+      // Уничтожаем предыдущее меню если оно есть
+      if (currentNestedMenu) {
+        currentNestedMenu.destroy()
+      }
+
+      // Создаем и сохраняем новое меню
+      currentNestedMenu = new NestedMenu(mainContent, nestedBookmarks)
+      currentNestedMenu.render()
 
       currentFolder.style.display = "block"
       currentFolder.textContent = folderTitle
@@ -195,8 +202,14 @@ async function initializeUI() {
 
   // Кнопка "Назад"
   backButton.addEventListener("click", async () => {
+    // Уничтожаем текущее меню
+    if (currentNestedMenu) {
+      currentNestedMenu.destroy()
+    }
+
     navigationStack.pop()
     if (navigationStack.length === 0) {
+      currentNestedMenu = null
       const bookmarks = await getAllBookmarks()
       mainInterface.render()
       mainContent.classList.remove("nested-view")
@@ -205,8 +218,8 @@ async function initializeUI() {
     } else {
       const current = navigationStack[navigationStack.length - 1]
       const bookmarks = await getBookmarksInFolder(current.id)
-      const nestedMenu = new NestedMenu(mainContent, bookmarks)
-      nestedMenu.render()
+      currentNestedMenu = new NestedMenu(mainContent, bookmarks)
+      currentNestedMenu.render()
       currentFolder.textContent = current.title
     }
   })
@@ -225,6 +238,22 @@ async function initializeUI() {
   settingsButton.addEventListener("click", () => {
     window.location.href = "settings.html"
   })
+
+  // Обработчик переключения темы
+  document
+    .getElementById("themeToggle")
+    .addEventListener("change", async (e) => {
+      const isDark = e.target.checked
+      document.body.classList.toggle("dark-theme", isDark)
+      await chrome.storage.sync.set({ theme: isDark ? "dark" : "light" })
+
+      // Обновляем только текущий интерфейс без полной перезагрузки
+      if (navigationStack.length === 0) {
+        await mainInterface.render()
+      } else if (currentNestedMenu) {
+        await currentNestedMenu.render()
+      }
+    })
 }
 
 // Функция для обновления текущего вида

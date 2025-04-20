@@ -84,7 +84,8 @@ export async function createStoredBookmark(parentId, title, url = "") {
 
   if (url) {
     newBookmark.url = url
-    newBookmark.favicon = `chrome://favicon/size/16@2x/${url}`
+    // Получаем favicon через новую функцию
+    newBookmark.favicon = await getFavicon(url)
   }
 
   if (parentId === "0") {
@@ -144,12 +145,24 @@ export async function saveBookmarks(bookmarks) {
 // Получить favicon для URL
 async function getFavicon(url) {
   try {
-    const response = await fetch(url)
-    const text = await response.text()
+    // Используем Google Favicon Service
+    const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+      url
+    )}&sz=32`
+
+    // Проверяем доступность favicon
+    const response = await fetch(googleFaviconUrl)
+    if (response.ok) {
+      return googleFaviconUrl
+    }
+
+    // Если не удалось получить через Google, пробуем получить напрямую с сайта
+    const siteResponse = await fetch(url)
+    const text = await siteResponse.text()
     const parser = new DOMParser()
     const doc = parser.parseFromString(text, "text/html")
 
-    // Пытаемся найти favicon в разных местах
+    // Ищем favicon в разных местах
     const links = Array.from(doc.getElementsByTagName("link"))
     const faviconLink = links.find(
       (link) =>
@@ -162,18 +175,11 @@ async function getFavicon(url) {
       return faviconUrl
     }
 
-    // Если не нашли, пробуем стандартный путь
-    const defaultFavicon = new URL("/favicon.ico", url).href
-    const defaultResponse = await fetch(defaultFavicon)
-    if (defaultResponse.ok) {
-      return defaultFavicon
-    }
-
-    // Если ничего не нашли, возвращаем дефолтную иконку
-    return "./assets/icons/default_favicon.png"
+    // Если не нашли, возвращаем дефолтную иконку
+    return "/assets/icons/link.svg"
   } catch (error) {
     console.error("Ошибка при получении favicon:", error)
-    return "./assets/icons/default_favicon.png"
+    return "/assets/icons/link.svg"
   }
 }
 
