@@ -40,8 +40,6 @@ export class NestedMenu {
     this.container.innerHTML = ""
     this.container.classList.add("nested-view")
 
-    console.log("NestedMenu render bookmarks:", this.bookmarks)
-
     // Проверяем, что у нас есть закладки для рендера
     if (!this.bookmarks || this.bookmarks.length === 0) {
       const empty = document.createElement("div")

@@ -104,8 +104,6 @@ class IconStorage {
         // Удаляем старую запись из storage
         await chrome.storage.local.remove(key)
       }
-
-      console.log("Migration completed successfully")
     } catch (error) {
       console.error("Migration failed:", error)
       throw error

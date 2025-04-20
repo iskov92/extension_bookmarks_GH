@@ -21,12 +21,6 @@ export class MainInterface {
     try {
       const result = await new Promise((resolve) => {
         chrome.storage.local.get(`folder_icon_${folderId}`, (result) => {
-          console.log(
-            "Кастомная иконка для папки",
-            folderId,
-            ":",
-            result[`folder_icon_${folderId}`]
-          )
           resolve(result[`folder_icon_${folderId}`])
         })
       })
@@ -60,8 +54,6 @@ export class MainInterface {
     // Очищаем контейнер перед рендером
     this.container.innerHTML = ""
     this.container.classList.add("main-view")
-
-    console.log("MainInterface render bookmarks:", this.bookmarks)
 
     // Проверяем, что у нас есть закладки для рендера
     if (!this.bookmarks || this.bookmarks.length === 0) {

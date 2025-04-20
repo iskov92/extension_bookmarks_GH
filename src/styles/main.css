@@ -635,7 +635,7 @@ input:checked + .slider:before {
   flex: 1;
   color: var(--text-secondary);
   font-size: 14px;
-  max-width: 200px;
+  max-width: 109px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
