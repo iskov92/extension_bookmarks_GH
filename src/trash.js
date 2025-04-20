@@ -37,12 +37,11 @@ async function initializeUI() {
   const clearTrashButton = document.getElementById("clearTrashButton")
   const themeToggle = document.getElementById("themeToggle")
 
-  // Set initial theme
-  chrome.storage.sync.get(["theme"], (result) => {
-    const currentTheme = result.theme || "light"
-    document.body.setAttribute("data-theme", currentTheme)
-    themeToggle.checked = currentTheme === "dark"
-  })
+  // Получаем текущую тему из хранилища
+  const { isDarkTheme } = await chrome.storage.sync.get("isDarkTheme")
+  const theme = isDarkTheme ? "dark" : "light"
+  document.body.setAttribute("data-theme", theme)
+  themeToggle.checked = isDarkTheme
 
   // Обработчики событий
   backButton.addEventListener("click", () => {
@@ -80,7 +79,7 @@ async function handleThemeToggle(e) {
   const isDark = e.target.checked
   const theme = isDark ? "dark" : "light"
   document.body.setAttribute("data-theme", theme)
-  await chrome.storage.sync.set({ theme })
+  await chrome.storage.sync.set({ isDarkTheme: isDark })
   // Перерисовываем элементы с новыми иконками
   await renderTrashItems()
 }

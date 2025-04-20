@@ -869,3 +869,85 @@ body[data-theme="dark"] .light-theme-icon {
 body[data-theme="dark"] .dark-theme-icon {
   display: block;
 }
+
+/* Стили для светлой темы */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --text-primary: #000000;
+  --text-secondary: #666666;
+  --border-color: #e0e0e0;
+  --hover-color: rgba(255, 138, 36, 0.1);
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --input-background: #ffffff;
+  --accent-color: var(--light-accent);
+}
+
+/* Стили для темной темы */
+[data-theme="dark"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --border-color: #404040;
+  --hover-color: rgba(36, 255, 208, 0.1);
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --input-background: #2d2d2d;
+  --accent-color: var(--dark-accent);
+}
+
+/* Специфичные стили для светлой темы */
+[data-theme="light"] .modal-footer button.save-button {
+  background-color: var(--light-accent);
+  border-color: var(--light-accent);
+  color: #000000;
+}
+
+[data-theme="light"] .language-option.active {
+  background: var(--light-accent);
+  color: #000000;
+}
+
+[data-theme="light"] .slider {
+  background-color: var(--light-accent);
+}
+
+[data-theme="light"] .main-content::-webkit-scrollbar-track {
+  background: var(--light-accent);
+}
+
+[data-theme="light"] .author-info a {
+  color: var(--light-accent);
+}
+
+[data-theme="light"] .author-info a:hover {
+  color: #e67d20;
+}
+
+/* Специфичные стили для темной темы */
+[data-theme="dark"] .modal-footer button.save-button {
+  background-color: var(--dark-accent);
+  border-color: var(--dark-accent);
+  color: #000000;
+}
+
+[data-theme="dark"] .language-option.active {
+  background: var(--dark-accent);
+  color: #000000;
+}
+
+[data-theme="dark"] .slider {
+  background-color: var(--dark-accent);
+}
+
+[data-theme="dark"] .main-content::-webkit-scrollbar-track {
+  background: var(--dark-accent);
+}
+
+[data-theme="dark"] .author-info a {
+  color: var(--dark-accent);
+}
+
+[data-theme="dark"] .author-info a:hover {
+  color: #20e6bc;
+}
