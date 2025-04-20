@@ -212,16 +212,21 @@ async function handleContextMenu(e) {
       case "delete":
         if (confirm(i18n.t("CONFIRM_DELETE"))) {
           try {
+            let itemToTrash = {
+              id,
+              type: isFolder ? "folder" : "bookmark",
+              title,
+              url,
+            }
+
+            // Если это папка, получаем её содержимое
+            if (isFolder) {
+              const folderContents = await getBookmarksInFolder(id)
+              itemToTrash.contents = folderContents
+            }
+
             // Сохраняем в корзину перед удалением
-            await trashStorage.moveToTrash(
-              {
-                id,
-                type: isFolder ? "folder" : "bookmark",
-                title,
-                url,
-              },
-              navigation.getStack()
-            )
+            await trashStorage.moveToTrash(itemToTrash, navigation.getStack())
 
             // Удаляем из закладок
             const deleted = await deleteBookmark(id)

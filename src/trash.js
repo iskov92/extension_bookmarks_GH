@@ -159,16 +159,41 @@ async function handleRestore(item) {
     // Восстанавливаем элемент из корзины
     const restoredItem = await trashStorage.restoreItem(item.id)
 
-    // Создаем элемент в корневой папке закладок
+    // Определяем родительскую папку из сохраненного пути
+    const parentId =
+      restoredItem.navigationPath && restoredItem.navigationPath.length > 0
+        ? restoredItem.navigationPath[restoredItem.navigationPath.length - 1].id
+        : "0"
+
+    // Создаем элемент в закладках
     if (item.type === "folder") {
-      await ErrorHandler.wrapAsync(
-        createFolder("0", item.title),
+      const newFolder = await ErrorHandler.wrapAsync(
+        createFolder(parentId, item.title),
         ErrorType.RESTORE,
         "folder"
       )
+
+      // Если у папки есть содержимое, восстанавливаем его
+      if (restoredItem.contents && restoredItem.contents.length > 0) {
+        for (const content of restoredItem.contents) {
+          if (content.type === "folder") {
+            await ErrorHandler.wrapAsync(
+              createFolder(newFolder.id, content.title),
+              ErrorType.RESTORE,
+              "folder"
+            )
+          } else {
+            await ErrorHandler.wrapAsync(
+              createBookmark(newFolder.id, content.title, content.url),
+              ErrorType.RESTORE,
+              "bookmark"
+            )
+          }
+        }
+      }
     } else {
       await ErrorHandler.wrapAsync(
-        createBookmark("0", item.title, item.url),
+        createBookmark(parentId, item.title, item.url),
         ErrorType.RESTORE,
         "bookmark"
       )

@@ -31,7 +31,7 @@ class TrashStorage {
     }
   }
 
-  async moveToTrash(item) {
+  async moveToTrash(item, navigationStack = []) {
     try {
       if (!this.db) await this.init()
 
@@ -39,10 +39,15 @@ class TrashStorage {
         const transaction = this.db.transaction([this.storeName], "readwrite")
         const store = transaction.objectStore(this.storeName)
 
-        const request = store.add({
+        // Сохраняем путь навигации и содержимое папки
+        const itemToStore = {
           ...item,
           deletedAt: new Date().toISOString(),
-        })
+          navigationPath: navigationStack,
+          contents: item.contents || [], // Содержимое папки, если есть
+        }
+
+        const request = store.add(itemToStore)
 
         request.onsuccess = () => resolve()
         request.onerror = () =>
