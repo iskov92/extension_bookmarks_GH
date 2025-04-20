@@ -52,4 +52,11 @@ export default {
     CONTACTS: "Contacts",
     AUTHOR: "Extension author",
   },
+  TRASH: {
+    TITLE: "Trash",
+    EMPTY: "Trash is empty",
+    CONFIRM_CLEAR: "Are you sure you want to clear the trash?",
+    RESTORE: "Restore",
+    CLEAR: "Clear trash",
+  },
 }

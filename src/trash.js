@@ -99,8 +99,8 @@ async function renderTrashItems() {
     const currentTheme = document.body.getAttribute("data-theme") || "light"
     const folderIcon =
       currentTheme === "dark"
-        ? "assets/icons/folder_white.svg"
-        : "assets/icons/folder_black.svg"
+        ? "../assets/icons/folder_white.svg"
+        : "../assets/icons/folder_black.svg"
 
     for (const item of items) {
       const itemElement = document.createElement("div")
@@ -116,7 +116,8 @@ async function renderTrashItems() {
 
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
-      icon.src = item.type === "folder" ? folderIcon : "assets/icons/link.svg"
+      icon.src =
+        item.type === "folder" ? folderIcon : "../assets/icons/link.svg"
       icon.alt = item.type
 
       const title = document.createElement("span")
@@ -125,9 +126,14 @@ async function renderTrashItems() {
 
       const restoreButton = document.createElement("button")
       restoreButton.className = "restore-button"
+      restoreButton.title = i18n.t("TRASH.RESTORE")
       restoreButton.innerHTML = `
-        <img src="assets/icons/return_white.svg" class="restore-icon light-theme-icon" alt="Восстановить">
-        <img src="assets/icons/return_black.svg" class="restore-icon dark-theme-icon" alt="Восстановить">
+        <img src="../assets/icons/return_white.svg" class="restore-icon light-theme-icon" alt="${i18n.t(
+          "TRASH.RESTORE"
+        )}">
+        <img src="../assets/icons/return_black.svg" class="restore-icon dark-theme-icon" alt="${i18n.t(
+          "TRASH.RESTORE"
+        )}">
       `
       restoreButton.addEventListener("click", async (e) => {
         e.stopPropagation()
