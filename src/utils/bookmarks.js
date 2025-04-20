@@ -216,7 +216,7 @@ export async function deleteBookmark(bookmarkId) {
  * @param {string} id - ID исходной папки/закладки
  * @param {string} parentId - ID целевой родительской папки
  */
-export async function copyBookmark(id) {
+export async function copyBookmark(id, parentId = "0") {
   const bookmarks = (await storage.get("gh_bookmarks")) || []
 
   function findInTree(items) {
@@ -226,6 +226,19 @@ export async function copyBookmark(id) {
       }
       if (item.type === "folder" && item.children) {
         const found = findInTree(item.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  function findParentFolder(items, targetId) {
+    for (const item of items) {
+      if (item.id === targetId) {
+        return item
+      }
+      if (item.type === "folder" && item.children) {
+        const found = findParentFolder(item.children, targetId)
         if (found) return found
       }
     }
@@ -250,7 +263,23 @@ export async function copyBookmark(id) {
   const copy = deepClone(itemToCopy)
   copy.title = `${copy.title} (копия)`
 
-  bookmarks.push(copy)
+  // Если parentId === "0", добавляем в корневой список
+  if (parentId === "0") {
+    bookmarks.push(copy)
+  } else {
+    // Иначе ищем целевую папку и добавляем в неё
+    const targetFolder = findParentFolder(bookmarks, parentId)
+    if (targetFolder) {
+      if (!targetFolder.children) {
+        targetFolder.children = []
+      }
+      targetFolder.children.push(copy)
+    } else {
+      // Если папка не найдена, добавляем в корень
+      bookmarks.push(copy)
+    }
+  }
+
   await storage.set("gh_bookmarks", bookmarks)
   return copy
 }

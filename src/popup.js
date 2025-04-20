@@ -167,8 +167,11 @@ async function handleContextMenu(e) {
 
       case "copy":
         contextMenu.close()
+        const currentFolderId = navigation.isRoot
+          ? "0"
+          : navigation.currentFolder.id
         const result = await ErrorHandler.wrapAsync(
-          copyBookmark(id),
+          copyBookmark(id, currentFolderId),
           ErrorType.COPY,
           isFolder ? "folder" : "bookmark"
         )
