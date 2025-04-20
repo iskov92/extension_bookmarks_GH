@@ -15,6 +15,7 @@ import { ContextMenu } from "./components/ContextMenu.js"
 import { Modal } from "./components/Modal.js"
 import { storage } from "./utils/storage.js"
 import { Navigation } from "./utils/navigation.js"
+import { ErrorHandler, ErrorType } from "./utils/errorHandler.js"
 
 // Глобальные переменные для доступа из всех функций
 let mainInterface
@@ -50,16 +51,25 @@ async function handleFolderClick(bookmarkElement) {
     currentNestedMenu.destroy()
   }
 
-  const nestedBookmarks = await getBookmarksInFolder(id)
-  // Создаем и сохраняем новое меню
-  currentNestedMenu = new NestedMenu(mainContent, nestedBookmarks)
-  currentNestedMenu.render()
+  const nestedBookmarks = await ErrorHandler.wrapAsync(
+    getBookmarksInFolder(id),
+    ErrorType.NAVIGATION,
+    "folder"
+  )
 
-  const currentFolder = document.getElementById("currentFolder")
-  const backButton = document.getElementById("backButton")
-  currentFolder.style.display = "block"
-  currentFolder.textContent = folderTitle
-  backButton.style.display = "block"
+  if (nestedBookmarks) {
+    // Создаем и сохраняем новое меню
+    currentNestedMenu = new NestedMenu(mainContent, nestedBookmarks)
+    currentNestedMenu.render()
+
+    const currentFolder = document.getElementById("currentFolder")
+    const backButton = document.getElementById("backButton")
+    currentFolder.style.display = "block"
+    currentFolder.textContent = folderTitle
+    backButton.style.display = "block"
+  } else {
+    navigation.pop() // Откатываем навигацию при ошибке
+  }
 }
 
 async function handleBackButtonClick() {
@@ -167,23 +177,25 @@ async function handleContextMenu(e) {
 
       case "delete":
         if (confirm("Вы уверены, что хотите удалить этот элемент?")) {
-          try {
-            await deleteBookmark(id)
+          const result = await ErrorHandler.wrapAsync(
+            deleteBookmark(id),
+            ErrorType.DELETE,
+            isFolder ? "folder" : "bookmark"
+          )
+          if (result) {
             await refreshCurrentView()
-          } catch (error) {
-            console.error("Ошибка при удалении:", error)
-            alert("Не удалось удалить элемент")
           }
         }
         break
 
       case "copy":
-        try {
-          await copyBookmark(id)
+        const result = await ErrorHandler.wrapAsync(
+          copyBookmark(id),
+          ErrorType.COPY,
+          isFolder ? "folder" : "bookmark"
+        )
+        if (result) {
           await refreshCurrentView()
-        } catch (error) {
-          console.error("Ошибка при копировании:", error)
-          alert("Не удалось скопировать элемент")
         }
         break
 
@@ -209,19 +221,29 @@ async function handleThemeToggle(e) {
 async function refreshCurrentView() {
   try {
     if (navigation.isRoot) {
-      const bookmarks = await getAllBookmarks()
-      mainInterface.bookmarks = bookmarks
-      await mainInterface.render()
+      const bookmarks = await ErrorHandler.wrapAsync(
+        getAllBookmarks(),
+        ErrorType.LOAD,
+        "bookmarks"
+      )
+      if (bookmarks) {
+        mainInterface.bookmarks = bookmarks
+        await mainInterface.render()
+      }
     } else {
       const currentFolder = navigation.currentFolder
-      const bookmarks = await getBookmarksInFolder(currentFolder.id)
-      if (currentNestedMenu) {
+      const bookmarks = await ErrorHandler.wrapAsync(
+        getBookmarksInFolder(currentFolder.id),
+        ErrorType.LOAD,
+        "bookmarks"
+      )
+      if (bookmarks && currentNestedMenu) {
         currentNestedMenu.bookmarks = bookmarks
         await currentNestedMenu.render()
       }
     }
   } catch (error) {
-    console.error("Ошибка при обновлении интерфейса:", error)
+    ErrorHandler.handle(error, ErrorType.LOAD, "interface")
   }
 }
 
@@ -331,32 +353,34 @@ function showAddDialog(parentId) {
 function showCreateFolderDialog(parentId) {
   const modal = new Modal()
   modal.show("Создать папку", "folder", {}, async (data) => {
-    try {
-      await createFolder(parentId, data.title)
+    const result = await ErrorHandler.wrapAsync(
+      createFolder(parentId, data.title),
+      ErrorType.CREATE,
+      "folder"
+    )
+    if (result) {
       modal.close()
       await refreshCurrentView()
       return true
-    } catch (error) {
-      console.error("Ошибка при создании папки:", error)
-      alert("Не удалось создать папку")
-      return false
     }
+    return false
   })
 }
 
 function showCreateBookmarkDialog(parentId) {
   const modal = new Modal()
   modal.show("Добавить закладку", "link", {}, async (data) => {
-    try {
-      await createBookmark(parentId, data.title, data.url)
+    const result = await ErrorHandler.wrapAsync(
+      createBookmark(parentId, data.title, data.url),
+      ErrorType.CREATE,
+      "bookmark"
+    )
+    if (result) {
       modal.close()
       await refreshCurrentView()
       return true
-    } catch (error) {
-      console.error("Ошибка при создании закладки:", error)
-      alert("Не удалось создать закладку")
-      return false
     }
+    return false
   })
 }
 
@@ -413,19 +437,21 @@ async function handleFolderEdit(folder, customContent, modal) {
   const previewImg = previewContent.querySelector("img")
   const iconUrl = previewImg ? previewImg.src : null
 
-  try {
-    await updateFolder(folder.id, { title: newTitle })
+  const updateResult = await ErrorHandler.wrapAsync(
+    updateFolder(folder.id, { title: newTitle }),
+    ErrorType.UPDATE,
+    "folder"
+  )
+
+  if (updateResult) {
     if (iconUrl) {
       await storage.set(`folder_icon_${folder.id}`, iconUrl)
     }
     modal.close()
     await refreshCurrentView()
     return true
-  } catch (error) {
-    console.error("Error updating folder:", error)
-    alert("Ошибка при обновлении папки")
-    return false
   }
+  return false
 }
 
 function setupFileInput(customContent) {
