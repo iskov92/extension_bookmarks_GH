@@ -1,6 +1,6 @@
 import { initTheme } from "./utils/theme.js"
 import { importFromBrowser } from "./utils/bookmarks.js"
-import { getStoredBookmarks } from "./utils/storage.js"
+import { getStoredBookmarks, saveBookmarks } from "./utils/storage.js"
 
 // Инициализация UI
 document.addEventListener("DOMContentLoaded", () => {
@@ -20,6 +20,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // Обработчик экспорта закладок
   const exportButton = document.getElementById("exportBookmarks")
   exportButton.addEventListener("click", exportBookmarksToFile)
+
+  // Обработчик импорта из файла
+  const importFromFileButton = document.getElementById("importFromFile")
+  importFromFileButton.addEventListener("click", () => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".html"
+    input.onchange = (e) => {
+      const file = e.target.files[0]
+      if (file) {
+        importBookmarksFromFile(file)
+      }
+    }
+    input.click()
+  })
 })
 
 // Функция импорта закладок из браузера
@@ -97,4 +112,74 @@ function generateBookmarksHTML(bookmarks) {
   })
 
   return header + content + footer
+}
+
+// Функция импорта закладок из HTML файла
+async function importBookmarksFromFile(file) {
+  try {
+    const content = await readFileContent(file)
+    const bookmarks = parseBookmarksHTML(content)
+    await saveBookmarks(bookmarks)
+    alert("Закладки успешно импортированы из файла!")
+  } catch (error) {
+    console.error("Ошибка при импорте закладок из файла:", error)
+    alert("Произошла ошибка при импорте закладок из файла")
+  }
+}
+
+// Функция чтения содержимого файла
+function readFileContent(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (event) => resolve(event.target.result)
+    reader.onerror = (error) => reject(error)
+    reader.readAsText(file)
+  })
+}
+
+// Функция парсинга HTML файла с закладками
+function parseBookmarksHTML(html) {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, "text/html")
+
+  function processNode(node) {
+    const items = []
+
+    // Перебираем все DT элементы
+    const dtElements = node.querySelectorAll(":scope > DT")
+
+    dtElements.forEach((dt) => {
+      const link = dt.querySelector(":scope > A")
+      const h3 = dt.querySelector(":scope > H3")
+
+      if (link) {
+        // Это закладка
+        items.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+          title: link.textContent,
+          url: link.href,
+          type: "bookmark",
+        })
+      } else if (h3) {
+        // Это папка
+        const dl = dt.querySelector(":scope > DL")
+        const folderId =
+          Date.now().toString(36) + Math.random().toString(36).substr(2)
+
+        const folder = {
+          id: folderId,
+          title: h3.textContent,
+          type: "folder",
+          children: dl ? processNode(dl) : [],
+        }
+
+        items.push(folder)
+      }
+    })
+
+    return items
+  }
+
+  const rootDL = doc.querySelector("DL")
+  return rootDL ? processNode(rootDL) : []
 }
