@@ -50,6 +50,13 @@
 .settings-buttons .settings-button img {
   width: 24px;
   height: 24px;
+  transition: transform 0.2s ease;
+}
+
+/* Увеличение иконок при наведении */
+#importFromFile:hover img,
+#exportBookmarks:hover img {
+  transform: scale(1.2);
 }
 
 .settings-buttons .settings-button span {
