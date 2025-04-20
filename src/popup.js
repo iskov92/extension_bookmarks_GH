@@ -14,14 +14,13 @@ import { NestedMenu } from "./components/NestedMenu.js"
 import { ContextMenu } from "./components/ContextMenu.js"
 import { Modal } from "./components/Modal.js"
 import { storage } from "./utils/storage.js"
+import { Navigation } from "./utils/navigation.js"
 
 // Глобальные переменные для доступа из всех функций
 let mainInterface
 let mainContent
-let navigationStack = []
 let currentNestedMenu = null
-
-// Создаем единый экземпляр контекстного меню
+const navigation = new Navigation()
 const contextMenu = new ContextMenu()
 
 // Предотвращаем стандартное контекстное меню браузера
@@ -44,7 +43,7 @@ async function handleFolderClick(bookmarkElement) {
   const id = bookmarkElement.dataset.id
   const folderTitle =
     bookmarkElement.querySelector(".bookmark-title").textContent
-  navigationStack.push({ id, title: folderTitle })
+  navigation.push({ id, title: folderTitle })
 
   // Уничтожаем предыдущее меню если оно есть
   if (currentNestedMenu) {
@@ -69,11 +68,11 @@ async function handleBackButtonClick() {
     currentNestedMenu.destroy()
   }
 
-  navigationStack.pop()
+  navigation.pop()
   const currentFolder = document.getElementById("currentFolder")
   const backButton = document.getElementById("backButton")
 
-  if (navigationStack.length === 0) {
+  if (navigation.isRoot) {
     currentNestedMenu = null
     const bookmarks = await getAllBookmarks()
     mainInterface.render()
@@ -81,7 +80,7 @@ async function handleBackButtonClick() {
     currentFolder.style.display = "none"
     backButton.style.display = "none"
   } else {
-    const current = navigationStack[navigationStack.length - 1]
+    const current = navigation.currentFolder
     const bookmarks = await getBookmarksInFolder(current.id)
     currentNestedMenu = new NestedMenu(mainContent, bookmarks)
     currentNestedMenu.render()
@@ -200,10 +199,29 @@ async function handleThemeToggle(e) {
   await chrome.storage.sync.set({ theme: isDark ? "dark" : "light" })
 
   // Обновляем только текущий интерфейс без полной перезагрузки
-  if (navigationStack.length === 0) {
+  if (navigation.isRoot) {
     await mainInterface.render()
   } else if (currentNestedMenu) {
     await currentNestedMenu.render()
+  }
+}
+
+async function refreshCurrentView() {
+  try {
+    if (navigation.isRoot) {
+      const bookmarks = await getAllBookmarks()
+      mainInterface.bookmarks = bookmarks
+      await mainInterface.render()
+    } else {
+      const currentFolder = navigation.currentFolder
+      const bookmarks = await getBookmarksInFolder(currentFolder.id)
+      if (currentNestedMenu) {
+        currentNestedMenu.bookmarks = bookmarks
+        await currentNestedMenu.render()
+      }
+    }
+  } catch (error) {
+    console.error("Ошибка при обновлении интерфейса:", error)
   }
 }
 
@@ -240,10 +258,7 @@ async function initializeUI() {
 
   backButton.addEventListener("click", handleBackButtonClick)
   addButton.addEventListener("click", () => {
-    const parentId =
-      navigationStack.length > 0
-        ? navigationStack[navigationStack.length - 1].id
-        : "0"
+    const parentId = navigation.isRoot ? "0" : navigation.currentFolder.id
     showAddDialog(parentId)
   })
 
@@ -254,26 +269,6 @@ async function initializeUI() {
   document
     .getElementById("themeToggle")
     .addEventListener("change", handleThemeToggle)
-}
-
-// Функция для обновления текущего вида
-async function refreshCurrentView() {
-  try {
-    if (navigationStack.length === 0) {
-      const bookmarks = await getAllBookmarks()
-      mainInterface.bookmarks = bookmarks
-      await mainInterface.render()
-    } else {
-      const currentFolder = navigationStack[navigationStack.length - 1]
-      const bookmarks = await getBookmarksInFolder(currentFolder.id)
-      if (currentNestedMenu) {
-        currentNestedMenu.bookmarks = bookmarks
-        await currentNestedMenu.render()
-      }
-    }
-  } catch (error) {
-    console.error("Ошибка при обновлении интерфейса:", error)
-  }
 }
 
 function showAddDialog(parentId) {
