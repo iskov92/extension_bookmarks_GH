@@ -161,19 +161,31 @@ function parseBookmarksHTML(html) {
           type: "bookmark",
         })
       } else if (h3) {
-        // Это папка
+        const folderTitle = h3.textContent
         const dl = dt.querySelector(":scope > DL")
-        const folderId =
-          Date.now().toString(36) + Math.random().toString(36).substr(2)
 
-        const folder = {
-          id: folderId,
-          title: h3.textContent,
-          type: "folder",
-          children: dl ? processNode(dl) : [],
+        // Если это стандартная папка браузера ("Панель закладок" или "Другие закладки"),
+        // добавляем её содержимое напрямую в корневой уровень
+        if (
+          folderTitle === "Панель закладок" ||
+          folderTitle === "Другие закладки"
+        ) {
+          if (dl) {
+            const nestedItems = processNode(dl)
+            items.push(...nestedItems)
+          }
+        } else {
+          // Для остальных папок сохраняем структуру как есть
+          const folderId =
+            Date.now().toString(36) + Math.random().toString(36).substr(2)
+          const folder = {
+            id: folderId,
+            title: folderTitle,
+            type: "folder",
+            children: dl ? processNode(dl) : [],
+          }
+          items.push(folder)
         }
-
-        items.push(folder)
       }
     })
 
