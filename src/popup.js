@@ -43,6 +43,39 @@ document.addEventListener("contextmenu", (e) => {
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     initTheme()
+
+    // Обработка параметра path из URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const pathParam = urlParams.get("path")
+    if (pathParam) {
+      try {
+        const pathData = JSON.parse(decodeURIComponent(pathParam))
+        if (Array.isArray(pathData) && pathData.length > 0) {
+          navigation.setStack(pathData)
+          // Обновляем UI для текущей папки
+          const currentFolder = navigation.currentFolder
+          if (currentFolder) {
+            mainContent = document.getElementById("mainContent")
+            const bookmarks = await getBookmarksInFolder(currentFolder.id)
+            currentNestedMenu = new NestedMenu(mainContent, bookmarks)
+            await currentNestedMenu.render()
+
+            const currentFolderElement = document.getElementById(
+              DOM_IDS.CURRENT_FOLDER
+            )
+            const backButton = document.getElementById(DOM_IDS.BACK_BUTTON)
+            if (currentFolderElement && backButton) {
+              currentFolderElement.style.display = "block"
+              currentFolderElement.textContent = currentFolder.title
+              backButton.style.display = "block"
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse path parameter:", e)
+      }
+    }
+
     await i18n.initLocale()
     await initializeUI()
     translatePage()
@@ -290,7 +323,13 @@ async function initializeUI() {
   })
 
   settingsButton.addEventListener("click", () => {
-    window.location.href = "settings.html"
+    // Сохраняем текущий путь навигации
+    const navigationState = {
+      stack: navigation.getStack(),
+    }
+    chrome.storage.local.set({ navigationState }, () => {
+      window.location.href = "settings.html"
+    })
   })
 
   document

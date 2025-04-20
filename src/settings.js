@@ -16,7 +16,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Обработчик кнопки "Назад"
   const backButton = document.getElementById("backButton")
   backButton.addEventListener("click", () => {
-    window.location.href = "popup.html"
+    chrome.storage.local.get(["navigationState"], (result) => {
+      if (result.navigationState && result.navigationState.stack) {
+        const path = encodeURIComponent(
+          JSON.stringify(result.navigationState.stack)
+        )
+        // Удаляем сохраненное состояние после использования
+        chrome.storage.local.remove("navigationState")
+        window.location.href = `popup.html?path=${path}`
+      } else {
+        window.location.href = "popup.html"
+      }
+    })
   })
 
   // Обработчик переключения языка

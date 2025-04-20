@@ -12,6 +12,15 @@ export class Navigation {
     return this.stack.length === 0
   }
 
+  getStack() {
+    return [...this.stack]
+  }
+
+  setStack(newStack) {
+    this.stack = [...newStack]
+    this._notifyListeners()
+  }
+
   push(folder) {
     this.stack.push(folder)
     this._notifyListeners()
