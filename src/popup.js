@@ -111,8 +111,6 @@ async function initializeUI() {
       items,
       bookmarkElement,
       async (action) => {
-        console.log("Выбрано действие:", action) // Отладочный вывод
-
         switch (action) {
           case "rename":
           case "edit":
@@ -258,22 +256,21 @@ async function initializeUI() {
 
 // Функция для обновления текущего вида
 async function refreshCurrentView() {
-  const bookmarks = await getAllBookmarks()
-
-  if (navigationStack.length === 0) {
-    // Обновляем корневой интерфейс
-    if (!mainInterface) {
-      mainInterface = new MainInterface(mainContent, bookmarks)
-    } else {
+  try {
+    if (navigationStack.length === 0) {
+      const bookmarks = await getAllBookmarks()
       mainInterface.bookmarks = bookmarks
+      await mainInterface.render()
+    } else {
+      const currentFolder = navigationStack[navigationStack.length - 1]
+      const bookmarks = await getBookmarksInFolder(currentFolder.id)
+      if (currentNestedMenu) {
+        currentNestedMenu.bookmarks = bookmarks
+        await currentNestedMenu.render()
+      }
     }
-    mainInterface.render()
-  } else {
-    // Обновляем вложенное меню
-    const current = navigationStack[navigationStack.length - 1]
-    const folderBookmarks = await getBookmarksInFolder(current.id)
-    const nestedMenu = new NestedMenu(mainContent, folderBookmarks)
-    nestedMenu.render()
+  } catch (error) {
+    console.error("Ошибка при обновлении интерфейса:", error)
   }
 }
 
@@ -281,25 +278,47 @@ function showAddDialog(parentId) {
   const addTypeContent = document.createElement("div")
   addTypeContent.className = "add-type-selector"
 
-  const folderButton = document.createElement("button")
-  folderButton.className = "add-type-button"
-  folderButton.dataset.type = "folder"
-  folderButton.innerHTML = `
-    <img src="/assets/icons/folder_white.svg" class="add-type-icon" alt="Folder">
-    <img src="/assets/icons/folder_black.svg" class="add-type-icon" alt="Folder">
-    Создать папку
-  `
+  const buttons = [
+    {
+      type: "folder",
+      text: "Создать папку",
+      icons: {
+        light: "/assets/icons/folder_white.svg",
+        dark: "/assets/icons/folder_black.svg",
+      },
+      onClick: () => showCreateFolderDialog(parentId),
+    },
+    {
+      type: "link",
+      text: "Добавить закладку",
+      icon: "/assets/icons/link.svg",
+      onClick: () => showCreateBookmarkDialog(parentId),
+    },
+  ]
 
-  const linkButton = document.createElement("button")
-  linkButton.className = "add-type-button"
-  linkButton.dataset.type = "link"
-  linkButton.innerHTML = `
-    <img src="/assets/icons/link.svg" class="add-type-icon" alt="Link">
-    Добавить закладку
-  `
+  buttons.forEach((button) => {
+    const buttonElement = document.createElement("button")
+    buttonElement.className = "add-type-button"
+    buttonElement.dataset.type = button.type
 
-  addTypeContent.appendChild(folderButton)
-  addTypeContent.appendChild(linkButton)
+    buttonElement.innerHTML =
+      button.type === "folder"
+        ? `
+      <img src="${button.icons.light}" class="add-type-icon light-theme-icon" alt="${button.text}">
+      <img src="${button.icons.dark}" class="add-type-icon dark-theme-icon" alt="${button.text}">
+      ${button.text}
+    `
+        : `
+      <img src="${button.icon}" class="add-type-icon" alt="${button.text}">
+      ${button.text}
+    `
+
+    buttonElement.addEventListener("click", () => {
+      modal.close()
+      button.onClick()
+    })
+    addTypeContent.appendChild(buttonElement)
+  })
 
   const modal = new Modal()
   modal.show(
@@ -307,22 +326,9 @@ function showAddDialog(parentId) {
     "select",
     {},
     null,
-    () => {
-      modal.close()
-    },
+    () => modal.close(),
     addTypeContent
   )
-
-  // Добавляем обработчики после создания модального окна
-  folderButton.addEventListener("click", () => {
-    modal.close()
-    showCreateFolderDialog(parentId)
-  })
-
-  linkButton.addEventListener("click", () => {
-    modal.close()
-    showCreateBookmarkDialog(parentId)
-  })
 }
 
 function showCreateFolderDialog(parentId) {
@@ -330,8 +336,8 @@ function showCreateFolderDialog(parentId) {
   modal.show("Создать папку", "folder", {}, async (data) => {
     try {
       await createFolder(parentId, data.title)
-      await refreshCurrentView()
       modal.close()
+      await refreshCurrentView()
       return true
     } catch (error) {
       console.error("Ошибка при создании папки:", error)
@@ -346,8 +352,8 @@ function showCreateBookmarkDialog(parentId) {
   modal.show("Добавить закладку", "link", {}, async (data) => {
     try {
       await createBookmark(parentId, data.title, data.url)
-      await refreshCurrentView()
       modal.close()
+      await refreshCurrentView()
       return true
     } catch (error) {
       console.error("Ошибка при создании закладки:", error)
@@ -357,14 +363,24 @@ function showCreateBookmarkDialog(parentId) {
   })
 }
 
-function showSettings() {
-  // TODO: Реализовать окно настроек
+async function showFolderEditDialog(folder) {
+  const savedIcon = await storage.get(`folder_icon_${folder.id}`)
+  const customContent = createFolderEditContent(folder, savedIcon)
+
+  const modal = new Modal()
+  modal.show(
+    "Изменить папку",
+    "folder",
+    {},
+    async (data) => await handleFolderEdit(folder, customContent, modal),
+    () => modal.close(),
+    customContent
+  )
+
+  setupFileInput(customContent)
 }
 
-async function showFolderEditDialog(folder) {
-  // Получаем сохраненную иконку
-  const savedIcon = await storage.get(`folder_icon_${folder.id}`)
-
+function createFolderEditContent(folder, savedIcon) {
   const customContent = document.createElement("div")
   customContent.className = "edit-folder"
   customContent.innerHTML = `
@@ -386,90 +402,64 @@ async function showFolderEditDialog(folder) {
       </div>
     </div>
   `
+  return customContent
+}
 
-  const modal = new Modal()
-  modal.show(
-    "Изменить папку",
-    "folder",
-    {},
-    async (data) => {
-      const newTitle = customContent.querySelector("#folderTitle").value.trim()
-      if (!newTitle) {
-        alert("Название папки не может быть пустым")
-        return false
-      }
+async function handleFolderEdit(folder, customContent, modal) {
+  const newTitle = customContent.querySelector("#folderTitle").value.trim()
+  if (!newTitle) {
+    alert("Название папки не может быть пустым")
+    return false
+  }
 
-      const previewContent = customContent.querySelector(".preview-content")
-      const previewImg = previewContent.querySelector("img")
-      const iconUrl = previewImg ? previewImg.src : null
+  const previewContent = customContent.querySelector(".preview-content")
+  const previewImg = previewContent.querySelector("img")
+  const iconUrl = previewImg ? previewImg.src : null
 
-      try {
-        // Обновляем название папки
-        await updateFolder(folder.id, { title: newTitle })
+  try {
+    await updateFolder(folder.id, { title: newTitle })
+    if (iconUrl) {
+      await storage.set(`folder_icon_${folder.id}`, iconUrl)
+    }
+    modal.close()
+    await refreshCurrentView()
+    return true
+  } catch (error) {
+    console.error("Error updating folder:", error)
+    alert("Ошибка при обновлении папки")
+    return false
+  }
+}
 
-        // Сохраняем иконку если она есть
-        if (iconUrl) {
-          await storage.set(`folder_icon_${folder.id}`, iconUrl)
-        }
-
-        // Обновляем все представления
-        if (navigationStack.length === 0) {
-          const bookmarks = await getAllBookmarks()
-          mainInterface.bookmarks = bookmarks
-          await mainInterface.render()
-        } else {
-          const current = navigationStack[navigationStack.length - 1]
-          const folderBookmarks = await getBookmarksInFolder(current.id)
-          if (currentNestedMenu) {
-            currentNestedMenu.bookmarks = folderBookmarks
-            await currentNestedMenu.render()
-          }
-        }
-
-        modal.close()
-        return true
-      } catch (error) {
-        console.error("Error updating folder:", error)
-        alert("Ошибка при обновлении папки")
-        return false
-      }
-    },
-    () => {
-      modal.close()
-    },
-    customContent
-  )
-
-  // Обработчик для загрузки файла
+function setupFileInput(customContent) {
   const fileInput = customContent.querySelector("#iconFile")
   fileInput.addEventListener("change", async (e) => {
     const file = e.target.files[0]
-    if (file) {
-      // Проверяем, что это изображение
-      if (!file.type.startsWith("image/")) {
-        alert("Пожалуйста, выберите изображение")
-        return
-      }
+    if (!file) return
 
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const previewContent = customContent.querySelector(".preview-content")
-        let previewImg = previewContent.querySelector("img")
-
-        if (!previewImg) {
-          previewImg = document.createElement("img")
-          previewContent.textContent = ""
-          previewContent.appendChild(previewImg)
-        }
-
-        previewImg.src = event.target.result
-        previewImg.onerror = () => {
-          console.error("Failed to load image")
-          previewImg.src = "/assets/icons/folder_black.svg"
-          alert("Не удалось загрузить изображение")
-        }
-      }
-      reader.readAsDataURL(file)
+    if (!file.type.startsWith("image/")) {
+      alert("Пожалуйста, выберите изображение")
+      return
     }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const previewContent = customContent.querySelector(".preview-content")
+      let previewImg = previewContent.querySelector("img")
+
+      if (!previewImg) {
+        previewImg = document.createElement("img")
+        previewContent.textContent = ""
+        previewContent.appendChild(previewImg)
+      }
+
+      previewImg.src = event.target.result
+      previewImg.onerror = () => {
+        console.error("Failed to load image")
+        previewImg.src = "/assets/icons/folder_black.svg"
+        alert("Не удалось загрузить изображение")
+      }
+    }
+    reader.readAsDataURL(file)
   })
 }
