@@ -283,6 +283,14 @@ input:checked + .slider:before {
   display: block;
 }
 
+[data-theme="light"] .dark-theme-icon {
+  display: none;
+}
+
+[data-theme="light"] .light-theme-icon {
+  display: block;
+}
+
 [data-theme="dark"] .dark-theme-icon {
   display: block;
 }

@@ -173,26 +173,42 @@ export async function updateBookmark(id, data) {
  * Удаляет закладку или папку
  * @param {string} id - ID закладки/папки
  */
-export async function deleteBookmark(id) {
-  const bookmarks = (await storage.get("gh_bookmarks")) || []
+export async function deleteBookmark(bookmarkId) {
+  try {
+    const bookmarks = await getStoredBookmarks()
 
-  function deleteFromTree(items) {
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].id === id) {
-        items.splice(i, 1)
-        return true
-      }
-      if (items[i].type === "folder" && items[i].children) {
-        if (deleteFromTree(items[i].children)) {
+    function deleteFromTree(items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+
+        if (item.id === bookmarkId) {
+          items.splice(i, 1)
           return true
         }
+
+        if (item.children && item.children.length > 0) {
+          const deleted = deleteFromTree(item.children)
+          if (deleted) {
+            if (item.children.length === 0) {
+              delete item.children
+            }
+            return true
+          }
+        }
       }
+      return false
+    }
+
+    const deleted = deleteFromTree(bookmarks)
+    if (deleted) {
+      await saveBookmarks(bookmarks)
+      return true
     }
     return false
+  } catch (error) {
+    console.error("Ошибка при удалении закладки:", error)
+    return false
   }
-
-  deleteFromTree(bookmarks)
-  await storage.set("gh_bookmarks", bookmarks)
 }
 
 /**

@@ -16,6 +16,15 @@ import { Modal } from "./components/Modal.js"
 import { storage } from "./utils/storage.js"
 import { Navigation } from "./utils/navigation.js"
 import { ErrorHandler, ErrorType } from "./utils/errorHandler.js"
+import {
+  ICONS,
+  UI_TEXTS,
+  CONTEXT_MENU_CONFIG,
+  ADD_BUTTONS_CONFIG,
+  STORAGE_KEYS,
+  DOM_IDS,
+  CSS_CLASSES,
+} from "./config/constants.js"
 
 // Глобальные переменные для доступа из всех функций
 let mainInterface
@@ -42,11 +51,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 // Обработчики событий
 async function handleFolderClick(bookmarkElement) {
   const id = bookmarkElement.dataset.id
-  const folderTitle =
-    bookmarkElement.querySelector(".bookmark-title").textContent
+  const folderTitle = bookmarkElement.querySelector(
+    `.${CSS_CLASSES.BOOKMARK_TITLE}`
+  ).textContent
   navigation.push({ id, title: folderTitle })
 
-  // Уничтожаем предыдущее меню если оно есть
   if (currentNestedMenu) {
     currentNestedMenu.destroy()
   }
@@ -58,35 +67,33 @@ async function handleFolderClick(bookmarkElement) {
   )
 
   if (nestedBookmarks) {
-    // Создаем и сохраняем новое меню
     currentNestedMenu = new NestedMenu(mainContent, nestedBookmarks)
     currentNestedMenu.render()
 
-    const currentFolder = document.getElementById("currentFolder")
-    const backButton = document.getElementById("backButton")
+    const currentFolder = document.getElementById(DOM_IDS.CURRENT_FOLDER)
+    const backButton = document.getElementById(DOM_IDS.BACK_BUTTON)
     currentFolder.style.display = "block"
     currentFolder.textContent = folderTitle
     backButton.style.display = "block"
   } else {
-    navigation.pop() // Откатываем навигацию при ошибке
+    navigation.pop()
   }
 }
 
 async function handleBackButtonClick() {
-  // Уничтожаем текущее меню
   if (currentNestedMenu) {
     currentNestedMenu.destroy()
   }
 
   navigation.pop()
-  const currentFolder = document.getElementById("currentFolder")
-  const backButton = document.getElementById("backButton")
+  const currentFolder = document.getElementById(DOM_IDS.CURRENT_FOLDER)
+  const backButton = document.getElementById(DOM_IDS.BACK_BUTTON)
 
   if (navigation.isRoot) {
     currentNestedMenu = null
     const bookmarks = await getAllBookmarks()
     mainInterface.render()
-    mainContent.classList.remove("nested-view")
+    mainContent.classList.remove(CSS_CLASSES.NESTED_VIEW)
     currentFolder.style.display = "none"
     backButton.style.display = "none"
   } else {
@@ -100,52 +107,22 @@ async function handleBackButtonClick() {
 
 async function handleContextMenu(e) {
   e.preventDefault()
-  const bookmarkElement = e.target.closest(".bookmark-item")
+  const bookmarkElement = e.target.closest(`.${CSS_CLASSES.BOOKMARK_ITEM}`)
   if (!bookmarkElement) {
     contextMenu.close()
     return
   }
 
-  const isFolder = bookmarkElement.classList.contains("folder")
+  const isFolder = bookmarkElement.classList.contains(CSS_CLASSES.FOLDER)
   const id = bookmarkElement.dataset.id
-  const title = bookmarkElement.querySelector(".bookmark-title").textContent
+  const title = bookmarkElement.querySelector(
+    `.${CSS_CLASSES.BOOKMARK_TITLE}`
+  ).textContent
   const url = bookmarkElement.dataset.url
 
   const items = isFolder
-    ? [
-        {
-          text: "Изменить",
-          icon: "/assets/icons/edit_white.svg",
-          iconDark: "/assets/icons/edit_black.svg",
-          action: "rename",
-        },
-        {
-          text: "Удалить",
-          icon: "/assets/icons/delete_white.svg",
-          iconDark: "/assets/icons/delete_black.svg",
-          action: "delete",
-        },
-        {
-          text: "Копировать",
-          icon: "/assets/icons/move_white.svg",
-          iconDark: "/assets/icons/move_black.svg",
-          action: "copy",
-        },
-      ]
-    : [
-        {
-          text: "Изменить",
-          icon: "/assets/icons/edit_white.svg",
-          iconDark: "/assets/icons/edit_black.svg",
-          action: "edit",
-        },
-        {
-          text: "Удалить",
-          icon: "/assets/icons/delete_white.svg",
-          iconDark: "/assets/icons/delete_black.svg",
-          action: "delete",
-        },
-      ]
+    ? CONTEXT_MENU_CONFIG.FOLDER
+    : CONTEXT_MENU_CONFIG.BOOKMARK
 
   contextMenu.show(e.pageX, e.pageY, items, bookmarkElement, async (action) => {
     switch (action) {
@@ -159,16 +136,18 @@ async function handleContextMenu(e) {
         } else {
           const modal = new Modal()
           modal.show(
-            "Изменить закладку",
+            UI_TEXTS.MODALS.EDIT_BOOKMARK,
             "link",
             { title, url },
             async (data) => {
-              try {
-                await updateBookmark(id, data)
+              const result = await ErrorHandler.wrapAsync(
+                updateBookmark(id, data),
+                ErrorType.UPDATE,
+                "bookmark"
+              )
+              if (result) {
+                modal.close()
                 await refreshCurrentView()
-              } catch (error) {
-                console.error("Ошибка при обновлении:", error)
-                alert("Не удалось сохранить изменения")
               }
             }
           )
@@ -176,19 +155,18 @@ async function handleContextMenu(e) {
         break
 
       case "delete":
-        if (confirm("Вы уверены, что хотите удалить этот элемент?")) {
-          const result = await ErrorHandler.wrapAsync(
-            deleteBookmark(id),
-            ErrorType.DELETE,
-            isFolder ? "folder" : "bookmark"
-          )
-          if (result) {
+        if (confirm("Вы уверены, что хотите удалить эту закладку?")) {
+          const deleted = await deleteBookmark(id)
+          if (deleted) {
             await refreshCurrentView()
+          } else {
+            alert("Не удалось удалить закладку")
           }
         }
         break
 
       case "copy":
+        contextMenu.close()
         const result = await ErrorHandler.wrapAsync(
           copyBookmark(id),
           ErrorType.COPY,
@@ -207,10 +185,11 @@ async function handleContextMenu(e) {
 
 async function handleThemeToggle(e) {
   const isDark = e.target.checked
-  document.body.classList.toggle("dark-theme", isDark)
-  await chrome.storage.sync.set({ theme: isDark ? "dark" : "light" })
+  document.body.classList.toggle(CSS_CLASSES.DARK_THEME, isDark)
+  await chrome.storage.sync.set({
+    [STORAGE_KEYS.THEME]: isDark ? "dark" : "light",
+  })
 
-  // Обновляем только текущий интерфейс без полной перезагрузки
   if (navigation.isRoot) {
     await mainInterface.render()
   } else if (currentNestedMenu) {
@@ -220,6 +199,11 @@ async function handleThemeToggle(e) {
 
 async function refreshCurrentView() {
   try {
+    // Очищаем контейнер перед обновлением
+    while (mainContent.firstChild) {
+      mainContent.removeChild(mainContent.firstChild)
+    }
+
     if (navigation.isRoot) {
       const bookmarks = await ErrorHandler.wrapAsync(
         getAllBookmarks(),
@@ -227,7 +211,7 @@ async function refreshCurrentView() {
         "bookmarks"
       )
       if (bookmarks) {
-        mainInterface.bookmarks = bookmarks
+        mainInterface = new MainInterface(mainContent, bookmarks)
         await mainInterface.render()
       }
     } else {
@@ -237,8 +221,8 @@ async function refreshCurrentView() {
         ErrorType.LOAD,
         "bookmarks"
       )
-      if (bookmarks && currentNestedMenu) {
-        currentNestedMenu.bookmarks = bookmarks
+      if (bookmarks) {
+        currentNestedMenu = new NestedMenu(mainContent, bookmarks)
         await currentNestedMenu.render()
       }
     }
@@ -297,25 +281,7 @@ function showAddDialog(parentId) {
   const addTypeContent = document.createElement("div")
   addTypeContent.className = "add-type-selector"
 
-  const buttons = [
-    {
-      type: "folder",
-      text: "Создать папку",
-      icons: {
-        light: "/assets/icons/folder_white.svg",
-        dark: "/assets/icons/folder_black.svg",
-      },
-      onClick: () => showCreateFolderDialog(parentId),
-    },
-    {
-      type: "link",
-      text: "Добавить закладку",
-      icon: "/assets/icons/link.svg",
-      onClick: () => showCreateBookmarkDialog(parentId),
-    },
-  ]
-
-  buttons.forEach((button) => {
+  ADD_BUTTONS_CONFIG.forEach((button) => {
     const buttonElement = document.createElement("button")
     buttonElement.className = "add-type-button"
     buttonElement.dataset.type = button.type
@@ -334,14 +300,16 @@ function showAddDialog(parentId) {
 
     buttonElement.addEventListener("click", () => {
       modal.close()
-      button.onClick()
+      button.type === "folder"
+        ? showCreateFolderDialog(parentId)
+        : showCreateBookmarkDialog(parentId)
     })
     addTypeContent.appendChild(buttonElement)
   })
 
   const modal = new Modal()
   modal.show(
-    "Выберите тип",
+    UI_TEXTS.MODALS.SELECT_TYPE,
     "select",
     {},
     null,
@@ -352,7 +320,7 @@ function showAddDialog(parentId) {
 
 function showCreateFolderDialog(parentId) {
   const modal = new Modal()
-  modal.show("Создать папку", "folder", {}, async (data) => {
+  modal.show(UI_TEXTS.MODALS.CREATE_FOLDER, "folder", {}, async (data) => {
     const result = await ErrorHandler.wrapAsync(
       createFolder(parentId, data.title),
       ErrorType.CREATE,
@@ -369,7 +337,7 @@ function showCreateFolderDialog(parentId) {
 
 function showCreateBookmarkDialog(parentId) {
   const modal = new Modal()
-  modal.show("Добавить закладку", "link", {}, async (data) => {
+  modal.show(UI_TEXTS.MODALS.ADD_BOOKMARK, "link", {}, async (data) => {
     const result = await ErrorHandler.wrapAsync(
       createBookmark(parentId, data.title, data.url),
       ErrorType.CREATE,

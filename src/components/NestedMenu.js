@@ -18,7 +18,7 @@ export class NestedMenu {
   // Получить дефолтную иконку папки в зависимости от темы
   async getDefaultFolderIcon() {
     const theme = await this.getCurrentTheme()
-    return `/assets/icons/folder_${theme === "dark" ? "white" : "black"}.svg`
+    return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
   }
 
   async getFolderIcon(folderId) {
