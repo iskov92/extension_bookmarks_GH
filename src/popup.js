@@ -103,6 +103,17 @@ function translatePage() {
   })
 }
 
+// Добавляем функцию для рекурсивного получения содержимого
+async function getFolderContentsRecursively(folderId) {
+  const contents = await getBookmarksInFolder(folderId)
+  for (const item of contents) {
+    if (item.type === "folder") {
+      item.contents = await getFolderContentsRecursively(item.id)
+    }
+  }
+  return contents
+}
+
 // Обработчики событий
 async function handleFolderClick(bookmarkElement) {
   const id = bookmarkElement.dataset.id
@@ -219,9 +230,9 @@ async function handleContextMenu(e) {
               url,
             }
 
-            // Если это папка, получаем её содержимое
+            // Если это папка, получаем её содержимое рекурсивно
             if (isFolder) {
-              const folderContents = await getBookmarksInFolder(id)
+              const folderContents = await getFolderContentsRecursively(id)
               itemToTrash.contents = folderContents
             }
 

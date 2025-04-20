@@ -140,6 +140,9 @@ async function renderTrashItems() {
       `
       restoreButton.addEventListener("click", async (e) => {
         e.stopPropagation()
+        // Делаем кнопку неактивной сразу после клика
+        restoreButton.disabled = true
+        restoreButton.style.opacity = "0.5"
         await handleRestore(item)
       })
 
@@ -154,17 +157,32 @@ async function renderTrashItems() {
   }
 }
 
+async function restoreContents(parentId, contents) {
+  for (const content of contents) {
+    if (content.type === "folder") {
+      const newFolder = await ErrorHandler.wrapAsync(
+        createFolder(parentId, content.title),
+        ErrorType.RESTORE,
+        "folder",
+        i18n.t("TRASH.WAIT_RESTORE")
+      )
+      // Рекурсивно восстанавливаем содержимое вложенной папки
+      if (content.contents && content.contents.length > 0) {
+        await restoreContents(newFolder.id, content.contents)
+      }
+    } else {
+      await ErrorHandler.wrapAsync(
+        createBookmark(parentId, content.title, content.url),
+        ErrorType.RESTORE,
+        "bookmark",
+        i18n.t("TRASH.WAIT_RESTORE")
+      )
+    }
+  }
+}
+
 async function handleRestore(item) {
   try {
-    // Блокируем кнопку восстановления
-    const restoreButton = document.querySelector(
-      `[data-id="${item.id}"] .restore-button`
-    )
-    if (restoreButton) {
-      restoreButton.disabled = true
-      restoreButton.style.opacity = "0.5"
-    }
-
     // Восстанавливаем элемент из корзины
     const restoredItem = await trashStorage.restoreItem(item.id)
 
@@ -193,25 +211,9 @@ async function handleRestore(item) {
 
       restoredItemId = newFolder.id
 
-      // Если у папки есть содержимое, восстанавливаем его
+      // Восстанавливаем содержимое папки рекурсивно
       if (restoredItem.contents && restoredItem.contents.length > 0) {
-        for (const content of restoredItem.contents) {
-          if (content.type === "folder") {
-            await ErrorHandler.wrapAsync(
-              createFolder(newFolder.id, content.title),
-              ErrorType.RESTORE,
-              "folder",
-              i18n.t("TRASH.WAIT_RESTORE")
-            )
-          } else {
-            await ErrorHandler.wrapAsync(
-              createBookmark(newFolder.id, content.title, content.url),
-              ErrorType.RESTORE,
-              "bookmark",
-              i18n.t("TRASH.WAIT_RESTORE")
-            )
-          }
-        }
+        await restoreContents(newFolder.id, restoredItem.contents)
       }
     } else {
       const newBookmark = await ErrorHandler.wrapAsync(
