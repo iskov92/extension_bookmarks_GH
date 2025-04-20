@@ -78,8 +78,10 @@ async function initializeUI() {
 
 async function handleThemeToggle(e) {
   const isDark = e.target.checked
-  document.body.setAttribute("data-theme", isDark ? "dark" : "light")
-  await chrome.storage.sync.set({ theme: isDark ? "dark" : "light" })
+  const theme = isDark ? "dark" : "light"
+  document.body.setAttribute("data-theme", theme)
+  await chrome.storage.sync.set({ theme })
+  // Перерисовываем элементы с новыми иконками
   await renderTrashItems()
 }
 
@@ -97,8 +99,9 @@ async function renderTrashItems() {
     }
 
     const currentTheme = document.body.getAttribute("data-theme") || "light"
+    // Инвертируем иконки для тем
     const folderIcon =
-      currentTheme === "dark"
+      currentTheme === "light"
         ? "../assets/icons/folder_white.svg"
         : "../assets/icons/folder_black.svg"
 
