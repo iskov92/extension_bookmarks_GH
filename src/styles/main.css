@@ -693,26 +693,33 @@ input:checked + .slider:before {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
-  border: none;
-  background-color: var(--button-background);
-  color: var(--button-text-color);
+  border: 1px solid var(--border-color);
+  background-color: transparent;
+  color: var(--text-primary);
+  transition: all var(--transition-speed);
 }
 
 .modal-footer button:hover {
-  background-color: var(--button-hover-color);
+  background-color: var(--bg-secondary);
 }
 
-.modal-footer button:active {
-  background-color: var(--button-active-color);
+.modal-footer button.save-button {
+  background-color: var(--light-accent);
+  border-color: var(--light-accent);
+  color: #000000;
+}
+
+[data-theme="dark"] .modal-footer button.save-button {
+  background-color: var(--dark-accent);
+  border-color: var(--dark-accent);
+}
+
+.modal-footer button.save-button:hover {
+  opacity: 0.9;
 }
 
 .modal-footer button.cancel {
   background-color: transparent;
-  border: 1px solid var(--border-color);
-}
-
-.modal-footer button.cancel:hover {
-  background-color: var(--bg-secondary);
 }
 
 .icon-preview {
