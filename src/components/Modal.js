@@ -26,28 +26,56 @@ export class Modal {
     if (customContent) {
       content.appendChild(customContent)
     } else if (type === "link") {
-      content.appendChild(
-        this.createInputGroup(
-          "name",
-          i18n.t("LABELS.BOOKMARK_NAME"),
-          initialData.title || ""
-        )
+      const nameGroup = this.createInputGroup(
+        "name",
+        i18n.t("LABELS.BOOKMARK_NAME"),
+        initialData.title || ""
       )
-      content.appendChild(
-        this.createInputGroup(
-          "url",
-          i18n.t("LABELS.BOOKMARK_URL"),
-          initialData.url || ""
-        )
+      const urlGroup = this.createInputGroup(
+        "url",
+        i18n.t("LABELS.BOOKMARK_URL"),
+        initialData.url || ""
       )
+
+      content.appendChild(nameGroup)
+      content.appendChild(urlGroup)
+
+      // Добавляем обработчик нажатия Enter в поля ввода
+      const nameInput = nameGroup.querySelector("input")
+      const urlInput = urlGroup.querySelector("input")
+
+      nameInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          if (this.onSave) {
+            this.handleSave(type)
+          }
+        }
+      })
+
+      urlInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          if (this.onSave) {
+            this.handleSave(type)
+          }
+        }
+      })
     } else if (type === "folder") {
-      content.appendChild(
-        this.createInputGroup(
-          "name",
-          i18n.t("LABELS.FOLDER_NAME"),
-          initialData.title || ""
-        )
+      const nameGroup = this.createInputGroup(
+        "name",
+        i18n.t("LABELS.FOLDER_NAME"),
+        initialData.title || ""
       )
+      content.appendChild(nameGroup)
+
+      // Добавляем обработчик нажатия Enter в поле ввода
+      const nameInput = nameGroup.querySelector("input")
+      nameInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          if (this.onSave) {
+            this.handleSave(type)
+          }
+        }
+      })
     }
 
     const buttons = document.createElement("div")

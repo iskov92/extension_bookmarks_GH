@@ -259,40 +259,51 @@ function generateBookmarksHTML(bookmarks, level = 0) {
  * @param {Object} data - Новые данные (title, url)
  */
 export async function updateBookmark(id, data) {
-  const bookmarks = (await storage.get("gh_bookmarks")) || []
+  try {
+    const bookmarks = (await storage.get("gh_bookmarks")) || []
 
-  // Если есть URL, проверяем и добавляем протокол если нужно
-  if (data.url) {
-    // Убираем пробелы в начале и конце
-    data.url = data.url.trim()
+    // Если есть URL, проверяем и добавляем протокол если нужно
+    if (data.url) {
+      // Убираем пробелы в начале и конце
+      data.url = data.url.trim()
 
-    // Проверяем наличие протокола
-    if (!data.url.match(/^https?:\/\//i)) {
-      // Если нет протокола, добавляем https://
-      data.url = `https://${data.url}`
+      // Проверяем наличие протокола
+      if (!data.url.match(/^https?:\/\//i)) {
+        // Если нет протокола, добавляем https://
+        data.url = `https://${data.url}`
+      }
+
+      // Обновляем favicon для нового URL
+      data.favicon = `chrome://favicon/size/16@2x/${data.url}`
     }
 
-    // Обновляем favicon для нового URL
-    data.favicon = `chrome://favicon/size/16@2x/${data.url}`
-  }
-
-  function updateInTree(items) {
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].id === id) {
-        items[i] = { ...items[i], ...data }
-        return true
-      }
-      if (items[i].type === "folder" && items[i].children) {
-        if (updateInTree(items[i].children)) {
+    function updateInTree(items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].id === id) {
+          items[i] = { ...items[i], ...data }
           return true
         }
+        if (items[i].type === "folder" && items[i].children) {
+          if (updateInTree(items[i].children)) {
+            return true
+          }
+        }
       }
+      return false
     }
-    return false
-  }
 
-  updateInTree(bookmarks)
-  await storage.set("gh_bookmarks", bookmarks)
+    const updated = updateInTree(bookmarks)
+    if (!updated) {
+      console.error("Закладка с ID", id, "не найдена для обновления")
+      throw new Error("Закладка не найдена")
+    }
+
+    await storage.set("gh_bookmarks", bookmarks)
+    return true
+  } catch (error) {
+    console.error("Ошибка при обновлении закладки:", error)
+    throw error
+  }
 }
 
 /**
