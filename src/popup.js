@@ -103,7 +103,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Подписываемся на изменения языка
     i18n.addListener(() => {
       translatePage()
-      refreshCurrentView()
+      refreshCurrentView(true)
     })
   } catch (error) {
     console.error("Ошибка инициализации:", error)
@@ -186,28 +186,95 @@ async function handleFolderClick(bookmarkElement) {
   }
 }
 
+// Функция обработки клика по кнопке "Назад"
 async function handleBackButtonClick() {
-  if (currentNestedMenu) {
-    currentNestedMenu.destroy()
-  }
+  try {
+    // Показываем индикатор загрузки
+    showLoadingIndicator()
 
-  navigation.pop()
-  const currentFolder = document.getElementById(DOM_IDS.CURRENT_FOLDER)
-  const backButton = document.getElementById(DOM_IDS.BACK_BUTTON)
+    // Очищаем таймеры
+    clearHoverTimers()
 
-  if (navigation.isRoot) {
-    currentNestedMenu = null
-    const bookmarks = await getAllBookmarks()
-    mainInterface.render()
-    mainContent.classList.remove(CSS_CLASSES.NESTED_VIEW)
-    currentFolder.style.display = "none"
-    backButton.style.display = "none"
-  } else {
-    const current = navigation.currentFolder
-    const bookmarks = await getBookmarksInFolder(current.id)
-    currentNestedMenu = new NestedMenu(mainContent, bookmarks)
-    currentNestedMenu.render()
-    currentFolder.textContent = current.title
+    // Полностью очищаем кэш для всех папок, чтобы гарантировать получение свежих данных
+    window._folderContentsCache = {}
+    window._cachedBookmarks = null
+
+    // Проверяем, есть ли папки в стеке навигации
+    if (navigation.getStack().length > 0) {
+      // Удаляем текущую папку из стека
+      navigation.pop()
+
+      if (navigation.getStack().length > 0) {
+        // Если стек не пуст, берем последнюю папку
+        const previousFolder = navigation.currentFolder
+        currentParentId = previousFolder.id
+
+        // Обновляем UI
+        updateFolderTitle(previousFolder.title)
+        toggleBackButton(true) // Продолжаем показывать кнопку назад
+
+        console.log(
+          `Возвращаемся в папку ${previousFolder.id}: ${previousFolder.title}`
+        )
+
+        // Принудительно получаем содержимое папки без кэширования (forceUpdate = true)
+        const nestedBookmarks = await ErrorHandler.wrapAsync(
+          getBookmarksInFolder(previousFolder.id, true),
+          ErrorType.NAVIGATION,
+          "folder"
+        )
+
+        if (nestedBookmarks) {
+          // Очищаем и обновляем NestedMenu
+          if (currentNestedMenu) {
+            currentNestedMenu.destroy()
+          }
+          currentNestedMenu = new NestedMenu(mainContent, nestedBookmarks)
+          await currentNestedMenu.render()
+
+          console.log(
+            `Отрисован NestedMenu с ${nestedBookmarks.length} элементами`
+          )
+        } else {
+          // В случае ошибки возвращаемся в корень
+          console.error(
+            "Не удалось получить содержимое папки, возвращаемся в корень"
+          )
+          navigation.clear()
+          currentParentId = "0"
+          updateFolderTitle("Закладки")
+          toggleBackButton(false)
+          const freshBookmarks = await getAllBookmarks(true)
+          mainInterface.bookmarks = freshBookmarks
+          await mainInterface.render()
+        }
+      } else {
+        // Вернулись в корневую папку
+        currentParentId = "0"
+        updateFolderTitle("Закладки")
+        toggleBackButton(false) // Скрываем кнопку назад
+
+        console.log("Возвращаемся в корневую папку")
+
+        // Получаем свежие закладки и обновляем mainInterface
+        const freshBookmarks = await getAllBookmarks(true)
+        mainInterface.bookmarks = freshBookmarks
+        await mainInterface.render()
+
+        console.log(
+          `Отрисован MainInterface с ${freshBookmarks.length} элементами`
+        )
+      }
+
+      // Сохраняем текущее состояние навигации
+      storage.set(STORAGE_KEYS.NAVIGATION, navigation.getStack())
+    }
+  } catch (error) {
+    console.error("Ошибка при обработке кнопки назад:", error)
+    showErrorMessage(i18n.t("ERROR.BACK_FAILED"))
+  } finally {
+    // Убираем индикатор загрузки
+    hideLoadingIndicator()
   }
 }
 
@@ -251,7 +318,7 @@ async function handleContextMenu(e) {
               )
               if (result) {
                 modal.close()
-                await refreshCurrentView()
+                await refreshCurrentView(true)
               }
             }
           )
@@ -280,7 +347,7 @@ async function handleContextMenu(e) {
             // Удаляем из закладок
             const deleted = await deleteBookmark(id)
             if (deleted) {
-              await refreshCurrentView()
+              await refreshCurrentView(true)
             } else {
               alert(i18n.t("ERROR.DELETE_FAILED"))
             }
@@ -306,7 +373,7 @@ async function handleContextMenu(e) {
           isFolder ? "folder" : "bookmark"
         )
         if (result) {
-          await refreshCurrentView()
+          await refreshCurrentView(true)
         }
         break
 
@@ -333,7 +400,7 @@ async function handleThemeToggle(e) {
 /**
  * Обновляет текущее представление закладок
  */
-async function refreshCurrentView() {
+async function refreshCurrentView(forceUpdateCache = false) {
   const mainContent = document.querySelector(".main-content")
   const currentFolderTitle = document.querySelector(".current-folder")
 
@@ -351,8 +418,15 @@ async function refreshCurrentView() {
       console.log(
         "Перетаскивание активно, откладываем обновление представления"
       )
-      setTimeout(() => refreshCurrentView(), 100)
+      setTimeout(() => refreshCurrentView(forceUpdateCache), 100)
       return
+    }
+
+    // Если требуется принудительное обновление кэша, очищаем его для текущей папки
+    if (forceUpdateCache && window._folderContentsCache) {
+      const parentId = navigation.getCurrentParentId()
+      console.log(`Очистка кэша для папки ${parentId} перед обновлением`)
+      delete window._folderContentsCache[parentId]
     }
 
     // Отображаем лоадер при необходимости
@@ -371,15 +445,27 @@ async function refreshCurrentView() {
           window.sortableInstance = null
 
           // Продолжаем обновление после уничтожения Sortable
-          continueRefreshCurrentView(mainContent, currentFolderTitle)
+          continueRefreshCurrentView(
+            mainContent,
+            currentFolderTitle,
+            forceUpdateCache
+          )
         }, 50)
       } catch (e) {
         console.warn("Ошибка при отключении Sortable:", e)
         window.sortableInstance = null
-        continueRefreshCurrentView(mainContent, currentFolderTitle)
+        continueRefreshCurrentView(
+          mainContent,
+          currentFolderTitle,
+          forceUpdateCache
+        )
       }
     } else {
-      continueRefreshCurrentView(mainContent, currentFolderTitle)
+      continueRefreshCurrentView(
+        mainContent,
+        currentFolderTitle,
+        forceUpdateCache
+      )
     }
   } catch (error) {
     console.error("Ошибка при обновлении представления:", error)
@@ -391,10 +477,17 @@ async function refreshCurrentView() {
 /**
  * Вспомогательная функция для продолжения обновления представления
  */
-async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
+async function continueRefreshCurrentView(
+  mainContent,
+  currentFolderTitle,
+  forceUpdateCache = false
+) {
   try {
     // Получаем текущий ID родительской папки
     const parentId = navigation.getCurrentParentId()
+    console.log(
+      `Обновление содержимого папки ${parentId}, forceUpdate=${forceUpdateCache}`
+    )
 
     // Сохраняем текущие иконки для повторного использования
     const currentIcons = {}
@@ -423,18 +516,19 @@ async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
       }
     })
 
-    // Получаем закладки с потенциальным принудительным обновлением,
-    // если был недавно перемещен элемент
+    // Получаем закладки с потенциальным принудительным обновлением
     const forceUpdate =
-      window.lastMovedItem &&
-      window.lastMovedItem.targetFolder === parentId &&
-      Date.now() - window.lastMovedItem.timestamp < 30000
+      forceUpdateCache ||
+      (window.lastMovedItem &&
+        window.lastMovedItem.targetFolder === parentId &&
+        Date.now() - window.lastMovedItem.timestamp < 30000)
 
     // Очищаем кеш содержимого папки, если требуется принудительное обновление
     if (forceUpdate && window._folderContentsCache) {
       delete window._folderContentsCache[parentId]
     }
 
+    // Получаем закладки из хранилища (с принудительным обновлением если нужно)
     const bookmarks = await getBookmarksInFolder(parentId, forceUpdate)
 
     // Очищаем содержимое
@@ -464,7 +558,7 @@ async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
     }
 
     // Если папка пуста, показываем сообщение
-    if (bookmarks.length === 0) {
+    if (!bookmarks || bookmarks.length === 0) {
       const emptyMessage = document.createElement("div")
       emptyMessage.className = "empty-message"
       emptyMessage.textContent = navigation.isRoot
@@ -678,7 +772,7 @@ function showCreateFolderDialog(parentId) {
     )
     if (result) {
       modal.close()
-      await refreshCurrentView()
+      await refreshCurrentView(true)
       return true
     }
     return false
@@ -695,7 +789,7 @@ function showCreateBookmarkDialog(parentId) {
     )
     if (result) {
       modal.close()
-      await refreshCurrentView()
+      await refreshCurrentView(true)
       return true
     }
     return false
@@ -822,8 +916,18 @@ function setupFileInput(customContent, folder) {
 }
 
 async function showFolderEditDialog(folder) {
-  const savedIcon = await storage.get(`folder_icon_${folder.id}`)
-  const customContent = createFolderEditContent(folder, savedIcon)
+  // Получаем иконку из IconStorage
+  let savedIconUrl = null
+  try {
+    const iconBlob = await iconStorage.getIcon(folder.id)
+    if (iconBlob) {
+      savedIconUrl = URL.createObjectURL(iconBlob)
+    }
+  } catch (error) {
+    console.error(`Ошибка при загрузке иконки для папки ${folder.id}:`, error)
+  }
+
+  const customContent = createFolderEditContent(folder, savedIconUrl)
 
   const modal = new Modal()
   modal.show(
@@ -838,7 +942,7 @@ async function showFolderEditDialog(folder) {
   setupFileInput(customContent, folder)
 }
 
-function createFolderEditContent(folder, savedIcon) {
+function createFolderEditContent(folder, savedIconUrl) {
   const customContent = document.createElement("div")
   customContent.className = "edit-folder"
   customContent.innerHTML = `
@@ -866,9 +970,11 @@ function createFolderEditContent(folder, savedIcon) {
       <label data-translate="LABELS.PREVIEW">${i18n.t("LABELS.PREVIEW")}</label>
       <div class="preview-content">
         ${
-          savedIcon && savedIcon.startsWith("data:image/")
-            ? `<img src="${savedIcon}" alt="${i18n.t("LABELS.PREVIEW")}" />`
-            : `<div class="preview-placeholder"></div>`
+          savedIconUrl
+            ? `<img src="${savedIconUrl}" alt="${i18n.t("LABELS.PREVIEW")}" />`
+            : `<span data-translate="LABELS.NO_PREVIEW">${i18n.t(
+                "LABELS.NO_PREVIEW"
+              )}</span>`
         }
       </div>
     </div>
@@ -879,7 +985,7 @@ function createFolderEditContent(folder, savedIcon) {
 async function handleFolderEdit(folder, customContent, modal) {
   const newTitle = customContent.querySelector("#folderTitle").value.trim()
   if (!newTitle) {
-    alert("Название папки не может быть пустым")
+    alert(i18n.t("VALIDATIONS.FOLDER_NAME_REQUIRED"))
     return false
   }
 
@@ -887,21 +993,44 @@ async function handleFolderEdit(folder, customContent, modal) {
   const previewImg = previewContent.querySelector("img")
   const iconUrl = previewImg ? previewImg.src : null
 
-  const updateResult = await ErrorHandler.wrapAsync(
-    updateFolder(folder.id, { title: newTitle }),
-    ErrorType.UPDATE,
-    "folder"
-  )
+  try {
+    // Обновляем название папки
+    const updateResult = await ErrorHandler.wrapAsync(
+      updateFolder(folder.id, { title: newTitle }),
+      ErrorType.UPDATE,
+      "folder"
+    )
 
-  if (updateResult) {
-    if (iconUrl) {
-      await storage.set(`folder_icon_${folder.id}`, iconUrl)
+    if (updateResult) {
+      // Если есть новая иконка, сохраняем ее в IconStorage
+      if (iconUrl) {
+        try {
+          // Получаем blob из URL
+          const response = await fetch(iconUrl)
+          const iconBlob = await response.blob()
+
+          // Сохраняем в IconStorage
+          await iconStorage.saveIcon(folder.id, iconBlob)
+          console.log(
+            `Иконка для папки ${folder.id} успешно сохранена в IconStorage`
+          )
+        } catch (iconError) {
+          console.error("Ошибка при сохранении иконки:", iconError)
+        }
+      }
+
+      modal.close()
+
+      // Обновляем текущее представление
+      await refreshCurrentView(true)
+      return true
     }
-    modal.close()
-    await refreshCurrentView()
-    return true
+    return false
+  } catch (error) {
+    console.error("Ошибка при обновлении папки:", error)
+    alert(i18n.t("ERROR.UPDATE_FAILED"))
+    return false
   }
-  return false
 }
 
 /**
@@ -1042,7 +1171,7 @@ function initDragAndDrop() {
               console.error(
                 "Не удалось найти перемещенный элемент в DOM после перемещения"
               )
-              await refreshCurrentView()
+              await refreshCurrentView(true)
               return
             }
 
@@ -1077,12 +1206,12 @@ function initDragAndDrop() {
             } else {
               console.error("Ошибка при сохранении нового порядка элементов")
               window.preventRefreshAfterDrop = false
-              await refreshCurrentView()
+              await refreshCurrentView(true)
             }
           } catch (error) {
             console.error("Ошибка при изменении порядка:", error)
             window.preventRefreshAfterDrop = false
-            await refreshCurrentView()
+            await refreshCurrentView(true)
           }
         }
 
@@ -1210,7 +1339,7 @@ function processDragEnd(dragInfo) {
   // Если перемещение не удалось, просто обновляем текущее представление
   if (!success) {
     console.log("Перемещение не удалось, обновляем текущее представление")
-    refreshCurrentView()
+    refreshCurrentView(true)
     return
   }
 
@@ -1234,62 +1363,72 @@ function processDragEnd(dragInfo) {
     window._folderContentsCache = {}
 
     // Обновляем текущее представление, так как элемент был удален из текущей папки
-    refreshCurrentView()
+    refreshCurrentView(true)
   } else {
     // Если это было перемещение внутри текущей папки (изменение порядка)
     console.log(
       `Элемент ${movedItemId} был переупорядочен внутри текущей папки ${currentParentId}`
     )
-
-    // Сбрасываем кеш содержимого текущей папки
-    if (window._folderContentsCache) {
-      delete window._folderContentsCache[currentParentId]
-    }
-
-    refreshCurrentView()
+    refreshCurrentView(true)
   }
 }
 
 // Функция обновления текущей папки (если её нет, добавим)
 async function refreshCurrentFolder() {
-  console.log("Обновление текущей папки")
+  try {
+    // Проверяем, нужно ли пропустить обновление
+    if (window.preventRefreshAfterDrop) {
+      console.log(
+        "Обновление представления отложено после drag-and-drop операции"
+      )
+      return
+    }
 
-  // Если активно перетаскивание, откладываем обновление
-  if (window.isDragging) {
-    console.log("Перетаскивание активно, откладываем обновление папки")
-    setTimeout(() => refreshCurrentFolder(), 100)
-    return
-  }
+    // Проверяем, идет ли активное перетаскивание
+    if (window.isDragging) {
+      console.log(
+        "Перетаскивание активно, откладываем обновление представления"
+      )
+      setTimeout(() => refreshCurrentFolder(), 100)
+      return
+    }
 
-  // Если есть активное перетаскивание, сначала сбрасываем его
-  document.body.classList.remove("dragging")
-  if (lastHoveredFolder) {
-    lastHoveredFolder.classList.remove("highlight")
-    lastHoveredFolder = null
-  }
+    // Отображаем лоадер при необходимости
+    showLoadingIndicator()
 
-  // Уничтожаем существующий экземпляр Sortable перед обновлением
-  if (window.sortableInstance) {
-    try {
-      window.sortableInstance.option("disabled", true)
-      setTimeout(() => {
-        try {
-          window.sortableInstance.destroy()
-        } catch (e) {
-          console.warn("Ошибка при уничтожении Sortable:", e)
-        }
+    // Очищаем кеш текущей папки
+    if (window._folderContentsCache) {
+      const parentId = navigation.getCurrentParentId()
+      delete window._folderContentsCache[parentId]
+    }
+
+    // Уничтожаем существующий экземпляр Sortable, если он есть
+    if (window.sortableInstance) {
+      try {
+        window.sortableInstance.option("disabled", true)
+        setTimeout(() => {
+          try {
+            window.sortableInstance.destroy()
+          } catch (e) {
+            console.warn("Ошибка при уничтожении Sortable:", e)
+          }
+          window.sortableInstance = null
+
+          // Продолжаем обновление после уничтожения Sortable
+          continueRefreshCurrentFolder()
+        }, 50)
+      } catch (e) {
+        console.warn("Ошибка при отключении Sortable:", e)
         window.sortableInstance = null
-
-        // Продолжаем обновление после уничтожения Sortable
         continueRefreshCurrentFolder()
-      }, 50)
-    } catch (e) {
-      console.warn("Ошибка при отключении Sortable:", e)
-      window.sortableInstance = null
+      }
+    } else {
       continueRefreshCurrentFolder()
     }
-  } else {
-    continueRefreshCurrentFolder()
+  } catch (error) {
+    console.error("Ошибка при обновлении текущей папки:", error)
+    showErrorMessage("Не удалось загрузить закладки")
+    hideLoadingIndicator()
   }
 }
 
@@ -1298,7 +1437,7 @@ async function continueRefreshCurrentFolder() {
   const currentFolderId = navigation.isRoot ? "0" : navigation.currentFolder?.id
   if (currentFolderId) {
     console.log(`Обновляем содержимое папки: ${currentFolderId}`)
-    await refreshCurrentView()
+    await refreshCurrentView(true) // Always force cache refresh
   } else {
     console.warn("ID текущей папки не определен")
   }
@@ -1434,7 +1573,7 @@ async function handleItemReordered(item, oldIndex, newIndex) {
       console.error(
         "Не удалось определить целевой элемент для изменения порядка или целевой элемент совпадает с исходным"
       )
-      await refreshCurrentView() // Обновляем представление для восстановления порядка
+      await refreshCurrentView(true) // Обновляем представление для восстановления порядка
       return
     }
 
@@ -1451,15 +1590,15 @@ async function handleItemReordered(item, oldIndex, newIndex) {
 
       // Принудительно обновляем представление, чтобы отобразить новый порядок
       // и избежать проблем с картинками
-      await refreshCurrentView()
+      await refreshCurrentView(true)
     } else {
       console.error("Не удалось изменить порядок элементов")
       // Обновляем представление, чтобы вернуть элементы в исходное состояние
-      await refreshCurrentView()
+      await refreshCurrentView(true)
     }
   } catch (error) {
     console.error("Ошибка при изменении порядка элементов:", error)
-    await refreshCurrentView()
+    await refreshCurrentView(true)
   }
 }
 
@@ -1472,24 +1611,17 @@ async function handleItemReordered(item, oldIndex, newIndex) {
  */
 async function handleItemMoved(item, fromContainer, toContainer, newIndex) {
   try {
-    // Получаем ID перемещенного элемента
+    window.preventRefreshAfterDrop = true
+
     const itemId = item.dataset.id
-
-    // Получаем ID целевой папки
-    // Если это тот же контейнер, используем метод reorderBookmarks
-    if (fromContainer === toContainer) {
-      return handleItemReordered(item, -1, newIndex)
-    }
-
-    // Иначе перемещаем элемент в другую папку
-    // Определяем ID целевой папки
+    const sourceContainerId = fromContainer.dataset.folderId || "0"
     const targetFolderId =
       toContainer.dataset.folderId ||
       (navigation.isRoot ? "0" : navigation.currentFolder?.id)
 
     if (!targetFolderId) {
       console.error("Не удалось определить ID целевой папки")
-      await refreshCurrentView()
+      await refreshCurrentView(true) // Принудительное обновление
       return
     }
 
@@ -1513,15 +1645,15 @@ async function handleItemMoved(item, fromContainer, toContainer, newIndex) {
       console.log("Элемент успешно перемещен в другую папку")
 
       // Обновляем текущее представление
-      await refreshCurrentView()
+      await refreshCurrentView(true) // Принудительное обновление
     } else {
       console.error("Не удалось переместить элемент в другую папку")
       // Обновляем представление, чтобы вернуть элементы в исходное состояние
-      await refreshCurrentView()
+      await refreshCurrentView(true) // Принудительное обновление
     }
   } catch (error) {
     console.error("Ошибка при перемещении элемента между папками:", error)
-    await refreshCurrentView()
+    await refreshCurrentView(true) // Принудительное обновление
   }
 }
 
@@ -1588,39 +1720,24 @@ function createBookmarkElement(item, cachedIcons = []) {
 
   // Определяем источник иконки
   let iconSrc = ""
-  const isDarkTheme =
-    document.documentElement.getAttribute("data-theme") === "dark"
-
-  // Проверяем наличие кэшированной иконки
-  let iconLoaded = false
-  if (cachedIcons && cachedIcons.length > 0) {
-    const themeCachedIcon = cachedIcons.find(
-      (i) => (isDarkTheme && !i.isLight) || (!isDarkTheme && i.isLight)
-    )
-
-    if (themeCachedIcon) {
-      iconSrc = themeCachedIcon.src
-      iconLoaded = themeCachedIcon.isLoaded
-    }
-  }
-
-  // Если не нашли кэшированную иконку, используем стандартную
-  if (!iconLoaded) {
-    if (item.type === "folder") {
-      // Используем async/await внутри IIFE для получения иконки папки из IconStorage
-      // Но пока делаем это синхронно с дефолтной иконкой
-      iconSrc = isDarkTheme
-        ? "/assets/icons/folder_black.svg"
-        : "/assets/icons/folder_white.svg"
-    } else {
-      iconSrc = item.favicon ? item.favicon : "/assets/icons/link.svg"
-    }
-  }
+  const isDarkTheme = document.body.classList.contains(CSS_CLASSES.DARK_THEME)
 
   // Создаем иконку
   const icon = document.createElement("img")
   icon.className = "bookmark-icon"
   icon.alt = item.type
+
+  // Установка иконок в зависимости от типа элемента и темы
+  if (item.type === "folder") {
+    // Для папок используем стандартные иконки в зависимости от темы
+    iconSrc = isDarkTheme
+      ? "/assets/icons/folder_black.svg"
+      : "/assets/icons/folder_white.svg"
+  } else {
+    // Для закладок используем favicon или стандартную иконку
+    iconSrc = item.favicon ? item.favicon : "/assets/icons/link.svg"
+  }
+
   icon.src = iconSrc
 
   // Обработчик ошибки загрузки иконки
@@ -1661,14 +1778,6 @@ function createBookmarkElement(item, cachedIcons = []) {
   // Добавляем элементы в структуру
   element.appendChild(icon)
   element.appendChild(title)
-
-  // Добавляем обработчики событий
-  if (item.type === "folder") {
-    element.addEventListener("click", handleFolderClick)
-  }
-
-  // Добавляем контекстное меню через делегирование событий,
-  // прямо на контейнере mainContent, вместо индивидуальных обработчиков
 
   return element
 }
@@ -1713,7 +1822,7 @@ async function handleButtonClick(e) {
             )
             if (result) {
               modal.close()
-              await refreshCurrentView()
+              await refreshCurrentView(true)
             }
           }
         )
@@ -1742,7 +1851,7 @@ async function handleButtonClick(e) {
           // Удаляем из закладок
           const deleted = await deleteBookmark(id)
           if (deleted) {
-            await refreshCurrentView()
+            await refreshCurrentView(true)
           } else {
             alert(getTranslation("ERROR.DELETE_FAILED"))
           }
@@ -1822,7 +1931,7 @@ function setupBackButtonDropTarget() {
           await handleBackButtonClick()
         } else {
           // Иначе просто обновляем текущий вид
-          await refreshCurrentView()
+          await refreshCurrentView(true)
         }
       } catch (error) {
         console.error("Ошибка при перемещении элемента на уровень выше:", error)
@@ -1936,5 +2045,119 @@ async function handleDrop(evt) {
     // Всегда вызываем processDragEnd, передавая результаты операции
     processDragEnd(dragInfo)
     resetDragging()
+  }
+
+  // После операции перетаскивания
+  if (dragInfo.success) {
+    await refreshCurrentView(true) // Принудительное обновление
+  } else {
+    await refreshCurrentView(true) // Принудительное обновление
+  }
+}
+
+/**
+ * Скрывает страницу настроек и возвращает к основному интерфейсу,
+ * обновляя данные
+ */
+async function hideSettingsPage() {
+  const settingsPage = document.getElementById(DOM_IDS.SETTINGS_PAGE)
+  settingsPage.style.display = "none"
+  document.getElementById(DOM_IDS.MAIN_CONTAINER).style.display = "block"
+  document.getElementById(DOM_IDS.SETTINGS_BUTTON).style.display = "block"
+
+  // Очищаем кеш при возврате из настроек
+  if (window._folderContentsCache) {
+    // Очищаем кеш для корневой папки
+    if (window._folderContentsCache["0"]) {
+      delete window._folderContentsCache["0"]
+    }
+
+    // Очищаем кеш для текущей папки, если мы находимся в ней
+    if (
+      !navigation.isRoot &&
+      navigation.currentFolder &&
+      window._folderContentsCache[navigation.currentFolder.id]
+    ) {
+      delete window._folderContentsCache[navigation.currentFolder.id]
+    }
+  }
+
+  // Обновляем данные главного интерфейса
+  if (navigation.isEmpty()) {
+    const bookmarks = await getAllBookmarks()
+    mainInterface.bookmarks = bookmarks
+    mainInterface.render()
+  } else {
+    // Если мы находимся в папке, обновляем данные для текущей папки
+    refreshCurrentView(true)
+  }
+}
+
+/**
+ * Скрывает страницу корзины и возвращает к основному интерфейсу,
+ * обновляя данные
+ */
+async function hideTrashPage() {
+  const trashPage = document.getElementById(DOM_IDS.TRASH_PAGE)
+  trashPage.style.display = "none"
+  document.getElementById(DOM_IDS.MAIN_CONTAINER).style.display = "block"
+  document.getElementById(DOM_IDS.TRASH_BUTTON).style.display = "block"
+
+  // Очищаем кеш при возврате из корзины
+  if (window._folderContentsCache) {
+    // Очищаем кеш для корневой папки
+    if (window._folderContentsCache["0"]) {
+      delete window._folderContentsCache["0"]
+    }
+
+    // Очищаем кеш для текущей папки, если мы находимся в ней
+    if (
+      !navigation.isRoot &&
+      navigation.currentFolder &&
+      window._folderContentsCache[navigation.currentFolder.id]
+    ) {
+      delete window._folderContentsCache[navigation.currentFolder.id]
+    }
+  }
+
+  // Обновляем данные главного интерфейса
+  if (navigation.isEmpty()) {
+    const bookmarks = await getAllBookmarks()
+    mainInterface.bookmarks = bookmarks
+    mainInterface.render()
+  } else {
+    // Если мы находимся в папке, обновляем данные для текущей папки
+    refreshCurrentView(true)
+  }
+}
+
+// Очистка всех таймеров наведения
+function clearHoverTimers() {
+  if (folderHoverTimer) {
+    clearTimeout(folderHoverTimer)
+    folderHoverTimer = null
+  }
+
+  // Очистка других возможных таймеров
+  if (window.highlightTimer) {
+    clearTimeout(window.highlightTimer)
+    window.highlightTimer = null
+  }
+}
+
+// Обновляет заголовок текущей папки
+function updateFolderTitle(title) {
+  const currentFolder = document.getElementById(DOM_IDS.CURRENT_FOLDER)
+  if (currentFolder) {
+    currentFolder.textContent = title
+    currentFolder.style.display = title ? "block" : "none"
+  }
+}
+
+// Показывает или скрывает кнопку назад
+function toggleBackButton(show) {
+  const backButton = document.getElementById(DOM_IDS.BACK_BUTTON)
+  if (backButton) {
+    backButton.style.display = show ? "block" : "none"
   }
 }

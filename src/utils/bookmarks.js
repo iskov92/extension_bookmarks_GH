@@ -7,8 +7,50 @@ import {
 } from "./storage.js"
 
 // Получить все закладки
-export async function getAllBookmarks() {
-  return await getStoredBookmarks()
+export async function getAllBookmarks(forceUpdate = false) {
+  // При принудительном обновлении сразу обходим кэш
+  if (forceUpdate) {
+    console.log(
+      "Принудительное обновление: получаем закладки напрямую из хранилища"
+    )
+    const bookmarks = await getStoredBookmarks()
+
+    // Обновляем кэш
+    if (!window._folderContentsCache) {
+      window._folderContentsCache = {}
+    }
+    window._folderContentsCache["0"] = {
+      contents: bookmarks,
+      timestamp: Date.now(),
+    }
+
+    return bookmarks
+  }
+
+  // Проверка кеша и времени его актуальности
+  if (window._folderContentsCache && window._folderContentsCache["0"]) {
+    const cache = window._folderContentsCache["0"]
+    // Кеш действителен не более 30 секунд
+    if (Date.now() - cache.timestamp < 30000) {
+      console.log("Использую кеш для корневой папки")
+      return cache.contents
+    }
+  }
+
+  // Если кэш устарел или его нет, получаем свежие данные
+  console.log("Кэш устарел или отсутствует: получаем закладки из хранилища")
+  const bookmarks = await getStoredBookmarks()
+
+  // Сохраняем в кеш
+  if (!window._folderContentsCache) {
+    window._folderContentsCache = {}
+  }
+  window._folderContentsCache["0"] = {
+    contents: bookmarks,
+    timestamp: Date.now(),
+  }
+
+  return bookmarks
 }
 
 // Создать новую закладку
@@ -23,19 +65,59 @@ export async function createFolder(parentId, title) {
 
 // Получить закладки из папки
 export async function getBookmarksInFolder(folderId, forceUpdate = false) {
-  // Проверка кеша и времени его актуальности
-  if (
-    !forceUpdate &&
-    window._folderContentsCache &&
-    window._folderContentsCache[folderId]
-  ) {
+  // При принудительном обновлении сразу обходим кэш
+  if (forceUpdate) {
+    console.log(
+      `Принудительное обновление: получаем содержимое папки ${folderId} напрямую из хранилища`
+    )
+
+    const bookmarks = await getStoredBookmarks()
+    let folderContents
+
+    if (folderId === "0") {
+      folderContents = bookmarks
+    } else {
+      function findFolder(items) {
+        for (const item of items) {
+          if (item.id === folderId) {
+            return item.children || []
+          }
+          if (item.type === "folder" && item.children) {
+            const found = findFolder(item.children)
+            if (found) return found
+          }
+        }
+        return null
+      }
+      folderContents = findFolder(bookmarks) || []
+    }
+
+    // Обновляем кэш
+    if (!window._folderContentsCache) {
+      window._folderContentsCache = {}
+    }
+    window._folderContentsCache[folderId] = {
+      contents: folderContents,
+      timestamp: Date.now(),
+    }
+
+    return folderContents
+  }
+
+  // Проверка кэша и времени его актуальности
+  if (window._folderContentsCache && window._folderContentsCache[folderId]) {
     const cache = window._folderContentsCache[folderId]
-    // Кеш действителен не более 30 секунд
+    // Кэш действителен не более 30 секунд
     if (Date.now() - cache.timestamp < 30000) {
-      console.log(`Использую кеш для папки ${folderId}`)
+      console.log(`Использую кэш для папки ${folderId}`)
       return cache.contents
     }
   }
+
+  // Кэш устарел или его нет - получаем свежие данные
+  console.log(
+    `Кэш устарел или отсутствует: получаем содержимое папки ${folderId} из хранилища`
+  )
 
   const bookmarks = await getStoredBookmarks()
   let folderContents
@@ -58,7 +140,7 @@ export async function getBookmarksInFolder(folderId, forceUpdate = false) {
     folderContents = findFolder(bookmarks) || []
   }
 
-  // Сохраняем в кеш
+  // Сохраняем в кэш
   if (!window._folderContentsCache) {
     window._folderContentsCache = {}
   }
