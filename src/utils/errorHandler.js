@@ -6,6 +6,9 @@ export const ErrorType = {
   COPY: "copy",
   LOAD: "load",
   NAVIGATION: "navigation",
+  MOVE: "move",
+  RESTORE: "restore",
+  REORDER: "reorder",
 }
 
 // Сообщения об ошибках
@@ -32,6 +35,20 @@ const errorMessages = {
   },
   [ErrorType.NAVIGATION]: {
     folder: "Ошибка при навигации по папкам",
+  },
+  [ErrorType.MOVE]: {
+    bookmark: "Не удалось переместить закладку",
+    folder: "Не удалось переместить папку",
+    cyclic: "Нельзя переместить папку в её собственную подпапку",
+  },
+  [ErrorType.RESTORE]: {
+    bookmark: "Не удалось восстановить закладку",
+    folder: "Не удалось восстановить папку",
+  },
+  [ErrorType.REORDER]: {
+    bookmark: "Не удалось изменить порядок закладок",
+    folder: "Не удалось изменить порядок папок",
+    general: "Не удалось изменить порядок элементов",
   },
 }
 

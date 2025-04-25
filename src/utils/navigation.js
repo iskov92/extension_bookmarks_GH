@@ -40,6 +40,14 @@ export class Navigation {
     this._notifyListeners()
   }
 
+  /**
+   * Получает ID текущей родительской папки
+   * @returns {string} - ID текущей родительской папки или "0" для корневого уровня
+   */
+  getCurrentParentId() {
+    return this.isRoot ? "0" : this.currentFolder?.id || "0"
+  }
+
   addListener(callback) {
     this._listeners.add(callback)
   }

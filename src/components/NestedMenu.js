@@ -69,6 +69,9 @@ export class NestedMenu {
       item.dataset.id = bookmark.id
       item.dataset.type = bookmark.type
 
+      // Делаем элемент перетаскиваемым
+      item.setAttribute("draggable", "true")
+
       if (bookmark.url) {
         item.dataset.url = bookmark.url
       }
@@ -92,6 +95,11 @@ export class NestedMenu {
       item.appendChild(icon)
       item.appendChild(title)
       this.container.appendChild(item)
+    }
+
+    // Вызываем функцию обновления обработчиков перетаскивания в родительском компоненте
+    if (typeof updateDragHandlers === "function") {
+      updateDragHandlers()
     }
   }
 

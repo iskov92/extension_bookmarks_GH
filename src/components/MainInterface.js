@@ -82,6 +82,10 @@ export class MainInterface {
         bookmark.type === "folder" ? "folder" : ""
       }`
       bookmarkElement.dataset.id = bookmark.id
+      bookmarkElement.dataset.type = bookmark.type
+
+      // Делаем элемент перетаскиваемым
+      bookmarkElement.setAttribute("draggable", "true")
 
       if (bookmark.url) {
         bookmarkElement.dataset.url = bookmark.url
@@ -107,6 +111,11 @@ export class MainInterface {
       bookmarkElement.appendChild(icon)
       bookmarkElement.appendChild(title)
       this.container.appendChild(bookmarkElement)
+    }
+
+    // Вызываем функцию обновления обработчиков перетаскивания в родительском компоненте
+    if (typeof updateDragHandlers === "function") {
+      updateDragHandlers()
     }
   }
 }
