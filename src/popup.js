@@ -58,6 +58,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await iconStorage.init()
     await iconStorage.migrateFromStorage()
+
+    // Делаем iconStorage доступным глобально
+    window.iconStorage = iconStorage
+
     initTheme()
 
     // Обработка параметра path из URL
@@ -334,6 +338,14 @@ async function refreshCurrentView() {
   const currentFolderTitle = document.querySelector(".current-folder")
 
   try {
+    // Проверяем, нужно ли пропустить обновление
+    if (window.preventRefreshAfterDrop) {
+      console.log(
+        "Обновление представления отложено после drag-and-drop операции"
+      )
+      return
+    }
+
     // Проверяем, идет ли активное перетаскивание
     if (window.isDragging) {
       console.log(
@@ -394,9 +406,18 @@ async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
           currentIcons[itemElem.dataset.id] = []
         }
         // Сохраняем ссылку на иконку и её src
+        // Нормализуем путь к иконке, добавляя / в начало, если его нет
+        let src = icon.src
+        if (src.includes("/assets/") && !src.includes("://assets/")) {
+          // Если путь относительный без /, добавляем его
+          src = src
+            .replace("/assets/", "//assets/")
+            .replace("//assets/", "/assets/")
+        }
+
         currentIcons[itemElem.dataset.id].push({
           isLight: icon.classList.contains("light-theme-icon"),
-          src: icon.src,
+          src: src,
           isLoaded: icon.complete && icon.naturalWidth > 0,
         })
       }
@@ -408,6 +429,11 @@ async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
       window.lastMovedItem &&
       window.lastMovedItem.targetFolder === parentId &&
       Date.now() - window.lastMovedItem.timestamp < 30000
+
+    // Очищаем кеш содержимого папки, если требуется принудительное обновление
+    if (forceUpdate && window._folderContentsCache) {
+      delete window._folderContentsCache[parentId]
+    }
 
     const bookmarks = await getBookmarksInFolder(parentId, forceUpdate)
 
@@ -900,6 +926,8 @@ function initDragAndDrop() {
 
   // Флаг для отслеживания активного перетаскивания
   window.isDragging = false
+  // Флаг для предотвращения автоматического обновления интерфейса после перетаскивания
+  window.preventRefreshAfterDrop = false
 
   // Инициализируем Sortable с базовыми настройками
   window.sortableInstance = new Sortable(container, {
@@ -940,6 +968,9 @@ function initDragAndDrop() {
     onEnd: function (evt) {
       console.log("Окончание перетаскивания", evt)
 
+      // Устанавливаем флаг, чтобы предотвратить автоматическое обновление интерфейса
+      window.preventRefreshAfterDrop = true
+
       // Запоминаем необходимые данные перед очисткой
       const draggedId = window.draggedItemId
       const draggedType = window.draggedItemType
@@ -965,22 +996,104 @@ function initDragAndDrop() {
 
       // Устанавливаем небольшую задержку перед обработкой,
       // чтобы Sortable успел завершить свои операции
-      setTimeout(() => {
+      setTimeout(async () => {
         window.isDragging = false
 
-        // Обрабатываем перетаскивание если был изменён порядок
-        if (hasChanged) {
-          // Используем сохраненные данные вместо обращения к evt
-          processDragEnd({
-            movedItemId: draggedId,
-            success: hasChanged,
-            targetFolderId: hasChanged ? toEl.dataset.id : null,
-          })
+        // Если перемещение происходило между разными контейнерами
+        if (hasChanged && fromEl !== toEl) {
+          // Обрабатываем перемещение в другую папку
+          try {
+            const targetFolderId = toEl.dataset.folderId
+            if (targetFolderId) {
+              const result = await moveBookmark(draggedId, targetFolderId)
+              if (result) {
+                showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+                // Сбрасываем кеш
+                window._folderContentsCache = {}
+                // Сохраняем информацию о последнем перемещении
+                window.lastMovedItem = {
+                  itemId: draggedId,
+                  targetFolder: targetFolderId,
+                  timestamp: Date.now(),
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Ошибка при перемещении между контейнерами:", error)
+          }
+        } else if (hasChanged) {
+          // Если это изменение порядка внутри одного контейнера
+          try {
+            const currentFolderId = navigation.getCurrentParentId()
+
+            // Получаем все элементы после перемещения для определения нового порядка
+            const items = Array.from(fromEl.querySelectorAll(".bookmark-item"))
+            console.log(
+              `Элементы после перемещения: ${items.length}`,
+              items.map((i) => i.dataset.id)
+            )
+
+            // Получаем актуальный порядок элементов после перемещения
+            const newOrder = items.map((item) => item.dataset.id)
+
+            // Находим перемещенный элемент
+            const movedItemIndex = newOrder.indexOf(draggedId)
+            if (movedItemIndex === -1) {
+              console.error(
+                "Не удалось найти перемещенный элемент в DOM после перемещения"
+              )
+              await refreshCurrentView()
+              return
+            }
+
+            // Определяем, перед каким элементом вставить (или null, если в конец)
+            let targetId = null
+            if (movedItemIndex < newOrder.length - 1) {
+              targetId = newOrder[movedItemIndex + 1]
+            }
+
+            console.log(
+              `Переупорядочивание: элемент ${draggedId} перед элементом ${
+                targetId || "конец списка"
+              } в папке ${currentFolderId}`
+            )
+
+            // Вызываем функцию переупорядочивания с актуальными параметрами
+            const result = await reorderBookmarks(
+              draggedId,
+              targetId,
+              currentFolderId
+            )
+
+            if (result) {
+              // Операция успешна
+              showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+              console.log("Порядок элементов успешно сохранен в хранилище")
+
+              // Сбрасываем кеши для обеспечения актуальности данных при следующей загрузке
+              if (window._folderContentsCache) {
+                delete window._folderContentsCache[currentFolderId]
+              }
+            } else {
+              console.error("Ошибка при сохранении нового порядка элементов")
+              window.preventRefreshAfterDrop = false
+              await refreshCurrentView()
+            }
+          } catch (error) {
+            console.error("Ошибка при изменении порядка:", error)
+            window.preventRefreshAfterDrop = false
+            await refreshCurrentView()
+          }
         }
 
         // Очищаем переменные
         window.draggedItemId = null
         window.draggedItemType = null
+
+        // Сбрасываем флаг блокировки обновления и разрешаем дальнейшие операции
+        setTimeout(() => {
+          window.preventRefreshAfterDrop = false
+        }, 100)
       }, 50)
     },
 
@@ -1111,8 +1224,14 @@ function processDragEnd(dragInfo) {
     )
 
     // Сохраняем информацию о последнем перемещении
-    localStorage.setItem("lastMovedItem", movedItemId)
-    localStorage.setItem("lastTargetFolder", targetFolderId)
+    window.lastMovedItem = {
+      itemId: movedItemId,
+      targetFolder: targetFolderId,
+      timestamp: Date.now(),
+    }
+
+    // Сбрасываем кеш содержимого папок для обеспечения актуальности данных
+    window._folderContentsCache = {}
 
     // Обновляем текущее представление, так как элемент был удален из текущей папки
     refreshCurrentView()
@@ -1121,6 +1240,12 @@ function processDragEnd(dragInfo) {
     console.log(
       `Элемент ${movedItemId} был переупорядочен внутри текущей папки ${currentParentId}`
     )
+
+    // Сбрасываем кеш содержимого текущей папки
+    if (window._folderContentsCache) {
+      delete window._folderContentsCache[currentParentId]
+    }
+
     refreshCurrentView()
   }
 }
@@ -1193,6 +1318,9 @@ async function moveItemToFolder(itemId, folderId) {
       }
     }
 
+    // Сбрасываем кеш папок для обеспечения актуальных данных
+    window._folderContentsCache = {}
+
     // Используем существующую функцию moveBookmark из bookmarks.js
     const result = await moveBookmark(itemId, folderId)
 
@@ -1223,8 +1351,11 @@ async function moveItemToFolder(itemId, folderId) {
         timestamp: Date.now(),
       }
 
-      // Не требуется полное обновление представления, т.к. мы уже
-      // визуально удалили элемент, это уменьшит мигания и сохранит иконки
+      // На всякий случай сбрасываем флаг блокировки обновления
+      // после завершения операции перемещения
+      setTimeout(() => {
+        window.preventRefreshAfterDrop = false
+      }, 500)
     }
 
     // Если Sortable был отключен, включаем его обратно
@@ -1299,10 +1430,11 @@ async function handleItemReordered(item, oldIndex, newIndex) {
 
     const targetId = itemsInContainer[targetIndex]?.dataset.id
 
-    if (!targetId) {
+    if (!targetId || targetId === itemId) {
       console.error(
-        "Не удалось определить целевой элемент для изменения порядка"
+        "Не удалось определить целевой элемент для изменения порядка или целевой элемент совпадает с исходным"
       )
+      await refreshCurrentView() // Обновляем представление для восстановления порядка
       return
     }
 
@@ -1316,6 +1448,10 @@ async function handleItemReordered(item, oldIndex, newIndex) {
     if (result) {
       showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
       console.log("Порядок элементов успешно изменен")
+
+      // Принудительно обновляем представление, чтобы отобразить новый порядок
+      // и избежать проблем с картинками
+      await refreshCurrentView()
     } else {
       console.error("Не удалось изменить порядок элементов")
       // Обновляем представление, чтобы вернуть элементы в исходное состояние
@@ -1359,12 +1495,25 @@ async function handleItemMoved(item, fromContainer, toContainer, newIndex) {
 
     console.log(`Перемещение элемента ${itemId} в папку ${targetFolderId}`)
 
+    // Сбрасываем кеш содержимого папок перед операцией
+    window._folderContentsCache = {}
+
     // Выполняем перемещение элемента в данных
     const result = await moveBookmark(itemId, targetFolderId)
 
     if (result) {
+      // Сохраняем информацию о последнем перемещении
+      window.lastMovedItem = {
+        itemId: itemId,
+        targetFolder: targetFolderId,
+        timestamp: Date.now(),
+      }
+
       showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
       console.log("Элемент успешно перемещен в другую папку")
+
+      // Обновляем текущее представление
+      await refreshCurrentView()
     } else {
       console.error("Не удалось переместить элемент в другую папку")
       // Обновляем представление, чтобы вернуть элементы в исходное состояние
@@ -1458,11 +1607,13 @@ function createBookmarkElement(item, cachedIcons = []) {
   // Если не нашли кэшированную иконку, используем стандартную
   if (!iconLoaded) {
     if (item.type === "folder") {
+      // Используем async/await внутри IIFE для получения иконки папки из IconStorage
+      // Но пока делаем это синхронно с дефолтной иконкой
       iconSrc = isDarkTheme
-        ? "assets/icons/folder.svg"
-        : "assets/icons/folder-dark.svg"
+        ? "/assets/icons/folder_black.svg"
+        : "/assets/icons/folder_white.svg"
     } else {
-      iconSrc = item.favicon ? item.favicon : "assets/icons/link.svg"
+      iconSrc = item.favicon ? item.favicon : "/assets/icons/link.svg"
     }
   }
 
@@ -1476,11 +1627,30 @@ function createBookmarkElement(item, cachedIcons = []) {
   icon.onerror = function () {
     if (item.type === "folder") {
       icon.src = isDarkTheme
-        ? "assets/icons/folder.svg"
-        : "assets/icons/folder-dark.svg"
+        ? "/assets/icons/folder_black.svg"
+        : "/assets/icons/folder_white.svg"
     } else {
-      icon.src = "assets/icons/link.svg"
+      icon.src = "/assets/icons/link.svg"
     }
+  }
+
+  // Если это папка, попробуем загрузить кастомную иконку асинхронно
+  if (item.type === "folder") {
+    // Асинхронно попытаемся загрузить иконку из IconStorage
+    setTimeout(async () => {
+      try {
+        const iconStorage = window.iconStorage
+        if (iconStorage) {
+          const iconBlob = await iconStorage.getIcon(item.id)
+          if (iconBlob) {
+            icon.src = URL.createObjectURL(iconBlob)
+            return
+          }
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке иконки папки:", error)
+      }
+    }, 0)
   }
 
   // Заголовок закладки
