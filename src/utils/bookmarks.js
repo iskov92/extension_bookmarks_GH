@@ -482,13 +482,13 @@ function findFolderById(bookmarks, folderId) {
 /**
  * Меняет порядок закладок в указанной папке
  * @param {string} sourceId - ID перемещаемого элемента
- * @param {string} targetId - ID элемента, рядом с которым нужно вставить
+ * @param {string|null} targetId - ID элемента, рядом с которым нужно вставить (или null для перемещения в конец)
  * @param {string} parentId - ID родительской папки
  * @returns {Promise<boolean>} - Успешно ли выполнена операция
  */
 export async function reorderBookmarks(sourceId, targetId, parentId) {
-  if (!sourceId || !targetId) {
-    console.error("reorderBookmarks: sourceId или targetId отсутствуют")
+  if (!sourceId) {
+    console.error("reorderBookmarks: sourceId отсутствует")
     return false
   }
 
@@ -500,7 +500,12 @@ export async function reorderBookmarks(sourceId, targetId, parentId) {
   }
 
   try {
+    console.log(
+      `reorderBookmarks: начало перемещения элемента ${sourceId} к ${targetId} в папке ${parentId}`
+    )
+
     const bookmarks = await getStoredBookmarks()
+    console.log("reorderBookmarks: закладки получены из хранилища")
 
     // Находим родительскую папку
     let targetFolder = bookmarks
@@ -518,11 +523,17 @@ export async function reorderBookmarks(sourceId, targetId, parentId) {
         return []
       }
       targetFolder = findFolder(bookmarks)
+      console.log(
+        `reorderBookmarks: найдена родительская папка, содержит ${targetFolder.length} элементов`
+      )
+    } else {
+      console.log(
+        `reorderBookmarks: работаем с корневой папкой, содержит ${targetFolder.length} элементов`
+      )
     }
 
-    // Проверяем, что оба элемента находятся в целевой папке
+    // Проверяем, что исходный элемент находится в целевой папке
     const sourceIndex = targetFolder.findIndex((item) => item.id === sourceId)
-    const targetIndex = targetFolder.findIndex((item) => item.id === targetId)
 
     if (sourceIndex === -1) {
       console.error(
@@ -531,28 +542,108 @@ export async function reorderBookmarks(sourceId, targetId, parentId) {
       return false
     }
 
-    if (targetIndex === -1) {
-      console.error(
-        `reorderBookmarks: элемент с ID ${targetId} не найден в выбранной папке`
-      )
-      return false
-    }
+    console.log(
+      `reorderBookmarks: найден исходный элемент на позиции ${sourceIndex}`
+    )
 
     // Извлекаем перемещаемый элемент
     const [movedItem] = targetFolder.splice(sourceIndex, 1)
+    console.log(
+      `reorderBookmarks: извлечен элемент "${movedItem.title}" (${movedItem.id})`
+    )
 
-    // Определяем новую позицию (учитывая смещение индексов после удаления)
-    const newIndex = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex
+    // Если targetId равен null, помещаем элемент в конец списка
+    if (targetId === null) {
+      targetFolder.push(movedItem)
+      console.log(
+        `reorderBookmarks: элемент перемещен в конец списка (позиция ${
+          targetFolder.length - 1
+        })`
+      )
+    } else {
+      // Иначе ищем целевую позицию
+      const targetIndex = targetFolder.findIndex((item) => item.id === targetId)
 
-    // Вставляем элемент на новую позицию
-    targetFolder.splice(newIndex, 0, movedItem)
+      if (targetIndex === -1) {
+        console.error(
+          `reorderBookmarks: элемент с ID ${targetId} не найден в выбранной папке`
+        )
+        // Всё равно вставляем элемент в конец, чтобы не потерять его
+        targetFolder.push(movedItem)
+        console.log(
+          `reorderBookmarks: целевая позиция не найдена, элемент добавлен в конец`
+        )
+        return false
+      }
+
+      // Вставляем элемент на новую позицию
+      targetFolder.splice(targetIndex, 0, movedItem)
+      console.log(
+        `reorderBookmarks: элемент успешно перемещен на позицию ${targetIndex}`
+      )
+    }
 
     // Сохраняем изменения
+    console.log("reorderBookmarks: сохраняем изменения в хранилище")
     await saveBookmarks(bookmarks)
 
-    console.log(
-      `reorderBookmarks: элемент успешно перемещен с позиции ${sourceIndex} на ${newIndex}`
-    )
+    // Проверяем, что изменения были сохранены правильно
+    const updatedBookmarks = await getStoredBookmarks()
+    console.log("reorderBookmarks: проверяем сохраненные изменения")
+
+    // Проверка для корневой папки
+    if (parentId === "0") {
+      const savedIndex = updatedBookmarks.findIndex(
+        (item) => item.id === sourceId
+      )
+      if (savedIndex === -1) {
+        console.error(
+          `reorderBookmarks: после сохранения элемент не найден в корневой папке`
+        )
+        return false
+      }
+      console.log(
+        `reorderBookmarks: после сохранения элемент найден на позиции ${savedIndex}`
+      )
+    } else {
+      // Для вложенных папок
+      let found = false
+      function verifyInFolder(items) {
+        for (const item of items) {
+          if (item.id === parentId && item.children) {
+            const savedIndex = item.children.findIndex(
+              (child) => child.id === sourceId
+            )
+            if (savedIndex === -1) {
+              console.error(
+                `reorderBookmarks: после сохранения элемент не найден в папке ${parentId}`
+              )
+              return false
+            }
+            console.log(
+              `reorderBookmarks: после сохранения элемент найден в папке ${parentId} на позиции ${savedIndex}`
+            )
+            return true
+          }
+          if (
+            item.type === "folder" &&
+            item.children &&
+            verifyInFolder(item.children)
+          ) {
+            return true
+          }
+        }
+        return false
+      }
+      found = verifyInFolder(updatedBookmarks)
+      if (!found) {
+        console.error(
+          `reorderBookmarks: после сохранения не удалось проверить элемент в папке ${parentId}`
+        )
+      }
+    }
+
+    console.log("reorderBookmarks: операция успешно завершена")
     return true
   } catch (error) {
     console.error(

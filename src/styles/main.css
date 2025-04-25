@@ -1370,3 +1370,18 @@ body.dragging * {
   color: var(--dark-text-secondary);
   border-color: var(--dark-accent);
 }
+
+/* Стили для drag-and-drop на кнопку возврата */
+.back-button.drag-over {
+  background-color: var(--light-accent);
+  color: #000000;
+  transform: scale(1.1);
+  transition: all 0.2s ease;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .back-button.drag-over {
+  background-color: var(--dark-accent);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}

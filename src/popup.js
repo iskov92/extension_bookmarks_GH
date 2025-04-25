@@ -312,15 +312,53 @@ async function refreshCurrentView() {
   const currentFolderTitle = document.querySelector(".current-folder")
 
   try {
+    // Проверяем, идет ли активное перетаскивание
+    if (window.isDragging) {
+      console.log(
+        "Перетаскивание активно, откладываем обновление представления"
+      )
+      setTimeout(() => refreshCurrentView(), 100)
+      return
+    }
+
     // Отображаем лоадер при необходимости
     showLoadingIndicator()
 
     // Уничтожаем существующий экземпляр Sortable, если он есть
     if (window.sortableInstance) {
-      window.sortableInstance.destroy()
-      window.sortableInstance = null
-    }
+      try {
+        window.sortableInstance.option("disabled", true)
+        setTimeout(() => {
+          try {
+            window.sortableInstance.destroy()
+          } catch (e) {
+            console.warn("Ошибка при уничтожении Sortable:", e)
+          }
+          window.sortableInstance = null
 
+          // Продолжаем обновление после уничтожения Sortable
+          continueRefreshCurrentView(mainContent, currentFolderTitle)
+        }, 50)
+      } catch (e) {
+        console.warn("Ошибка при отключении Sortable:", e)
+        window.sortableInstance = null
+        continueRefreshCurrentView(mainContent, currentFolderTitle)
+      }
+    } else {
+      continueRefreshCurrentView(mainContent, currentFolderTitle)
+    }
+  } catch (error) {
+    console.error("Ошибка при обновлении представления:", error)
+    showErrorMessage("Не удалось загрузить закладки")
+    hideLoadingIndicator()
+  }
+}
+
+/**
+ * Вспомогательная функция для продолжения обновления представления
+ */
+async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
+  try {
     // Получаем текущий ID родительской папки
     const parentId = navigation.getCurrentParentId()
     const bookmarks = await getBookmarksInFolder(parentId)
@@ -368,10 +406,29 @@ async function refreshCurrentView() {
       })
     }
 
+    // Проверяем загрузку иконок после небольшой задержки
+    setTimeout(() => {
+      const icons = mainContent.querySelectorAll(".bookmark-icon")
+      icons.forEach((icon) => {
+        if (!icon.complete || icon.naturalWidth === 0) {
+          // Перезагрузка иконки если она не загрузилась
+          const originalSrc = icon.src
+          // Устанавливаем резервную иконку
+          if (icon.closest(".folder")) {
+            icon.src = icon.classList.contains("light-theme-icon")
+              ? "assets/icons/folder-dark.svg"
+              : "assets/icons/folder.svg"
+          } else {
+            icon.src = "assets/icons/globe.svg"
+          }
+        }
+      })
+    }, 500)
+
     // Инициализируем Sortable после добавления элементов
     initDragAndDrop()
   } catch (error) {
-    console.error("Ошибка при обновлении представления:", error)
+    console.error("Ошибка при продолжении обновления представления:", error)
     showErrorMessage("Не удалось загрузить закладки")
   } finally {
     // Скрываем лоадер
@@ -475,6 +532,9 @@ async function initializeUI() {
 
   // Инициализация обработчиков перетаскивания
   initDragAndDrop()
+
+  // Добавляем поддержку перетаскивания на кнопку возврата
+  setupBackButtonDropTarget()
 }
 
 function showAddDialog(parentId) {
@@ -780,9 +840,16 @@ function initDragAndDrop() {
 
   // Если уже есть экземпляр Sortable, уничтожаем его
   if (window.sortableInstance) {
-    window.sortableInstance.destroy()
+    try {
+      window.sortableInstance.destroy()
+    } catch (e) {
+      console.warn("Ошибка при уничтожении Sortable:", e)
+    }
     window.sortableInstance = null
   }
+
+  // Флаг для отслеживания активного перетаскивания
+  window.isDragging = false
 
   // Инициализируем Sortable с базовыми настройками
   window.sortableInstance = new Sortable(container, {
@@ -806,6 +873,7 @@ function initDragAndDrop() {
     // Обработчик начала перетаскивания
     onStart: function (evt) {
       console.log("Начало перетаскивания", evt.item)
+      window.isDragging = true
       const draggedItem = evt.item
 
       // Сохраняем ID перетаскиваемого элемента
@@ -822,6 +890,15 @@ function initDragAndDrop() {
     onEnd: function (evt) {
       console.log("Окончание перетаскивания", evt)
 
+      // Запоминаем необходимые данные перед очисткой
+      const draggedId = window.draggedItemId
+      const draggedType = window.draggedItemType
+      const oldIndex = evt.oldIndex
+      const newIndex = evt.newIndex
+      const fromEl = evt.from
+      const toEl = evt.to
+      const hasChanged = evt.newIndex !== evt.oldIndex || evt.to !== evt.from
+
       // Очищаем таймер и выделение папки
       if (folderHoverTimer) {
         clearTimeout(folderHoverTimer)
@@ -833,17 +910,24 @@ function initDragAndDrop() {
         lastHoveredFolder = null
       }
 
-      // Обрабатываем перетаскивание если был изменён порядок
-      if (evt.newIndex !== evt.oldIndex || evt.to !== evt.from) {
-        handleSortableEnd(evt)
-      }
-
-      // Очищаем переменные
-      window.draggedItemId = null
-      window.draggedItemType = null
-
       // Удаляем класс dragging с тела документа
       document.body.classList.remove("dragging")
+
+      // Устанавливаем небольшую задержку перед обработкой,
+      // чтобы Sortable успел завершить свои операции
+      setTimeout(() => {
+        window.isDragging = false
+
+        // Обрабатываем перетаскивание если был изменён порядок
+        if (hasChanged) {
+          // Используем сохраненные данные вместо обращения к evt
+          processDragEnd(draggedId, oldIndex, newIndex, fromEl, toEl)
+        }
+
+        // Очищаем переменные
+        window.draggedItemId = null
+        window.draggedItemType = null
+      }, 50)
     },
 
     // Обработчик перемещения
@@ -871,6 +955,20 @@ function initDragAndDrop() {
         folderHoverTimer = setTimeout(() => {
           // Получаем ID папки
           const folderId = targetItem.dataset.id
+          const draggedId = window.draggedItemId
+
+          // Проверка, чтобы не перемещать папку в саму себя
+          if (draggedId === folderId) {
+            if (folderHoverTimer) {
+              clearTimeout(folderHoverTimer)
+              folderHoverTimer = null
+            }
+            if (lastHoveredFolder) {
+              lastHoveredFolder.classList.remove("highlight")
+              lastHoveredFolder = null
+            }
+            return
+          }
 
           // Очищаем переменные и устанавливаем выделение перед перемещением
           folderHoverTimer = null
@@ -879,13 +977,41 @@ function initDragAndDrop() {
             lastHoveredFolder = null
           }
 
-          // Перемещаем элемент в папку
-          moveItemToFolder(window.draggedItemId, folderId)
-            .then(() => {
-              // Обновляем отображение содержимого папки
-              refreshCurrentFolder()
-            })
-            .catch((error) => {
+          // Перемещаем элемент в папку после деактивации Sortable
+          // для предотвращения конфликтов
+          if (window.sortableInstance) {
+            try {
+              window.sortableInstance.option("disabled", true)
+              setTimeout(() => {
+                moveItemToFolder(draggedId, folderId)
+                  .catch((error) => {
+                    console.error("Ошибка при перемещении в папку:", error)
+                    ErrorHandler.handle(
+                      error,
+                      ErrorType.MOVE,
+                      window.draggedItemType || "bookmark"
+                    )
+                  })
+                  .finally(() => {
+                    if (window.sortableInstance) {
+                      window.sortableInstance.option("disabled", false)
+                    }
+                  })
+              }, 50)
+            } catch (e) {
+              console.warn("Ошибка при отключении Sortable:", e)
+              // Если не удалось отключить, просто выполняем перемещение
+              moveItemToFolder(draggedId, folderId).catch((error) => {
+                console.error("Ошибка при перемещении в папку:", error)
+                ErrorHandler.handle(
+                  error,
+                  ErrorType.MOVE,
+                  window.draggedItemType || "bookmark"
+                )
+              })
+            }
+          } else {
+            moveItemToFolder(draggedId, folderId).catch((error) => {
               console.error("Ошибка при перемещении в папку:", error)
               ErrorHandler.handle(
                 error,
@@ -893,7 +1019,8 @@ function initDragAndDrop() {
                 window.draggedItemType || "bookmark"
               )
             })
-        }, 800) // Задержка перед открытием папки
+          }
+        }, 800) // Задержка перед перемещением в папку
       }
 
       return true // Разрешаем перемещение
@@ -903,70 +1030,141 @@ function initDragAndDrop() {
   console.log("Sortable.js инициализирован успешно")
 }
 
-// Обработчик окончания сортировки
-async function handleSortableEnd(evt) {
-  try {
-    // Получаем ID перетаскиваемого элемента и новую позицию
-    const itemId = window.draggedItemId
-    const newIndex = evt.newIndex
-
-    if (!itemId) {
-      console.error("ID перетаскиваемого элемента не найден")
-      return
-    }
-
-    console.log(`Перемещаем элемент ${itemId} на позицию ${newIndex}`)
-
-    // Получаем все видимые элементы
-    const items = Array.from(document.querySelectorAll(".bookmark-item"))
-
-    // Получаем текущую папку или ID родительской папки
-    const currentFolderId = navigation.isRoot
-      ? "0"
-      : navigation.currentFolder?.id
-
-    // Если новый индекс существует и не равен старому
-    if (newIndex !== undefined) {
-      // Определяем ID элемента, перед которым будет размещен перетаскиваемый элемент
-      let targetId = null
-
-      if (newIndex < items.length) {
-        targetId = items[newIndex].dataset.id
-      }
-
-      // Если у нас есть и исходный элемент и целевой элемент
-      if (itemId && targetId) {
-        // Перед изменением порядка уничтожаем Sortable
-        if (window.sortableInstance) {
-          window.sortableInstance.destroy()
-          window.sortableInstance = null
-        }
-
-        // Обновляем порядок закладок
-        await reorderBookmarks(itemId, targetId, currentFolderId)
-
-        // Обновляем текущую папку
-        await refreshCurrentFolder()
-      }
-    }
-  } catch (error) {
-    console.error("Ошибка при обработке перетаскивания:", error)
-    // Используем ErrorHandler.handle вместо ErrorHandler.show
-    ErrorHandler.handle(error, ErrorType.REORDER, "general")
+/**
+ * Обрабатывает завершение перетаскивания без прямого доступа к объекту события
+ */
+function processDragEnd(
+  draggedId,
+  oldIndex,
+  newIndex,
+  fromContainer,
+  toContainer
+) {
+  if (!draggedId || oldIndex === newIndex) {
+    console.log(
+      "Позиция элемента не изменилась или нет ID, пропускаем обновление"
+    )
+    return
   }
+
+  const currentFolderId = navigation.getCurrentFolderId()
+  console.log(
+    `handleSortableEnd: Текущая папка ID=${currentFolderId}, oldIndex=${oldIndex}, newIndex=${newIndex}`
+  )
+
+  const bookmarksList = document.getElementById("mainContent")
+  if (
+    !bookmarksList ||
+    !bookmarksList.children ||
+    newIndex >= bookmarksList.children.length
+  ) {
+    console.error(
+      "Не удалось найти элемент списка закладок или индекс вне диапазона"
+    )
+    return
+  }
+
+  const draggedItem = bookmarksList.children[newIndex]
+  if (!draggedItem) {
+    console.error("Не удалось найти перетаскиваемый элемент по индексу")
+    return
+  }
+
+  let targetId = null
+  if (newIndex < bookmarksList.children.length - 1) {
+    targetId = bookmarksList.children[newIndex + 1].getAttribute("data-id")
+    console.log(`handleSortableEnd: Целевой элемент (следующий) ID=${targetId}`)
+  } else {
+    console.log("handleSortableEnd: Перемещение в конец списка")
+  }
+
+  ErrorHandler.wrapAsync(async () => {
+    const result = await reorderBookmarks(draggedId, targetId, currentFolderId)
+    console.log(
+      `handleSortableEnd: Результат перемещения: ${
+        result ? "успешно" : "ошибка"
+      }`
+    )
+
+    if (result) {
+      console.log(
+        "handleSortableEnd: Обновляем отображение после успешного перемещения"
+      )
+
+      // Проверяем, что иконки загружены правильно
+      const iconElements = document.querySelectorAll(
+        `[data-id="${draggedId}"] .bookmark-icon`
+      )
+      iconElements.forEach((icon) => {
+        if (!icon.complete || icon.naturalWidth === 0) {
+          console.warn(
+            `Иконка не загружена для элемента ${draggedId}, пробуем перезагрузить`
+          )
+          const originalSrc = icon.src
+          icon.src = originalSrc
+        }
+      })
+    } else {
+      console.error(
+        "handleSortableEnd: Не удалось сохранить изменения порядка, возвращаем элементы"
+      )
+      // При необходимости можно добавить перезагрузку содержимого
+      // refreshCurrentView()
+    }
+  })
 }
 
 // Функция обновления текущей папки (если её нет, добавим)
 async function refreshCurrentFolder() {
-  // Уничтожаем существующий экземпляр Sortable перед обновлением
-  if (window.sortableInstance) {
-    window.sortableInstance.destroy()
-    window.sortableInstance = null
+  console.log("Обновление текущей папки")
+
+  // Если активно перетаскивание, откладываем обновление
+  if (window.isDragging) {
+    console.log("Перетаскивание активно, откладываем обновление папки")
+    setTimeout(() => refreshCurrentFolder(), 100)
+    return
   }
 
+  // Если есть активное перетаскивание, сначала сбрасываем его
+  document.body.classList.remove("dragging")
+  if (lastHoveredFolder) {
+    lastHoveredFolder.classList.remove("highlight")
+    lastHoveredFolder = null
+  }
+
+  // Уничтожаем существующий экземпляр Sortable перед обновлением
+  if (window.sortableInstance) {
+    try {
+      window.sortableInstance.option("disabled", true)
+      setTimeout(() => {
+        try {
+          window.sortableInstance.destroy()
+        } catch (e) {
+          console.warn("Ошибка при уничтожении Sortable:", e)
+        }
+        window.sortableInstance = null
+
+        // Продолжаем обновление после уничтожения Sortable
+        continueRefreshCurrentFolder()
+      }, 50)
+    } catch (e) {
+      console.warn("Ошибка при отключении Sortable:", e)
+      window.sortableInstance = null
+      continueRefreshCurrentFolder()
+    }
+  } else {
+    continueRefreshCurrentFolder()
+  }
+}
+
+// Вспомогательная функция для продолжения обновления текущей папки
+async function continueRefreshCurrentFolder() {
   const currentFolderId = navigation.isRoot ? "0" : navigation.currentFolder?.id
   if (currentFolderId) {
+    console.log(`Обновляем содержимое папки: ${currentFolderId}`)
     await refreshCurrentView()
+  } else {
+    console.warn("ID текущей папки не определен")
   }
 }
 
@@ -975,18 +1173,46 @@ async function moveItemToFolder(itemId, folderId) {
   try {
     console.log(`Перемещаем элемент ${itemId} в папку ${folderId}`)
 
-    // Уничтожаем существующий экземпляр Sortable перед операцией
-    if (window.sortableInstance) {
-      window.sortableInstance.destroy()
-      window.sortableInstance = null
+    // Если активно перетаскивание, деактивируем Sortable
+    if (window.sortableInstance && window.isDragging) {
+      try {
+        window.sortableInstance.option("disabled", true)
+      } catch (e) {
+        console.warn("Ошибка при отключении Sortable:", e)
+      }
     }
 
     // Используем существующую функцию moveBookmark из bookmarks.js
-    await moveBookmark(itemId, folderId)
+    const result = await moveBookmark(itemId, folderId)
 
-    return true
+    if (result) {
+      // Обновляем текущее представление вместо перехода в папку
+      await refreshCurrentView()
+      showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+    }
+
+    // Если Sortable был отключен, включаем его обратно
+    if (window.sortableInstance) {
+      try {
+        window.sortableInstance.option("disabled", false)
+      } catch (e) {
+        console.warn("Ошибка при включении Sortable:", e)
+      }
+    }
+
+    return result
   } catch (error) {
     console.error("Ошибка при перемещении элемента в папку:", error)
+
+    // Если Sortable был отключен, включаем его обратно
+    if (window.sortableInstance) {
+      try {
+        window.sortableInstance.option("disabled", false)
+      } catch (e) {
+        console.warn("Ошибка при включении Sortable:", e)
+      }
+    }
+
     throw error
   }
 }
@@ -1161,79 +1387,212 @@ function getTranslation(key) {
  */
 function createBookmarkElement(bookmark) {
   const bookmarkElement = document.createElement("div")
-  bookmarkElement.className =
-    bookmark.type === "folder" ? "bookmark-item folder" : "bookmark-item"
-  bookmarkElement.dataset.id = bookmark.id
-  bookmarkElement.dataset.type = bookmark.type
+  bookmarkElement.classList.add("bookmark-item")
+  bookmarkElement.setAttribute("data-id", bookmark.id)
+  bookmarkElement.setAttribute("data-type", bookmark.type)
 
-  // Для папок добавляем атрибут с текстом для перетаскивания
-  if (bookmark.type === "folder") {
-    bookmarkElement.dataset.dragText = getTranslation("DRAG_DROP.DROP_HERE")
+  if (bookmark.url) {
+    bookmarkElement.setAttribute("data-url", bookmark.url)
   }
 
-  // Создаем иконку
-  const iconElement = document.createElement("img")
-  iconElement.className = "bookmark-icon"
+  // Добавляем обработку drag-and-drop
+  bookmarkElement.setAttribute("draggable", "true")
 
+  // Обработка иконок для разных типов элементов
   if (bookmark.type === "folder") {
-    // Для папок используем иконку папки или загруженную пользователем
-    const iconUrl = localStorage.getItem(`folder_icon_${bookmark.id}`)
-    iconElement.src = iconUrl || "assets/icons/folder_white.svg"
-    iconElement.alt = "Folder"
+    bookmarkElement.classList.add("folder")
 
-    // Для темной темы используем другую иконку если нет кастомной
-    if (!iconUrl) {
-      iconElement.classList.add("theme-icon")
+    // Сначала создаем элементы для обеих иконок
+    const iconElement = document.createElement("img")
+    iconElement.classList.add("bookmark-icon")
 
-      // Создаем альтернативную иконку для светлой темы
-      const lightIconElement = document.createElement("img")
-      lightIconElement.className = "bookmark-icon light-theme-icon"
-      lightIconElement.src = "assets/icons/folder_black.svg"
-      lightIconElement.alt = "Folder"
-      bookmarkElement.appendChild(lightIconElement)
+    const alternateIconElement = document.createElement("img")
+    alternateIconElement.classList.add("bookmark-icon", "light-theme-icon")
 
-      // Темную иконку делаем для темной темы
-      iconElement.classList.add("dark-theme-icon")
+    try {
+      // Загружаем стандартные иконки как запасной вариант
+      iconElement.src = "assets/icons/folder.svg"
+      alternateIconElement.src = "assets/icons/folder-dark.svg"
+
+      // Проверяем наличие сохраненной иконки для папки
+      const iconUrl = localStorage.getItem(`folder_icon_${bookmark.id}`)
+      const altIconUrl = localStorage.getItem(
+        `folder_icon_light_${bookmark.id}`
+      )
+
+      if (iconUrl) {
+        console.log(
+          `Загрузка пользовательской иконки для папки ${bookmark.id}: ${iconUrl}`
+        )
+        iconElement.src = iconUrl
+      } else {
+        console.log(`Использую стандартную иконку для папки ${bookmark.id}`)
+      }
+
+      if (altIconUrl) {
+        console.log(
+          `Загрузка светлой иконки для папки ${bookmark.id}: ${altIconUrl}`
+        )
+        alternateIconElement.src = altIconUrl
+      } else {
+        console.log(
+          `Использую стандартную светлую иконку для папки ${bookmark.id}`
+        )
+      }
+
+      // Обработка ошибок загрузки
+      iconElement.onerror = function () {
+        console.warn(
+          `Не удалось загрузить иконку для папки ${bookmark.id}, использую стандартную`
+        )
+        this.src = "assets/icons/folder.svg"
+        this.onerror = null // Предотвращаем бесконечный цикл
+      }
+
+      alternateIconElement.onerror = function () {
+        console.warn(
+          `Не удалось загрузить светлую иконку для папки ${bookmark.id}, использую стандартную`
+        )
+        this.src = "assets/icons/folder-dark.svg"
+        this.onerror = null
+      }
+    } catch (error) {
+      console.error(
+        `Ошибка при загрузке иконок для папки ${bookmark.id}:`,
+        error
+      )
     }
+
+    // Добавляем иконки в элемент в правильном порядке - сначала для светлой темы, потом для темной
+    bookmarkElement.appendChild(alternateIconElement)
+    bookmarkElement.appendChild(iconElement)
   } else {
-    // Для закладок используем favicon или изображение по умолчанию
-    iconElement.src = bookmark.favicon || "assets/icons/link.svg"
-    iconElement.alt = "Bookmark"
-    iconElement.onerror = function () {
-      // Если не удалось загрузить favicon, показываем изображение по умолчанию
-      this.src = "assets/icons/link.svg"
+    // Для закладок используем favicon или стандартную иконку
+    const defaultIcon = "assets/icons/globe.svg"
+    const iconElement = document.createElement("img")
+    iconElement.classList.add("bookmark-icon")
+
+    if (bookmark.url) {
+      try {
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${
+          new URL(bookmark.url).hostname
+        }&sz=32`
+        console.log(
+          `Загрузка иконки для закладки ${bookmark.id}: ${faviconUrl}`
+        )
+        iconElement.src = faviconUrl
+
+        // Улучшенная обработка ошибок загрузки иконок
+        iconElement.onerror = function () {
+          console.warn(
+            `Не удалось загрузить иконку для закладки ${bookmark.id}, использую стандартную`
+          )
+          this.src = defaultIcon
+          this.onerror = null // Предотвращаем бесконечный цикл
+        }
+      } catch (error) {
+        console.error(
+          `Ошибка при загрузке иконки для закладки ${bookmark.id}:`,
+          error
+        )
+        iconElement.src = defaultIcon
+      }
+    } else {
+      console.log(
+        `URL отсутствует для закладки ${bookmark.id}, использую стандартную иконку`
+      )
+      iconElement.src = defaultIcon
     }
+
+    bookmarkElement.appendChild(iconElement)
   }
 
-  // Создаем контейнер для заголовка
-  const titleElement = document.createElement("div")
-  titleElement.className = "bookmark-title"
-  titleElement.textContent = bookmark.title
-
-  // Добавляем элементы в закладку
-  bookmarkElement.appendChild(iconElement)
+  const titleElement = document.createElement("span")
+  titleElement.classList.add("bookmark-title")
+  titleElement.textContent = bookmark.title || i18n.getMessage("noTitle")
   bookmarkElement.appendChild(titleElement)
 
-  // Добавляем обработчик клика для папок
-  if (bookmark.type === "folder") {
-    bookmarkElement.addEventListener("click", function (e) {
-      // Проверяем, не происходит ли перетаскивание
-      if (!window.bookmarksSortable || !window.bookmarksSortable.dragging) {
-        handleFolderClick(this)
-      }
-    })
-  } else {
-    // Для закладок добавляем ссылку
-    bookmarkElement.addEventListener("click", function (e) {
-      if (!window.bookmarksSortable || !window.bookmarksSortable.dragging) {
-        // Открываем ссылку в новой вкладке
-        chrome.tabs.create({ url: bookmark.url })
-      }
-    })
-  }
-
-  // Добавляем контекстное меню
-  bookmarkElement.addEventListener("contextmenu", handleContextMenu)
-
   return bookmarkElement
+}
+
+// Добавим после initializeUI
+function setupBackButtonDropTarget() {
+  const backButton = document.getElementById("backButton")
+  if (!backButton) return
+
+  // Добавляем обработчики для кнопки возврата
+  backButton.addEventListener("dragover", (e) => {
+    // Предотвращаем стандартное поведение для разрешения drop
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Только если мы не в корне и идет перетаскивание
+    if (!navigation.isRoot && window.draggedItemId) {
+      backButton.classList.add("drag-over")
+      e.dataTransfer.dropEffect = "move"
+    }
+  })
+
+  backButton.addEventListener("dragleave", () => {
+    backButton.classList.remove("drag-over")
+  })
+
+  backButton.addEventListener("drop", async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    backButton.classList.remove("drag-over")
+
+    // Проверяем, что есть ID перетаскиваемого элемента и мы не в корне
+    if (window.draggedItemId && !navigation.isRoot) {
+      // Получаем родительскую папку текущей папки
+      const stack = navigation.getStack()
+      let parentFolderId = "0"
+
+      // Если в стеке больше одного элемента, берем ID предыдущего
+      if (stack.length > 1) {
+        parentFolderId = stack[stack.length - 2].id
+      }
+
+      // Отключаем Sortable перед операцией перемещения
+      if (window.sortableInstance) {
+        try {
+          window.sortableInstance.option("disabled", true)
+        } catch (e) {
+          console.warn("Ошибка при отключении Sortable:", e)
+        }
+      }
+
+      // Перемещаем элемент в родительскую папку
+      try {
+        const draggedItemId = window.draggedItemId
+        // Очищаем переменные перетаскивания перед операцией
+        window.draggedItemId = null
+        window.draggedItemType = null
+        window.isDragging = false
+
+        await moveBookmark(draggedItemId, parentFolderId)
+        showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+
+        // Если мы находимся в папке, которую перетаскиваем, переходим назад
+        if (draggedItemId === navigation.currentFolder?.id) {
+          await handleBackButtonClick()
+        } else {
+          // Иначе просто обновляем текущий вид
+          await refreshCurrentView()
+        }
+      } catch (error) {
+        console.error("Ошибка при перемещении элемента на уровень выше:", error)
+        ErrorHandler.handle(error, ErrorType.MOVE, "bookmark")
+      } finally {
+        // Включаем Sortable после операции
+        if (window.sortableInstance) {
+          try {
+            window.sortableInstance.option("disabled", false)
+          } catch (e) {
+            console.warn("Ошибка при включении Sortable:", e)
+          }
+        }
+      }
+    }
+  })
 }
