@@ -305,20 +305,38 @@ async function handleContextMenu(e) {
             title: title,
           })
         } else {
+          console.log("Редактирование закладки:", id, title, url)
           const modal = new Modal()
           modal.show(
             UI_TEXTS.MODALS.EDIT_BOOKMARK,
             "link",
             { title, url },
             async (data) => {
-              const result = await ErrorHandler.wrapAsync(
-                updateBookmark(id, data),
-                ErrorType.UPDATE,
-                "bookmark"
+              console.log(
+                "Обработчик кнопки 'Сохранить' вызван с данными:",
+                data
               )
-              if (result) {
-                modal.close()
-                await refreshCurrentView(true)
+              try {
+                console.log("Вызов функции updateBookmark с данными:", id, data)
+                const result = await ErrorHandler.wrapAsync(
+                  updateBookmark(id, data),
+                  ErrorType.UPDATE,
+                  "bookmark"
+                )
+                console.log("Результат обновления закладки:", result)
+                if (result) {
+                  console.log("Закрытие модального окна")
+                  modal.close()
+                  console.log("Обновление текущего представления")
+                  await refreshCurrentView(true)
+                } else {
+                  console.error(
+                    "Не удалось обновить закладку, результат:",
+                    result
+                  )
+                }
+              } catch (error) {
+                console.error("Ошибка при обновлении закладки:", error)
               }
             }
           )
@@ -1939,15 +1957,51 @@ function setupBackButtonDropTarget() {
         window.draggedItemType = null
         window.isDragging = false
 
-        await moveBookmark(draggedItemId, parentFolderId)
-        showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+        // Сначала находим и сохраняем ссылку на DOM-элемент перед перемещением
+        const draggedDOMElement = document.querySelector(
+          `[data-id="${draggedItemId}"]`
+        )
+
+        const result = await moveBookmark(draggedItemId, parentFolderId)
+
+        if (result) {
+          showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+
+          // Если элемент найден в DOM, визуально удаляем его
+          if (draggedDOMElement) {
+            try {
+              // Анимация удаления
+              draggedDOMElement.style.transition = "opacity 0.3s"
+              draggedDOMElement.style.opacity = "0"
+
+              // После анимации удаляем элемент из DOM
+              setTimeout(() => {
+                if (draggedDOMElement.parentNode) {
+                  draggedDOMElement.parentNode.removeChild(draggedDOMElement)
+                }
+              }, 300)
+            } catch (domError) {
+              console.warn("Не удалось удалить элемент из DOM:", domError)
+            }
+          }
+
+          // Записываем информацию о перемещённом элементе
+          window.lastMovedItem = {
+            itemId: draggedItemId,
+            targetFolder: parentFolderId,
+            timestamp: Date.now(),
+          }
+        }
 
         // Если мы находимся в папке, которую перетаскиваем, переходим назад
         if (draggedItemId === navigation.currentFolder?.id) {
           await handleBackButtonClick()
         } else {
-          // Иначе просто обновляем текущий вид
-          await refreshCurrentView(true)
+          // Иначе обновляем только информацию в кэше, но не перерисовываем
+          // Сбрасываем кэш для родительской папки, т.к. в неё был добавлен элемент
+          if (window._folderContentsCache && parentFolderId) {
+            delete window._folderContentsCache[parentFolderId]
+          }
         }
       } catch (error) {
         console.error("Ошибка при перемещении элемента на уровень выше:", error)
