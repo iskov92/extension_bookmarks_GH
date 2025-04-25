@@ -1,0 +1,33 @@
+/* Стили для drag and drop */
+.bookmark-item.dragging {
+  opacity: 0.7;
+  cursor: grabbing;
+  position: relative;
+  z-index: 100;
+}
+
+.folder.drag-over {
+  background-color: var(--highlight-color);
+  border-radius: 5px;
+}
+
+.folder.folder-highlight {
+  background-color: var(--highlight-color);
+  box-shadow: 0 0 5px var(--highlight-color-shadow);
+  border-radius: 5px;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.drop-indicator {
+  height: 2px;
+  background-color: var(--light-accent);
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  pointer-events: none;
+}
+
+.bookmark-item.shifting {
+  transition: transform 0.2s ease-out;
+}

@@ -52,4 +52,27 @@ export default {
     CONTACTS: "Contacts",
     AUTHOR: "Extension author",
   },
+  TRASH: {
+    TITLE: "Trash",
+    EMPTY: "Trash is empty",
+    CONFIRM_CLEAR: "Are you sure you want to clear the trash?",
+    RESTORE: "Restore",
+    CLEAR: "Clear trash",
+    WAIT_RESTORE: "Please wait, restoration in progress...",
+    ROOT_FOLDER: "Root folder",
+    RESTORED_TO: "Item has been restored to path: {path}",
+  },
+  ERROR: {
+    DELETE_FAILED: "Failed to delete item",
+    MOVE_BOOKMARK: "Failed to move bookmark",
+    MOVE_FOLDER: "Failed to move folder",
+    MOVE_CYCLIC: "Cannot move a folder into its own subfolder",
+    REORDER_FAILED: "Failed to reorder items",
+  },
+  DRAG_DROP: {
+    MOVE_SUCCESS: "Item moved successfully",
+    DROP_HERE: "Drop here",
+    FOLDER_HOVER: "Hold to open folder",
+    MOVING: "Moving...",
+  },
 }

@@ -4,7 +4,7 @@
   "short_name": "GH Bookmarks",
   "version": "1.0",
   "description": "Автономный менеджер закладок с собственным хранилищем, независимым от браузера. Удобное управление и организация закладок.",
-  "permissions": ["storage", "bookmarks"],
+  "permissions": ["storage", "bookmarks", "unlimitedStorage"],
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": {

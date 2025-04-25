@@ -1,4 +1,5 @@
 import { storage } from "../utils/storage.js"
+import { iconStorage } from "../services/IconStorage.js"
 
 export class NestedMenu {
   constructor(container, bookmarks) {
@@ -23,15 +24,9 @@ export class NestedMenu {
 
   async getFolderIcon(folderId) {
     try {
-      // Получаем кастомную иконку из локального хранилища
-      const result = await new Promise((resolve) => {
-        chrome.storage.local.get(`folder_icon_${folderId}`, (result) => {
-          resolve(result[`folder_icon_${folderId}`])
-        })
-      })
-
-      if (result) {
-        return result
+      const iconBlob = await iconStorage.getIcon(folderId)
+      if (iconBlob) {
+        return URL.createObjectURL(iconBlob)
       }
       return await this.getDefaultFolderIcon()
     } catch (error) {
@@ -44,8 +39,6 @@ export class NestedMenu {
     // Очищаем контейнер перед рендером
     this.container.innerHTML = ""
     this.container.classList.add("nested-view")
-
-    console.log("NestedMenu render bookmarks:", this.bookmarks)
 
     // Проверяем, что у нас есть закладки для рендера
     if (!this.bookmarks || this.bookmarks.length === 0) {
@@ -76,6 +69,9 @@ export class NestedMenu {
       item.dataset.id = bookmark.id
       item.dataset.type = bookmark.type
 
+      // Делаем элемент перетаскиваемым
+      item.setAttribute("draggable", "true")
+
       if (bookmark.url) {
         item.dataset.url = bookmark.url
       }
@@ -99,6 +95,11 @@ export class NestedMenu {
       item.appendChild(icon)
       item.appendChild(title)
       this.container.appendChild(item)
+    }
+
+    // Вызываем функцию обновления обработчиков перетаскивания в родительском компоненте
+    if (typeof updateDragHandlers === "function") {
+      updateDragHandlers()
     }
   }
 

@@ -28,6 +28,10 @@
                 </button>
             </div>
             <div class="header-controls">
+                <button id="trashButton" class="header-button trash-button">
+                    <img src="../assets/icons/delete_black.svg" alt="Корзина" class="header-icon dark-theme-icon">
+                    <img src="../assets/icons/delete_white.svg" alt="Корзина" class="header-icon light-theme-icon">
+                </button>
                 <label class="theme-switch">
                     <input type="checkbox" id="themeToggle" checked>
                     <span class="slider round"></span>
@@ -44,6 +48,8 @@
         </main>
     </div>
 
+    <!-- Подключаем библиотеку Sortable.js -->
+    <script src="./libs/Sortable.min.js"></script>
     <script type="module" src="./popup.js"></script>
 </body>
 

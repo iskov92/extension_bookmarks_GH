@@ -1,4 +1,5 @@
 import { storage } from "../utils/storage.js"
+import { iconStorage } from "../services/IconStorage.js"
 
 export class MainInterface {
   constructor(container, bookmarks) {
@@ -20,12 +21,6 @@ export class MainInterface {
     try {
       const result = await new Promise((resolve) => {
         chrome.storage.local.get(`folder_icon_${folderId}`, (result) => {
-          console.log(
-            "Кастомная иконка для папки",
-            folderId,
-            ":",
-            result[`folder_icon_${folderId}`]
-          )
           resolve(result[`folder_icon_${folderId}`])
         })
       })
@@ -44,9 +39,9 @@ export class MainInterface {
 
   async getFolderIcon(folderId) {
     try {
-      const customIcon = await storage.get(`folder_icon_${folderId}`)
-      if (customIcon) {
-        return customIcon
+      const iconBlob = await iconStorage.getIcon(folderId)
+      if (iconBlob) {
+        return URL.createObjectURL(iconBlob)
       }
       return await this.getDefaultFolderIcon()
     } catch (error) {
@@ -59,8 +54,6 @@ export class MainInterface {
     // Очищаем контейнер перед рендером
     this.container.innerHTML = ""
     this.container.classList.add("main-view")
-
-    console.log("MainInterface render bookmarks:", this.bookmarks)
 
     // Проверяем, что у нас есть закладки для рендера
     if (!this.bookmarks || this.bookmarks.length === 0) {
@@ -89,6 +82,10 @@ export class MainInterface {
         bookmark.type === "folder" ? "folder" : ""
       }`
       bookmarkElement.dataset.id = bookmark.id
+      bookmarkElement.dataset.type = bookmark.type
+
+      // Делаем элемент перетаскиваемым
+      bookmarkElement.setAttribute("draggable", "true")
 
       if (bookmark.url) {
         bookmarkElement.dataset.url = bookmark.url
@@ -114,6 +111,11 @@ export class MainInterface {
       bookmarkElement.appendChild(icon)
       bookmarkElement.appendChild(title)
       this.container.appendChild(bookmarkElement)
+    }
+
+    // Вызываем функцию обновления обработчиков перетаскивания в родительском компоненте
+    if (typeof updateDragHandlers === "function") {
+      updateDragHandlers()
     }
   }
 }

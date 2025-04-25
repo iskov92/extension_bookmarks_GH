@@ -7,8 +7,50 @@ import {
 } from "./storage.js"
 
 // Получить все закладки
-export async function getAllBookmarks() {
-  return await getStoredBookmarks()
+export async function getAllBookmarks(forceUpdate = false) {
+  // При принудительном обновлении сразу обходим кэш
+  if (forceUpdate) {
+    console.log(
+      "Принудительное обновление: получаем закладки напрямую из хранилища"
+    )
+    const bookmarks = await getStoredBookmarks()
+
+    // Обновляем кэш
+    if (!window._folderContentsCache) {
+      window._folderContentsCache = {}
+    }
+    window._folderContentsCache["0"] = {
+      contents: bookmarks,
+      timestamp: Date.now(),
+    }
+
+    return bookmarks
+  }
+
+  // Проверка кеша и времени его актуальности
+  if (window._folderContentsCache && window._folderContentsCache["0"]) {
+    const cache = window._folderContentsCache["0"]
+    // Кеш действителен не более 30 секунд
+    if (Date.now() - cache.timestamp < 30000) {
+      console.log("Использую кеш для корневой папки")
+      return cache.contents
+    }
+  }
+
+  // Если кэш устарел или его нет, получаем свежие данные
+  console.log("Кэш устарел или отсутствует: получаем закладки из хранилища")
+  const bookmarks = await getStoredBookmarks()
+
+  // Сохраняем в кеш
+  if (!window._folderContentsCache) {
+    window._folderContentsCache = {}
+  }
+  window._folderContentsCache["0"] = {
+    contents: bookmarks,
+    timestamp: Date.now(),
+  }
+
+  return bookmarks
 }
 
 // Создать новую закладку
@@ -22,8 +64,92 @@ export async function createFolder(parentId, title) {
 }
 
 // Получить закладки из папки
-export async function getBookmarksInFolder(folderId) {
-  return await getBookmarksFromFolder(folderId)
+export async function getBookmarksInFolder(folderId, forceUpdate = false) {
+  // При принудительном обновлении сразу обходим кэш
+  if (forceUpdate) {
+    console.log(
+      `Принудительное обновление: получаем содержимое папки ${folderId} напрямую из хранилища`
+    )
+
+    const bookmarks = await getStoredBookmarks()
+    let folderContents
+
+    if (folderId === "0") {
+      folderContents = bookmarks
+    } else {
+      function findFolder(items) {
+        for (const item of items) {
+          if (item.id === folderId) {
+            return item.children || []
+          }
+          if (item.type === "folder" && item.children) {
+            const found = findFolder(item.children)
+            if (found) return found
+          }
+        }
+        return null
+      }
+      folderContents = findFolder(bookmarks) || []
+    }
+
+    // Обновляем кэш
+    if (!window._folderContentsCache) {
+      window._folderContentsCache = {}
+    }
+    window._folderContentsCache[folderId] = {
+      contents: folderContents,
+      timestamp: Date.now(),
+    }
+
+    return folderContents
+  }
+
+  // Проверка кэша и времени его актуальности
+  if (window._folderContentsCache && window._folderContentsCache[folderId]) {
+    const cache = window._folderContentsCache[folderId]
+    // Кэш действителен не более 30 секунд
+    if (Date.now() - cache.timestamp < 30000) {
+      console.log(`Использую кэш для папки ${folderId}`)
+      return cache.contents
+    }
+  }
+
+  // Кэш устарел или его нет - получаем свежие данные
+  console.log(
+    `Кэш устарел или отсутствует: получаем содержимое папки ${folderId} из хранилища`
+  )
+
+  const bookmarks = await getStoredBookmarks()
+  let folderContents
+
+  if (folderId === "0") {
+    folderContents = bookmarks
+  } else {
+    function findFolder(items) {
+      for (const item of items) {
+        if (item.id === folderId) {
+          return item.children || []
+        }
+        if (item.type === "folder" && item.children) {
+          const found = findFolder(item.children)
+          if (found) return found
+        }
+      }
+      return null
+    }
+    folderContents = findFolder(bookmarks) || []
+  }
+
+  // Сохраняем в кэш
+  if (!window._folderContentsCache) {
+    window._folderContentsCache = {}
+  }
+  window._folderContentsCache[folderId] = {
+    contents: folderContents,
+    timestamp: Date.now(),
+  }
+
+  return folderContents
 }
 
 // Импортировать закладки из браузера
@@ -323,5 +449,403 @@ export async function updateFolder(id, data) {
   } catch (error) {
     console.error("Ошибка при обновлении папки:", error)
     throw error
+  }
+}
+
+/**
+ * Перемещает закладку или папку в другую папку
+ * @param {string} itemId - ID перемещаемого элемента
+ * @param {string} targetFolderId - ID целевой папки
+ * @returns {Promise<boolean>} - Успешно ли выполнено перемещение
+ */
+export async function moveBookmark(itemId, targetFolderId) {
+  try {
+    // Если пытаемся переместить в тот же родительский элемент, ничего не делаем
+    if (itemId === targetFolderId) {
+      return false
+    }
+
+    const bookmarks = await getStoredBookmarks()
+
+    // Проверка на перемещение в подпапку (предотвращаем циклическую ссылку)
+    if (isChildFolder(bookmarks, itemId, targetFolderId)) {
+      console.error("Нельзя переместить папку в её собственную подпапку")
+      return false
+    }
+
+    // Найти и извлечь перемещаемый элемент
+    let itemToMove = null
+    let sourceParentPath = []
+
+    function findAndExtractItem(items, parentPath = []) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].id === itemId) {
+          itemToMove = items[i]
+          sourceParentPath = [...parentPath]
+          items.splice(i, 1)
+          return true
+        }
+        if (items[i].type === "folder" && items[i].children) {
+          if (
+            findAndExtractItem(items[i].children, [...parentPath, items[i]])
+          ) {
+            return true
+          }
+        }
+      }
+      return false
+    }
+
+    findAndExtractItem(bookmarks)
+
+    if (!itemToMove) {
+      console.error("Элемент для перемещения не найден")
+      return false
+    }
+
+    // Добавить элемент в целевую папку
+    if (targetFolderId === "0") {
+      // Если перемещаем в корень
+      bookmarks.push(itemToMove)
+    } else {
+      function addToTargetFolder(items) {
+        for (const item of items) {
+          if (item.id === targetFolderId) {
+            item.children = item.children || []
+            item.children.push(itemToMove)
+            return true
+          }
+          if (item.type === "folder" && item.children) {
+            if (addToTargetFolder(item.children)) {
+              return true
+            }
+          }
+        }
+        return false
+      }
+
+      if (!addToTargetFolder(bookmarks)) {
+        // Если целевая папка не найдена, возвращаем элемент на прежнее место
+        if (sourceParentPath.length === 0) {
+          bookmarks.push(itemToMove)
+        } else {
+          let parent = bookmarks
+          for (const folder of sourceParentPath) {
+            parent = parent.find((item) => item.id === folder.id)?.children
+            if (!parent) break
+          }
+          if (parent) parent.push(itemToMove)
+        }
+        console.error("Целевая папка не найдена")
+        return false
+      }
+    }
+
+    await saveBookmarks(bookmarks)
+    return true
+  } catch (error) {
+    console.error("Ошибка при перемещении закладки:", error)
+    return false
+  }
+}
+
+/**
+ * Проверяет, является ли потенциальная целевая папка подпапкой исходной папки
+ * @param {Array} bookmarks - Массив закладок
+ * @param {string} sourceId - ID исходной папки
+ * @param {string} targetId - ID целевой папки
+ * @returns {boolean} - true если целевая папка является подпапкой исходной
+ */
+function isChildFolder(bookmarks, sourceId, targetId) {
+  // Рекурсивно проверяем, является ли targetId подпапкой sourceId
+  function checkInFolder(items) {
+    // Находим исходную папку
+    const sourceFolder = findFolderById(items, sourceId)
+    if (!sourceFolder || sourceFolder.type !== "folder") {
+      return false
+    }
+
+    // Проверяем, содержит ли исходная папка целевую папку
+    function isDescendant(folder) {
+      if (!folder.children) return false
+
+      for (const child of folder.children) {
+        if (child.id === targetId) {
+          return true
+        }
+        if (child.type === "folder" && isDescendant(child)) {
+          return true
+        }
+      }
+      return false
+    }
+
+    return isDescendant(sourceFolder)
+  }
+
+  return checkInFolder(bookmarks)
+}
+
+/**
+ * Находит папку по ID в дереве закладок
+ * @param {Array} bookmarks - Массив закладок
+ * @param {string} folderId - ID папки для поиска
+ * @returns {Object|null} - Найденная папка или null
+ */
+function findFolderById(bookmarks, folderId) {
+  for (const bookmark of bookmarks) {
+    if (bookmark.id === folderId) {
+      return bookmark
+    }
+    if (bookmark.type === "folder" && bookmark.children) {
+      const found = findFolderById(bookmark.children, folderId)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+/**
+ * Меняет порядок закладок в указанной папке
+ * @param {string} sourceId - ID перемещаемого элемента
+ * @param {string|null} targetId - ID элемента, рядом с которым нужно вставить (или null для перемещения в конец)
+ * @param {string} parentId - ID родительской папки
+ * @returns {Promise<boolean>} - Успешно ли выполнена операция
+ */
+export async function reorderBookmarks(sourceId, targetId, parentId) {
+  if (!sourceId) {
+    console.error("reorderBookmarks: sourceId отсутствует")
+    return false
+  }
+
+  if (sourceId === targetId) {
+    console.log(
+      "reorderBookmarks: исходный и целевой элементы совпадают, операция отменена"
+    )
+    return false
+  }
+
+  try {
+    console.log(
+      `reorderBookmarks: начало перемещения элемента ${sourceId} к ${targetId} в папке ${parentId}`
+    )
+
+    const bookmarks = await getStoredBookmarks()
+    console.log("reorderBookmarks: закладки получены из хранилища")
+
+    // Находим родительскую папку
+    let targetFolder = bookmarks
+    if (parentId !== "0") {
+      function findFolder(items) {
+        for (const item of items) {
+          if (item.id === parentId) {
+            return item.children || []
+          }
+          if (item.type === "folder" && item.children) {
+            const found = findFolder(item.children)
+            if (found.length > 0) return found
+          }
+        }
+        return []
+      }
+      targetFolder = findFolder(bookmarks)
+      console.log(
+        `reorderBookmarks: найдена родительская папка, содержит ${targetFolder.length} элементов`
+      )
+    } else {
+      console.log(
+        `reorderBookmarks: работаем с корневой папкой, содержит ${targetFolder.length} элементов`
+      )
+    }
+
+    // Проверяем, что исходный элемент находится в целевой папке
+    const sourceIndex = targetFolder.findIndex((item) => item.id === sourceId)
+
+    if (sourceIndex === -1) {
+      console.error(
+        `reorderBookmarks: элемент с ID ${sourceId} не найден в выбранной папке`
+      )
+      return false
+    }
+
+    console.log(
+      `reorderBookmarks: найден исходный элемент на позиции ${sourceIndex}`
+    )
+
+    // Извлекаем перемещаемый элемент
+    const [movedItem] = targetFolder.splice(sourceIndex, 1)
+    console.log(
+      `reorderBookmarks: извлечен элемент "${movedItem.title}" (${movedItem.id})`
+    )
+
+    // Если targetId равен null, помещаем элемент в конец списка
+    if (targetId === null) {
+      targetFolder.push(movedItem)
+      console.log(
+        `reorderBookmarks: элемент перемещен в конец списка (позиция ${
+          targetFolder.length - 1
+        })`
+      )
+    } else {
+      // Иначе ищем целевую позицию
+      const targetIndex = targetFolder.findIndex((item) => item.id === targetId)
+
+      if (targetIndex === -1) {
+        console.error(
+          `reorderBookmarks: элемент с ID ${targetId} не найден в выбранной папке`
+        )
+        // Всё равно вставляем элемент в конец, чтобы не потерять его
+        targetFolder.push(movedItem)
+        console.log(
+          `reorderBookmarks: целевая позиция не найдена, элемент добавлен в конец`
+        )
+        return false
+      }
+
+      // Вставляем элемент на новую позицию
+      targetFolder.splice(targetIndex, 0, movedItem)
+      console.log(
+        `reorderBookmarks: элемент успешно перемещен на позицию ${targetIndex}`
+      )
+    }
+
+    // Сохраняем изменения
+    console.log("reorderBookmarks: сохраняем изменения в хранилище")
+    await saveBookmarks(bookmarks)
+
+    // Проверяем, что изменения были сохранены правильно
+    const updatedBookmarks = await getStoredBookmarks()
+    console.log("reorderBookmarks: проверяем сохраненные изменения")
+
+    // Проверка для корневой папки
+    if (parentId === "0") {
+      const savedIndex = updatedBookmarks.findIndex(
+        (item) => item.id === sourceId
+      )
+      if (savedIndex === -1) {
+        console.error(
+          `reorderBookmarks: после сохранения элемент не найден в корневой папке`
+        )
+        return false
+      }
+      console.log(
+        `reorderBookmarks: после сохранения элемент найден на позиции ${savedIndex}`
+      )
+    } else {
+      // Для вложенных папок
+      let found = false
+      function verifyInFolder(items) {
+        for (const item of items) {
+          if (item.id === parentId && item.children) {
+            const savedIndex = item.children.findIndex(
+              (child) => child.id === sourceId
+            )
+            if (savedIndex === -1) {
+              console.error(
+                `reorderBookmarks: после сохранения элемент не найден в папке ${parentId}`
+              )
+              return false
+            }
+            console.log(
+              `reorderBookmarks: после сохранения элемент найден в папке ${parentId} на позиции ${savedIndex}`
+            )
+            return true
+          }
+          if (
+            item.type === "folder" &&
+            item.children &&
+            verifyInFolder(item.children)
+          ) {
+            return true
+          }
+        }
+        return false
+      }
+      found = verifyInFolder(updatedBookmarks)
+      if (!found) {
+        console.error(
+          `reorderBookmarks: после сохранения не удалось проверить элемент в папке ${parentId}`
+        )
+      }
+    }
+
+    console.log("reorderBookmarks: операция успешно завершена")
+    return true
+  } catch (error) {
+    console.error(
+      "reorderBookmarks: ошибка при изменении порядка закладок",
+      error
+    )
+    return false
+  }
+}
+
+/**
+ * Проверяет, является ли папка потомком (непосредственным или вложенным) другой папки
+ * @param {string} parentId - ID предполагаемой родительской папки
+ * @param {string} childId - ID предполагаемой дочерней папки
+ * @returns {Promise<boolean>} - true, если childId является потомком parentId
+ */
+async function isChildOf(parentId, childId) {
+  try {
+    // Если ID совпадают, это одна и та же папка
+    if (parentId === childId) {
+      return false
+    }
+
+    const bookmarks = await getStoredBookmarks()
+
+    // Рекурсивно проверяем, содержится ли childId внутри parentId
+    function checkIsChild(items, targetId) {
+      for (const item of items) {
+        if (item.id === targetId) {
+          return true
+        }
+        if (
+          item.type === "folder" &&
+          item.children &&
+          item.children.length > 0
+        ) {
+          if (checkIsChild(item.children, targetId)) {
+            return true
+          }
+        }
+      }
+      return false
+    }
+
+    // Находим родительскую папку
+    function findFolder(items, id) {
+      for (const item of items) {
+        if (item.id === id) {
+          return item
+        }
+        if (
+          item.type === "folder" &&
+          item.children &&
+          item.children.length > 0
+        ) {
+          const folder = findFolder(item.children, id)
+          if (folder) {
+            return folder
+          }
+        }
+      }
+      return null
+    }
+
+    const parentFolder = findFolder(bookmarks, parentId)
+    if (
+      !parentFolder ||
+      parentFolder.type !== "folder" ||
+      !parentFolder.children
+    ) {
+      return false
+    }
+
+    return checkIsChild(parentFolder.children, childId)
+  } catch (error) {
+    console.error("isChildOf: ошибка при проверке вложенности папок", error)
+    return false
   }
 }
