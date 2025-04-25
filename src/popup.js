@@ -398,6 +398,30 @@ async function handleThemeToggle(e) {
 }
 
 /**
+ * Сохраняет и возвращает текущую тему
+ * @returns {string} - Текущая тема ("dark" или "light")
+ */
+function getCurrentThemeState() {
+  return (
+    document.body.getAttribute("data-theme") ||
+    (document.body.classList.contains(CSS_CLASSES.DARK_THEME)
+      ? "dark"
+      : "light")
+  )
+}
+
+/**
+ * Восстанавливает тему в соответствии с сохраненным состоянием
+ * @param {string} theme - Тема для восстановления ("dark" или "light")
+ */
+function restoreThemeState(theme) {
+  if (theme && (theme === "dark" || theme === "light")) {
+    document.body.setAttribute("data-theme", theme)
+    document.body.classList.toggle(CSS_CLASSES.DARK_THEME, theme === "dark")
+  }
+}
+
+/**
  * Обновляет текущее представление закладок
  */
 async function refreshCurrentView(forceUpdateCache = false) {
@@ -405,6 +429,9 @@ async function refreshCurrentView(forceUpdateCache = false) {
   const currentFolderTitle = document.querySelector(".current-folder")
 
   try {
+    // Сохраняем текущее состояние темы
+    const currentTheme = getCurrentThemeState()
+
     // Проверяем, нужно ли пропустить обновление
     if (window.preventRefreshAfterDrop) {
       console.log(
@@ -439,17 +466,21 @@ async function refreshCurrentView(forceUpdateCache = false) {
         setTimeout(() => {
           try {
             window.sortableInstance.destroy()
+            window.sortableInstance = null
+            continueRefreshCurrentView(
+              mainContent,
+              currentFolderTitle,
+              forceUpdateCache
+            )
           } catch (e) {
             console.warn("Ошибка при уничтожении Sortable:", e)
+            window.sortableInstance = null
+            continueRefreshCurrentView(
+              mainContent,
+              currentFolderTitle,
+              forceUpdateCache
+            )
           }
-          window.sortableInstance = null
-
-          // Продолжаем обновление после уничтожения Sortable
-          continueRefreshCurrentView(
-            mainContent,
-            currentFolderTitle,
-            forceUpdateCache
-          )
         }, 50)
       } catch (e) {
         console.warn("Ошибка при отключении Sortable:", e)
@@ -467,6 +498,11 @@ async function refreshCurrentView(forceUpdateCache = false) {
         forceUpdateCache
       )
     }
+
+    // Восстанавливаем состояние темы после обновления
+    setTimeout(() => {
+      restoreThemeState(currentTheme)
+    }, 200)
   } catch (error) {
     console.error("Ошибка при обновлении представления:", error)
     showErrorMessage("Не удалось загрузить закладки")
@@ -1443,83 +1479,82 @@ async function continueRefreshCurrentFolder() {
   }
 }
 
-// Функция для перемещения элемента в папку
+/**
+ * Перемещает элемент в другую папку
+ * @param {string} itemId - ID элемента
+ * @param {string} folderId - ID целевой папки
+ * @returns {Promise<boolean>} - Успешно ли выполнено перемещение
+ */
 async function moveItemToFolder(itemId, folderId) {
+  console.log(`Перемещаем элемент ${itemId} в папку ${folderId}`)
+
   try {
-    console.log(`Перемещаем элемент ${itemId} в папку ${folderId}`)
+    // Сохраняем текущее состояние темы до перемещения
+    const currentTheme =
+      document.body.getAttribute("data-theme") ||
+      (document.body.classList.contains(CSS_CLASSES.DARK_THEME)
+        ? "dark"
+        : "light")
 
-    // Если активно перетаскивание, деактивируем Sortable
-    if (window.sortableInstance && window.isDragging) {
-      try {
-        window.sortableInstance.option("disabled", true)
-      } catch (e) {
-        console.warn("Ошибка при отключении Sortable:", e)
-      }
-    }
+    // Пробуем выполнить перемещение
+    const moved = await moveBookmark(itemId, folderId)
 
-    // Сбрасываем кеш папок для обеспечения актуальных данных
-    window._folderContentsCache = {}
-
-    // Используем существующую функцию moveBookmark из bookmarks.js
-    const result = await moveBookmark(itemId, folderId)
-
-    if (result) {
-      // Визуально удаляем элемент из текущего контейнера
-      const element = document.querySelector(`[data-id="${itemId}"]`)
-      if (element) {
-        // Анимируем исчезновение элемента перед удалением
-        element.style.transition = "opacity 0.3s, transform 0.3s"
-        element.style.opacity = "0"
-        element.style.transform = "scale(0.9)"
-
-        // Удаляем элемент после анимации
-        setTimeout(() => {
-          if (element.parentNode) {
-            element.parentNode.removeChild(element)
-          }
-        }, 300)
-      }
-
-      // Показываем уведомление об успешном перемещении
-      showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
-
-      // Сохраняем информацию о последнем перемещении
+    if (moved) {
+      // Сохраняем информацию о перемещенном элементе
       window.lastMovedItem = {
-        itemId: itemId,
+        itemId,
         targetFolder: folderId,
         timestamp: Date.now(),
+        theme: currentTheme, // Сохраняем информацию о теме при перемещении
       }
 
-      // На всякий случай сбрасываем флаг блокировки обновления
-      // после завершения операции перемещения
-      setTimeout(() => {
-        window.preventRefreshAfterDrop = false
-      }, 500)
-    }
+      // Обновляем текущее представление
+      await refreshCurrentView(true) // Принудительное обновление
 
-    // Если Sortable был отключен, включаем его обратно
-    if (window.sortableInstance) {
-      try {
-        window.sortableInstance.option("disabled", false)
-      } catch (e) {
-        console.warn("Ошибка при включении Sortable:", e)
+      // Убедимся, что тема сохранена после обновления
+      if (currentTheme !== document.body.getAttribute("data-theme")) {
+        document.body.setAttribute("data-theme", currentTheme)
+        document.body.classList.toggle(
+          CSS_CLASSES.DARK_THEME,
+          currentTheme === "dark"
+        )
       }
-    }
 
-    return result
+      return true
+    } else {
+      console.error("Не удалось переместить элемент в другую папку")
+      // Обновляем представление, чтобы вернуть элементы в исходное состояние
+      await refreshCurrentView(true) // Принудительное обновление
+
+      // Восстанавливаем тему
+      document.body.setAttribute("data-theme", currentTheme)
+      document.body.classList.toggle(
+        CSS_CLASSES.DARK_THEME,
+        currentTheme === "dark"
+      )
+
+      return false
+    }
   } catch (error) {
-    console.error("Ошибка при перемещении элемента в папку:", error)
+    console.error("Ошибка при перемещении элемента между папками:", error)
 
-    // Если Sortable был отключен, включаем его обратно
-    if (window.sortableInstance) {
-      try {
-        window.sortableInstance.option("disabled", false)
-      } catch (e) {
-        console.warn("Ошибка при включении Sortable:", e)
-      }
-    }
+    // Получаем текущую тему
+    const currentTheme =
+      document.body.getAttribute("data-theme") ||
+      (document.body.classList.contains(CSS_CLASSES.DARK_THEME)
+        ? "dark"
+        : "light")
 
-    throw error
+    await refreshCurrentView(true) // Принудительное обновление
+
+    // Восстанавливаем тему после обновления
+    document.body.setAttribute("data-theme", currentTheme)
+    document.body.classList.toggle(
+      CSS_CLASSES.DARK_THEME,
+      currentTheme === "dark"
+    )
+
+    return false
   }
 }
 
@@ -1549,56 +1584,49 @@ function showDragIndicator(show) {
  * @param {number} newIndex - Новая позиция
  */
 async function handleItemReordered(item, oldIndex, newIndex) {
+  // Получаем список всех элементов в контейнере
+  const container = item.parentElement
+  if (!container) return
+
+  const parentId = container.dataset.folderId || "0"
+
+  // Получаем IDs всех элементов в контейнере
+  const allElements = Array.from(container.children)
+  const itemIds = allElements.map((el) => el.dataset.id)
+
+  console.log(
+    `Элементы после перемещения: ${itemIds.length} (${allElements.length})`,
+    itemIds
+  )
+
+  // Получаем ID элемента перед которым нужно вставить (или null для перемещения в конец)
+  let targetId = null
+  if (newIndex < itemIds.length - 1) {
+    targetId = itemIds[newIndex + 1]
+  }
+
+  console.log(
+    `Переупорядочивание: элемент ${itemIds[newIndex]} перед элементом ${targetId} в папке ${parentId}`
+  )
+
+  // Сохраняем текущую тему
+  const currentTheme = getCurrentThemeState()
+
   try {
-    // Получаем ID перемещенного элемента
-    const itemId = item.dataset.id
+    // Переупорядочиваем закладку в хранилище
+    const result = await reorderBookmarks(itemIds[newIndex], targetId, parentId)
 
-    // Получаем текущий родительский ID
-    const parentId = navigation.getCurrentParentId()
-
-    // Получаем все элементы в контейнере
-    const itemsInContainer = Array.from(
-      document.querySelectorAll(".main-content > .bookmark-item")
-    )
-
-    // Получаем ID элемента, относительно которого перемещаем (берем ID соседнего элемента)
-    let targetIndex = newIndex
-    if (targetIndex >= itemsInContainer.length) {
-      targetIndex = itemsInContainer.length - 1
-    }
-
-    const targetId = itemsInContainer[targetIndex]?.dataset.id
-
-    if (!targetId || targetId === itemId) {
-      console.error(
-        "Не удалось определить целевой элемент для изменения порядка или целевой элемент совпадает с исходным"
-      )
-      await refreshCurrentView(true) // Обновляем представление для восстановления порядка
-      return
-    }
-
-    console.log(
-      `Изменение порядка элемента ${itemId} относительно ${targetId} в папке ${parentId}`
-    )
-
-    // Выполняем перестановку элементов в данных
-    const result = await reorderBookmarks(itemId, targetId, parentId)
-
-    if (result) {
-      showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
-      console.log("Порядок элементов успешно изменен")
-
-      // Принудительно обновляем представление, чтобы отобразить новый порядок
-      // и избежать проблем с картинками
+    if (!result) {
+      console.log("Ошибка при сохранении нового порядка элементов")
       await refreshCurrentView(true)
-    } else {
-      console.error("Не удалось изменить порядок элементов")
-      // Обновляем представление, чтобы вернуть элементы в исходное состояние
-      await refreshCurrentView(true)
+      // Восстанавливаем тему после обновления
+      restoreThemeState(currentTheme)
     }
   } catch (error) {
-    console.error("Ошибка при изменении порядка элементов:", error)
+    console.log("Ошибка при сохранении нового порядка элементов")
     await refreshCurrentView(true)
+    // Восстанавливаем тему после обновления
+    restoreThemeState(currentTheme)
   }
 }
 
@@ -1611,49 +1639,31 @@ async function handleItemReordered(item, oldIndex, newIndex) {
  */
 async function handleItemMoved(item, fromContainer, toContainer, newIndex) {
   try {
-    window.preventRefreshAfterDrop = true
+    const movedItemId = item.dataset.id
+    const targetParentId = toContainer.dataset.folderId || "0"
 
-    const itemId = item.dataset.id
-    const sourceContainerId = fromContainer.dataset.folderId || "0"
-    const targetFolderId =
-      toContainer.dataset.folderId ||
-      (navigation.isRoot ? "0" : navigation.currentFolder?.id)
+    // Сохраняем текущую тему
+    const currentTheme = getCurrentThemeState()
 
-    if (!targetFolderId) {
-      console.error("Не удалось определить ID целевой папки")
-      await refreshCurrentView(true) // Принудительное обновление
-      return
-    }
+    console.log(
+      `Перемещение элемента ${movedItemId} в папку ${targetParentId}, новый индекс: ${newIndex}`
+    )
 
-    console.log(`Перемещение элемента ${itemId} в папку ${targetFolderId}`)
+    // Сначала пытаемся выполнить перемещение элемента в целевую папку
+    const result = await moveItemToFolder(movedItemId, targetParentId)
 
-    // Сбрасываем кеш содержимого папок перед операцией
-    window._folderContentsCache = {}
-
-    // Выполняем перемещение элемента в данных
-    const result = await moveBookmark(itemId, targetFolderId)
-
-    if (result) {
-      // Сохраняем информацию о последнем перемещении
-      window.lastMovedItem = {
-        itemId: itemId,
-        targetFolder: targetFolderId,
-        timestamp: Date.now(),
-      }
-
-      showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
-      console.log("Элемент успешно перемещен в другую папку")
-
-      // Обновляем текущее представление
-      await refreshCurrentView(true) // Принудительное обновление
-    } else {
-      console.error("Не удалось переместить элемент в другую папку")
-      // Обновляем представление, чтобы вернуть элементы в исходное состояние
-      await refreshCurrentView(true) // Принудительное обновление
+    if (!result) {
+      console.error("Не удалось переместить элемент в папку")
+      await refreshCurrentView(true)
+      // Восстанавливаем тему
+      restoreThemeState(currentTheme)
     }
   } catch (error) {
     console.error("Ошибка при перемещении элемента между папками:", error)
-    await refreshCurrentView(true) // Принудительное обновление
+    const currentTheme = getCurrentThemeState()
+    await refreshCurrentView(true)
+    // Восстанавливаем тему
+    restoreThemeState(currentTheme)
   }
 }
 
@@ -1718,9 +1728,10 @@ function createBookmarkElement(item, cachedIcons = []) {
     element.dataset.url = item.url
   }
 
-  // Определяем источник иконки
-  let iconSrc = ""
-  const isDarkTheme = document.body.classList.contains(CSS_CLASSES.DARK_THEME)
+  // Определяем текущую тему
+  const isDarkTheme =
+    document.body.getAttribute("data-theme") === "dark" ||
+    document.body.classList.contains(CSS_CLASSES.DARK_THEME)
 
   // Создаем иконку
   const icon = document.createElement("img")
@@ -1729,31 +1740,8 @@ function createBookmarkElement(item, cachedIcons = []) {
 
   // Установка иконок в зависимости от типа элемента и темы
   if (item.type === "folder") {
-    // Для папок используем стандартные иконки в зависимости от темы
-    iconSrc = isDarkTheme
-      ? "/assets/icons/folder_black.svg"
-      : "/assets/icons/folder_white.svg"
-  } else {
-    // Для закладок используем favicon или стандартную иконку
-    iconSrc = item.favicon ? item.favicon : "/assets/icons/link.svg"
-  }
-
-  icon.src = iconSrc
-
-  // Обработчик ошибки загрузки иконки
-  icon.onerror = function () {
-    if (item.type === "folder") {
-      icon.src = isDarkTheme
-        ? "/assets/icons/folder_black.svg"
-        : "/assets/icons/folder_white.svg"
-    } else {
-      icon.src = "/assets/icons/link.svg"
-    }
-  }
-
-  // Если это папка, попробуем загрузить кастомную иконку асинхронно
-  if (item.type === "folder") {
-    // Асинхронно попытаемся загрузить иконку из IconStorage
+    // Для папок используем две иконки (для светлой и темной темы)
+    // Сначала пробуем загрузить кастомную иконку из IconStorage
     setTimeout(async () => {
       try {
         const iconStorage = window.iconStorage
@@ -1764,10 +1752,38 @@ function createBookmarkElement(item, cachedIcons = []) {
             return
           }
         }
+
+        // Если кастомной иконки нет, используем стандартную в зависимости от темы
+        icon.src = isDarkTheme
+          ? "/assets/icons/folder_black.svg"
+          : "/assets/icons/folder_white.svg"
       } catch (error) {
         console.error("Ошибка при загрузке иконки папки:", error)
+        // При ошибке используем стандартную иконку
+        icon.src = isDarkTheme
+          ? "/assets/icons/folder_black.svg"
+          : "/assets/icons/folder_white.svg"
       }
     }, 0)
+
+    // Устанавливаем начальную иконку до загрузки кастомной
+    icon.src = isDarkTheme
+      ? "/assets/icons/folder_black.svg"
+      : "/assets/icons/folder_white.svg"
+  } else {
+    // Для закладок используем favicon или стандартную иконку
+    icon.src = item.favicon ? item.favicon : "/assets/icons/link.svg"
+  }
+
+  // Обработчик ошибки загрузки иконки
+  icon.onerror = function () {
+    if (item.type === "folder") {
+      icon.src = isDarkTheme
+        ? "/assets/icons/folder_black.svg"
+        : "/assets/icons/folder_white.svg"
+    } else {
+      icon.src = "/assets/icons/link.svg"
+    }
   }
 
   // Заголовок закладки
