@@ -22,8 +22,52 @@ export async function createFolder(parentId, title) {
 }
 
 // Получить закладки из папки
-export async function getBookmarksInFolder(folderId) {
-  return await getBookmarksFromFolder(folderId)
+export async function getBookmarksInFolder(folderId, forceUpdate = false) {
+  // Проверка кеша и времени его актуальности
+  if (
+    !forceUpdate &&
+    window._folderContentsCache &&
+    window._folderContentsCache[folderId]
+  ) {
+    const cache = window._folderContentsCache[folderId]
+    // Кеш действителен не более 30 секунд
+    if (Date.now() - cache.timestamp < 30000) {
+      console.log(`Использую кеш для папки ${folderId}`)
+      return cache.contents
+    }
+  }
+
+  const bookmarks = await getStoredBookmarks()
+  let folderContents
+
+  if (folderId === "0") {
+    folderContents = bookmarks
+  } else {
+    function findFolder(items) {
+      for (const item of items) {
+        if (item.id === folderId) {
+          return item.children || []
+        }
+        if (item.type === "folder" && item.children) {
+          const found = findFolder(item.children)
+          if (found) return found
+        }
+      }
+      return null
+    }
+    folderContents = findFolder(bookmarks) || []
+  }
+
+  // Сохраняем в кеш
+  if (!window._folderContentsCache) {
+    window._folderContentsCache = {}
+  }
+  window._folderContentsCache[folderId] = {
+    contents: folderContents,
+    timestamp: Date.now(),
+  }
+
+  return folderContents
 }
 
 // Импортировать закладки из браузера

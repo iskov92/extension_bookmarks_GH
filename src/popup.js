@@ -129,17 +129,23 @@ async function getFolderContentsRecursively(folderId) {
 // Обработчики событий
 async function handleFolderClick(bookmarkElement) {
   const id = bookmarkElement.dataset.id
-  const folderTitle = bookmarkElement.querySelector(
-    `.${CSS_CLASSES.BOOKMARK_TITLE}`
-  ).textContent
+  const folderTitle =
+    bookmarkElement.querySelector(`.bookmark-title`).textContent
   navigation.push({ id, title: folderTitle })
 
   if (currentNestedMenu) {
     currentNestedMenu.destroy()
   }
 
+  // Проверяем, был ли перемещен элемент в эту папку
+  const hasRecentMove =
+    window.lastMovedItem &&
+    window.lastMovedItem.targetFolder === id &&
+    Date.now() - window.lastMovedItem.timestamp < 30000 // 30 секунд
+
+  // Если был недавно перемещен элемент в эту папку, обновляем данные из хранилища
   const nestedBookmarks = await ErrorHandler.wrapAsync(
-    getBookmarksInFolder(id),
+    getBookmarksInFolder(id, hasRecentMove),
     ErrorType.NAVIGATION,
     "folder"
   )
@@ -153,6 +159,24 @@ async function handleFolderClick(bookmarkElement) {
     currentFolder.style.display = "block"
     currentFolder.textContent = folderTitle
     backButton.style.display = "block"
+
+    // Если был недавно перемещен элемент в эту папку, выделяем его
+    if (hasRecentMove) {
+      setTimeout(() => {
+        const movedElement = document.querySelector(
+          `[data-id="${window.lastMovedItem.itemId}"]`
+        )
+        if (movedElement) {
+          movedElement.style.transition = "background-color 0.5s"
+          movedElement.style.backgroundColor = "var(--highlight-color)"
+          setTimeout(() => {
+            movedElement.style.backgroundColor = ""
+          }, 1500)
+        }
+        // Сбрасываем информацию о перемещении
+        window.lastMovedItem = null
+      }, 100)
+    }
   } else {
     navigation.pop()
   }
@@ -193,9 +217,7 @@ async function handleContextMenu(e) {
 
   const isFolder = bookmarkElement.classList.contains(CSS_CLASSES.FOLDER)
   const id = bookmarkElement.dataset.id
-  const title = bookmarkElement.querySelector(
-    `.${CSS_CLASSES.BOOKMARK_TITLE}`
-  ).textContent
+  const title = bookmarkElement.querySelector(`.bookmark-title`).textContent
   const url = bookmarkElement.dataset.url
 
   const items = isFolder
@@ -361,7 +383,33 @@ async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
   try {
     // Получаем текущий ID родительской папки
     const parentId = navigation.getCurrentParentId()
-    const bookmarks = await getBookmarksInFolder(parentId)
+
+    // Сохраняем текущие иконки для повторного использования
+    const currentIcons = {}
+    const existingIcons = mainContent.querySelectorAll(".bookmark-icon")
+    existingIcons.forEach((icon) => {
+      const itemElem = icon.closest(".bookmark-item")
+      if (itemElem && itemElem.dataset.id) {
+        if (!currentIcons[itemElem.dataset.id]) {
+          currentIcons[itemElem.dataset.id] = []
+        }
+        // Сохраняем ссылку на иконку и её src
+        currentIcons[itemElem.dataset.id].push({
+          isLight: icon.classList.contains("light-theme-icon"),
+          src: icon.src,
+          isLoaded: icon.complete && icon.naturalWidth > 0,
+        })
+      }
+    })
+
+    // Получаем закладки с потенциальным принудительным обновлением,
+    // если был недавно перемещен элемент
+    const forceUpdate =
+      window.lastMovedItem &&
+      window.lastMovedItem.targetFolder === parentId &&
+      Date.now() - window.lastMovedItem.timestamp < 30000
+
+    const bookmarks = await getBookmarksInFolder(parentId, forceUpdate)
 
     // Очищаем содержимое
     mainContent.innerHTML = ""
@@ -401,32 +449,34 @@ async function continueRefreshCurrentView(mainContent, currentFolderTitle) {
     } else {
       // Создаем элементы закладок/папок
       bookmarks.forEach((bookmark) => {
-        const bookmarkElement = createBookmarkElement(bookmark)
+        const bookmarkElement = createBookmarkElement(
+          bookmark,
+          currentIcons[bookmark.id]
+        )
         mainContent.appendChild(bookmarkElement)
       })
     }
 
-    // Проверяем загрузку иконок после небольшой задержки
-    setTimeout(() => {
-      const icons = mainContent.querySelectorAll(".bookmark-icon")
-      icons.forEach((icon) => {
-        if (!icon.complete || icon.naturalWidth === 0) {
-          // Перезагрузка иконки если она не загрузилась
-          const originalSrc = icon.src
-          // Устанавливаем резервную иконку
-          if (icon.closest(".folder")) {
-            icon.src = icon.classList.contains("light-theme-icon")
-              ? "assets/icons/folder-dark.svg"
-              : "assets/icons/folder.svg"
-          } else {
-            icon.src = "assets/icons/globe.svg"
-          }
-        }
-      })
-    }, 500)
-
     // Инициализируем Sortable после добавления элементов
     initDragAndDrop()
+
+    // Если был перемещен элемент в эту папку, выделяем его
+    if (forceUpdate && window.lastMovedItem) {
+      setTimeout(() => {
+        const movedElement = mainContent.querySelector(
+          `[data-id="${window.lastMovedItem.itemId}"]`
+        )
+        if (movedElement) {
+          movedElement.style.transition = "background-color 0.5s"
+          movedElement.style.backgroundColor = "var(--highlight-color)"
+          setTimeout(() => {
+            movedElement.style.backgroundColor = ""
+          }, 1500)
+        }
+        // Сбрасываем информацию о перемещении
+        window.lastMovedItem = null
+      }, 100)
+    }
   } catch (error) {
     console.error("Ошибка при продолжении обновления представления:", error)
     showErrorMessage("Не удалось загрузить закладки")
@@ -921,7 +971,11 @@ function initDragAndDrop() {
         // Обрабатываем перетаскивание если был изменён порядок
         if (hasChanged) {
           // Используем сохраненные данные вместо обращения к evt
-          processDragEnd(draggedId, oldIndex, newIndex, fromEl, toEl)
+          processDragEnd({
+            movedItemId: draggedId,
+            success: hasChanged,
+            targetFolderId: hasChanged ? toEl.dataset.id : null,
+          })
         }
 
         // Очищаем переменные
@@ -1031,87 +1085,44 @@ function initDragAndDrop() {
 }
 
 /**
- * Обрабатывает завершение перетаскивания без прямого доступа к объекту события
+ * Обрабатывает завершение операции перетаскивания
+ * @param {Object} dragInfo - Информация о перетаскивании
+ * @param {string} dragInfo.movedItemId - ID перемещенного элемента
+ * @param {boolean} dragInfo.success - Успешно ли выполнено перемещение
+ * @param {string|null} dragInfo.targetFolderId - ID целевой папки (null если просто изменение порядка)
  */
-function processDragEnd(
-  draggedId,
-  oldIndex,
-  newIndex,
-  fromContainer,
-  toContainer
-) {
-  if (!draggedId || oldIndex === newIndex) {
+function processDragEnd(dragInfo) {
+  const { movedItemId, success, targetFolderId } = dragInfo
+
+  // Если перемещение не удалось, просто обновляем текущее представление
+  if (!success) {
+    console.log("Перемещение не удалось, обновляем текущее представление")
+    refreshCurrentView()
+    return
+  }
+
+  // Получаем текущую папку
+  const currentParentId = navigation.getCurrentParentId()
+
+  // Если элемент был перемещен в другую папку (не в текущую)
+  if (targetFolderId && targetFolderId !== currentParentId) {
     console.log(
-      "Позиция элемента не изменилась или нет ID, пропускаем обновление"
+      `Элемент ${movedItemId} перемещен в другую папку: ${targetFolderId}`
     )
-    return
-  }
 
-  const currentFolderId = navigation.getCurrentFolderId()
-  console.log(
-    `handleSortableEnd: Текущая папка ID=${currentFolderId}, oldIndex=${oldIndex}, newIndex=${newIndex}`
-  )
+    // Сохраняем информацию о последнем перемещении
+    localStorage.setItem("lastMovedItem", movedItemId)
+    localStorage.setItem("lastTargetFolder", targetFolderId)
 
-  const bookmarksList = document.getElementById("mainContent")
-  if (
-    !bookmarksList ||
-    !bookmarksList.children ||
-    newIndex >= bookmarksList.children.length
-  ) {
-    console.error(
-      "Не удалось найти элемент списка закладок или индекс вне диапазона"
-    )
-    return
-  }
-
-  const draggedItem = bookmarksList.children[newIndex]
-  if (!draggedItem) {
-    console.error("Не удалось найти перетаскиваемый элемент по индексу")
-    return
-  }
-
-  let targetId = null
-  if (newIndex < bookmarksList.children.length - 1) {
-    targetId = bookmarksList.children[newIndex + 1].getAttribute("data-id")
-    console.log(`handleSortableEnd: Целевой элемент (следующий) ID=${targetId}`)
+    // Обновляем текущее представление, так как элемент был удален из текущей папки
+    refreshCurrentView()
   } else {
-    console.log("handleSortableEnd: Перемещение в конец списка")
-  }
-
-  ErrorHandler.wrapAsync(async () => {
-    const result = await reorderBookmarks(draggedId, targetId, currentFolderId)
+    // Если это было перемещение внутри текущей папки (изменение порядка)
     console.log(
-      `handleSortableEnd: Результат перемещения: ${
-        result ? "успешно" : "ошибка"
-      }`
+      `Элемент ${movedItemId} был переупорядочен внутри текущей папки ${currentParentId}`
     )
-
-    if (result) {
-      console.log(
-        "handleSortableEnd: Обновляем отображение после успешного перемещения"
-      )
-
-      // Проверяем, что иконки загружены правильно
-      const iconElements = document.querySelectorAll(
-        `[data-id="${draggedId}"] .bookmark-icon`
-      )
-      iconElements.forEach((icon) => {
-        if (!icon.complete || icon.naturalWidth === 0) {
-          console.warn(
-            `Иконка не загружена для элемента ${draggedId}, пробуем перезагрузить`
-          )
-          const originalSrc = icon.src
-          icon.src = originalSrc
-        }
-      })
-    } else {
-      console.error(
-        "handleSortableEnd: Не удалось сохранить изменения порядка, возвращаем элементы"
-      )
-      // При необходимости можно добавить перезагрузку содержимого
-      // refreshCurrentView()
-    }
-  })
+    refreshCurrentView()
+  }
 }
 
 // Функция обновления текущей папки (если её нет, добавим)
@@ -1186,9 +1197,34 @@ async function moveItemToFolder(itemId, folderId) {
     const result = await moveBookmark(itemId, folderId)
 
     if (result) {
-      // Обновляем текущее представление вместо перехода в папку
-      await refreshCurrentView()
+      // Визуально удаляем элемент из текущего контейнера
+      const element = document.querySelector(`[data-id="${itemId}"]`)
+      if (element) {
+        // Анимируем исчезновение элемента перед удалением
+        element.style.transition = "opacity 0.3s, transform 0.3s"
+        element.style.opacity = "0"
+        element.style.transform = "scale(0.9)"
+
+        // Удаляем элемент после анимации
+        setTimeout(() => {
+          if (element.parentNode) {
+            element.parentNode.removeChild(element)
+          }
+        }, 300)
+      }
+
+      // Показываем уведомление об успешном перемещении
       showNotification(getTranslation("DRAG_DROP.MOVE_SUCCESS"))
+
+      // Сохраняем информацию о последнем перемещении
+      window.lastMovedItem = {
+        itemId: itemId,
+        targetFolder: folderId,
+        timestamp: Date.now(),
+      }
+
+      // Не требуется полное обновление представления, т.к. мы уже
+      // визуально удалили элемент, это уменьшит мигания и сохранит иконки
     }
 
     // Если Sortable был отключен, включаем его обратно
@@ -1381,138 +1417,176 @@ function getTranslation(key) {
 }
 
 /**
- * Создает элемент закладки или папки для отображения в интерфейсе
- * @param {Object} bookmark - Объект закладки или папки
- * @returns {HTMLElement} - Созданный элемент
+ * Создает DOM-элемент закладки или папки
+ * @param {Object} item - Объект закладки или папки
+ * @param {Array} cachedIcons - Массив объектов с информацией о кэшированных иконках
+ * @returns {HTMLElement} - DOM-элемент закладки или папки
  */
-function createBookmarkElement(bookmark) {
-  const bookmarkElement = document.createElement("div")
-  bookmarkElement.classList.add("bookmark-item")
-  bookmarkElement.setAttribute("data-id", bookmark.id)
-  bookmarkElement.setAttribute("data-type", bookmark.type)
+function createBookmarkElement(item, cachedIcons = []) {
+  // Создаем элемент div вместо li, чтобы соответствовать структуре в компонентах
+  const element = document.createElement("div")
+  element.className =
+    item.type === "folder" ? "bookmark-item folder" : "bookmark-item"
+  element.dataset.id = item.id
+  element.dataset.type = item.type
 
-  if (bookmark.url) {
-    bookmarkElement.setAttribute("data-url", bookmark.url)
+  // Делаем элемент перетаскиваемым
+  element.setAttribute("draggable", "true")
+
+  if (item.url) {
+    element.dataset.url = item.url
   }
 
-  // Добавляем обработку drag-and-drop
-  bookmarkElement.setAttribute("draggable", "true")
+  // Определяем источник иконки
+  let iconSrc = ""
+  const isDarkTheme =
+    document.documentElement.getAttribute("data-theme") === "dark"
 
-  // Обработка иконок для разных типов элементов
-  if (bookmark.type === "folder") {
-    bookmarkElement.classList.add("folder")
+  // Проверяем наличие кэшированной иконки
+  let iconLoaded = false
+  if (cachedIcons && cachedIcons.length > 0) {
+    const themeCachedIcon = cachedIcons.find(
+      (i) => (isDarkTheme && !i.isLight) || (!isDarkTheme && i.isLight)
+    )
 
-    // Сначала создаем элементы для обеих иконок
-    const iconElement = document.createElement("img")
-    iconElement.classList.add("bookmark-icon")
-
-    const alternateIconElement = document.createElement("img")
-    alternateIconElement.classList.add("bookmark-icon", "light-theme-icon")
-
-    try {
-      // Загружаем стандартные иконки как запасной вариант
-      iconElement.src = "assets/icons/folder.svg"
-      alternateIconElement.src = "assets/icons/folder-dark.svg"
-
-      // Проверяем наличие сохраненной иконки для папки
-      const iconUrl = localStorage.getItem(`folder_icon_${bookmark.id}`)
-      const altIconUrl = localStorage.getItem(
-        `folder_icon_light_${bookmark.id}`
-      )
-
-      if (iconUrl) {
-        console.log(
-          `Загрузка пользовательской иконки для папки ${bookmark.id}: ${iconUrl}`
-        )
-        iconElement.src = iconUrl
-      } else {
-        console.log(`Использую стандартную иконку для папки ${bookmark.id}`)
-      }
-
-      if (altIconUrl) {
-        console.log(
-          `Загрузка светлой иконки для папки ${bookmark.id}: ${altIconUrl}`
-        )
-        alternateIconElement.src = altIconUrl
-      } else {
-        console.log(
-          `Использую стандартную светлую иконку для папки ${bookmark.id}`
-        )
-      }
-
-      // Обработка ошибок загрузки
-      iconElement.onerror = function () {
-        console.warn(
-          `Не удалось загрузить иконку для папки ${bookmark.id}, использую стандартную`
-        )
-        this.src = "assets/icons/folder.svg"
-        this.onerror = null // Предотвращаем бесконечный цикл
-      }
-
-      alternateIconElement.onerror = function () {
-        console.warn(
-          `Не удалось загрузить светлую иконку для папки ${bookmark.id}, использую стандартную`
-        )
-        this.src = "assets/icons/folder-dark.svg"
-        this.onerror = null
-      }
-    } catch (error) {
-      console.error(
-        `Ошибка при загрузке иконок для папки ${bookmark.id}:`,
-        error
-      )
+    if (themeCachedIcon) {
+      iconSrc = themeCachedIcon.src
+      iconLoaded = themeCachedIcon.isLoaded
     }
+  }
 
-    // Добавляем иконки в элемент в правильном порядке - сначала для светлой темы, потом для темной
-    bookmarkElement.appendChild(alternateIconElement)
-    bookmarkElement.appendChild(iconElement)
-  } else {
-    // Для закладок используем favicon или стандартную иконку
-    const defaultIcon = "assets/icons/globe.svg"
-    const iconElement = document.createElement("img")
-    iconElement.classList.add("bookmark-icon")
-
-    if (bookmark.url) {
-      try {
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${
-          new URL(bookmark.url).hostname
-        }&sz=32`
-        console.log(
-          `Загрузка иконки для закладки ${bookmark.id}: ${faviconUrl}`
-        )
-        iconElement.src = faviconUrl
-
-        // Улучшенная обработка ошибок загрузки иконок
-        iconElement.onerror = function () {
-          console.warn(
-            `Не удалось загрузить иконку для закладки ${bookmark.id}, использую стандартную`
-          )
-          this.src = defaultIcon
-          this.onerror = null // Предотвращаем бесконечный цикл
-        }
-      } catch (error) {
-        console.error(
-          `Ошибка при загрузке иконки для закладки ${bookmark.id}:`,
-          error
-        )
-        iconElement.src = defaultIcon
-      }
+  // Если не нашли кэшированную иконку, используем стандартную
+  if (!iconLoaded) {
+    if (item.type === "folder") {
+      iconSrc = isDarkTheme
+        ? "assets/icons/folder.svg"
+        : "assets/icons/folder-dark.svg"
     } else {
-      console.log(
-        `URL отсутствует для закладки ${bookmark.id}, использую стандартную иконку`
-      )
-      iconElement.src = defaultIcon
+      iconSrc = item.favicon ? item.favicon : "assets/icons/link.svg"
     }
-
-    bookmarkElement.appendChild(iconElement)
   }
 
-  const titleElement = document.createElement("span")
-  titleElement.classList.add("bookmark-title")
-  titleElement.textContent = bookmark.title || i18n.getMessage("noTitle")
-  bookmarkElement.appendChild(titleElement)
+  // Создаем иконку
+  const icon = document.createElement("img")
+  icon.className = "bookmark-icon"
+  icon.alt = item.type
+  icon.src = iconSrc
 
-  return bookmarkElement
+  // Обработчик ошибки загрузки иконки
+  icon.onerror = function () {
+    if (item.type === "folder") {
+      icon.src = isDarkTheme
+        ? "assets/icons/folder.svg"
+        : "assets/icons/folder-dark.svg"
+    } else {
+      icon.src = "assets/icons/link.svg"
+    }
+  }
+
+  // Заголовок закладки
+  const title = document.createElement("span")
+  title.className = "bookmark-title"
+  title.textContent = item.title
+
+  // Добавляем элементы в структуру
+  element.appendChild(icon)
+  element.appendChild(title)
+
+  // Добавляем обработчики событий
+  if (item.type === "folder") {
+    element.addEventListener("click", handleFolderClick)
+  }
+
+  // Добавляем контекстное меню через делегирование событий,
+  // прямо на контейнере mainContent, вместо индивидуальных обработчиков
+
+  return element
+}
+
+/**
+ * Обрабатывает клики по кнопкам в элементе закладки
+ * @param {Event} e - Событие клика
+ */
+async function handleButtonClick(e) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  const action = e.target.closest("[data-action]")?.dataset.action
+  if (!action) return
+
+  const bookmarkItem = e.target.closest(".bookmark-item")
+  if (!bookmarkItem) return
+
+  const id = bookmarkItem.dataset.id
+  const isFolder = bookmarkItem.classList.contains("folder")
+  const title = bookmarkItem.querySelector(".bookmark-text").textContent
+  const url = bookmarkItem.dataset.url
+
+  switch (action) {
+    case "edit":
+      if (isFolder) {
+        showFolderEditDialog({
+          id: id,
+          title: title,
+        })
+      } else {
+        const modal = new Modal()
+        modal.show(
+          getTranslation("MODALS.EDIT_BOOKMARK"),
+          "link",
+          { title, url },
+          async (data) => {
+            const result = await ErrorHandler.wrapAsync(
+              updateBookmark(id, data),
+              ErrorType.UPDATE,
+              "bookmark"
+            )
+            if (result) {
+              modal.close()
+              await refreshCurrentView()
+            }
+          }
+        )
+      }
+      break
+
+    case "delete":
+      if (confirm(getTranslation("CONFIRM_DELETE"))) {
+        try {
+          let itemToTrash = {
+            id,
+            type: isFolder ? "folder" : "bookmark",
+            title,
+            url,
+          }
+
+          // Если это папка, получаем её содержимое рекурсивно
+          if (isFolder) {
+            const folderContents = await getFolderContentsRecursively(id)
+            itemToTrash.contents = folderContents
+          }
+
+          // Сохраняем в корзину перед удалением
+          await trashStorage.moveToTrash(itemToTrash, navigation.getStack())
+
+          // Удаляем из закладок
+          const deleted = await deleteBookmark(id)
+          if (deleted) {
+            await refreshCurrentView()
+          } else {
+            alert(getTranslation("ERROR.DELETE_FAILED"))
+          }
+        } catch (error) {
+          console.error("Error deleting item:", error)
+          ErrorHandler.handle(
+            error,
+            ErrorType.DELETE,
+            isFolder ? "folder" : "bookmark"
+          )
+        }
+      }
+      break
+  }
 }
 
 // Добавим после initializeUI
@@ -1595,4 +1669,102 @@ function setupBackButtonDropTarget() {
       }
     }
   })
+}
+
+/**
+ * Обрабатывает событие drop для перетаскиваемых элементов
+ * @param {DragEvent} evt - событие drop
+ */
+async function handleDrop(evt) {
+  // Проверяем, что перетаскивание было инициировано и у нас есть перетаскиваемый элемент
+  if (!isDragging || !draggedElement) {
+    return
+  }
+
+  // Очищаем таймеры и эффекты перед обработкой
+  clearHoverTimer()
+  clearAllHighlights()
+  hideDropIndicator()
+
+  // Создаем объект информации о перетаскивании с начальным результатом "неуспешно"
+  const dragInfo = {
+    movedItemId: draggedElement.dataset.id,
+    success: false,
+    targetFolderId: null,
+  }
+
+  try {
+    evt.preventDefault()
+    evt.stopPropagation()
+
+    // Получаем целевой элемент
+    const target = getDropTarget(evt)
+
+    // Если цель - папка
+    if (target && target.classList.contains("folder")) {
+      const targetFolderId = target.dataset.id
+
+      // Вызываем функцию для перемещения закладки в папку
+      const success = await ErrorHandler.wrapAsync(async () => {
+        return await moveBookmark(draggedElement.dataset.id, targetFolderId)
+      })
+
+      // Обновляем информацию о перетаскивании
+      dragInfo.success = success
+      dragInfo.targetFolderId = targetFolderId
+
+      console.log(
+        `Перемещение в папку ${targetFolderId}: ${
+          success ? "успешно" : "неудачно"
+        }`
+      )
+    }
+    // Если перетаскивание происходит рядом с элементом (изменение порядка)
+    else if (dropPosition.target) {
+      const { targetId, position } = dropPosition
+
+      // Получаем индексы для перестановки
+      const oldIndex = Array.from(bookmarksContainer.children).indexOf(
+        draggedElement
+      )
+      const targetElement = document.querySelector(
+        `.bookmark-item[data-id="${targetId}"]`
+      )
+      let newIndex = Array.from(bookmarksContainer.children).indexOf(
+        targetElement
+      )
+
+      // Корректируем новый индекс в зависимости от позиции
+      if (position === "after" && newIndex < oldIndex) {
+        newIndex += 1
+      } else if (position === "before" && newIndex > oldIndex) {
+        newIndex -= 1
+      }
+
+      // Перемещаем элемент в DOM
+      const currentParentId = navigation.getCurrentParentId()
+      const success = await reorderBookmarks(
+        draggedElement.dataset.id,
+        currentParentId,
+        newIndex
+      )
+
+      // Обновляем информацию о перетаскивании
+      dragInfo.success = success
+      dragInfo.targetFolderId = currentParentId
+
+      console.log(
+        `Изменение порядка в папке ${currentParentId}: ${
+          success ? "успешно" : "неудачно"
+        }`
+      )
+    }
+  } catch (error) {
+    console.error("Ошибка при обработке drop:", error)
+    dragInfo.success = false
+  } finally {
+    // Всегда вызываем processDragEnd, передавая результаты операции
+    processDragEnd(dragInfo)
+    resetDragging()
+  }
 }
