@@ -33,6 +33,13 @@ export class DragDropModule {
     this.lastTarget = null
     this.debounceTimer = null
 
+    // Переменные для отслеживания клика vs. перетаскивания
+    this.mouseDownX = 0
+    this.mouseDownY = 0
+    this.mouseDownTimer = null
+    this.dragThreshold = 5 // пикселей для определения перетаскивания
+    this.dragDelay = 150 // мс перед определением перетаскивания
+
     // Флаги для управления процессом перетаскивания
     window.isDragging = false
     window.preventRefreshAfterDrop = false
@@ -87,11 +94,50 @@ export class DragDropModule {
     const target = e.target.closest(".bookmark-item")
     if (!target) return
 
-    // Добавляем класс для изменения курсора на grab
-    document.body.classList.add("dragging-pending")
+    // Сохраняем позицию мыши для определения, было ли это перетаскивание или клик
+    this.mouseDownX = e.clientX
+    this.mouseDownY = e.clientY
 
     // Сохраняем целевой элемент для возможного перетаскивания
     this.pendingDragElement = target
+
+    // Добавляем класс для изменения курсора только после небольшой задержки
+    // Это предотвратит мерцание курсора при обычном клике
+    this.mouseDownTimer = setTimeout(() => {
+      // Если пользователь все еще удерживает кнопку мыши
+      if (this.pendingDragElement) {
+        document.body.classList.add("dragging-pending")
+      }
+    }, this.dragDelay)
+
+    // Добавляем глобальные обработчики для отслеживания движения мыши
+    document.addEventListener("mousemove", this.handleMouseMoveGlobal)
+  }
+
+  /**
+   * Глобальный обработчик движения мыши (будет добавлен только при mousedown)
+   * @param {MouseEvent} e - Событие движения мыши
+   */
+  handleMouseMoveGlobal = (e) => {
+    // Если нет активного pendingDragElement, выходим
+    if (!this.pendingDragElement) return
+
+    // Вычисляем смещение от начальной позиции
+    const deltaX = Math.abs(e.clientX - this.mouseDownX)
+    const deltaY = Math.abs(e.clientY - this.mouseDownY)
+
+    // Если смещение больше порога и нажата кнопка мыши,
+    // считаем это началом перетаскивания
+    if (deltaX > this.dragThreshold || deltaY > this.dragThreshold) {
+      // Добавляем класс для изменения курсора немедленно
+      document.body.classList.add("dragging-pending")
+
+      // Очищаем таймер, так как решение уже принято
+      if (this.mouseDownTimer) {
+        clearTimeout(this.mouseDownTimer)
+        this.mouseDownTimer = null
+      }
+    }
   }
 
   /**
@@ -99,11 +145,20 @@ export class DragDropModule {
    * @param {MouseEvent} e - Событие отпускания мыши
    */
   handleMouseUp(e) {
+    // Очищаем таймер, если он активен
+    if (this.mouseDownTimer) {
+      clearTimeout(this.mouseDownTimer)
+      this.mouseDownTimer = null
+    }
+
     // Если не началось перетаскивание, убираем класс dragging-pending
     if (!window.isDragging) {
       document.body.classList.remove("dragging-pending")
       this.pendingDragElement = null
     }
+
+    // Удаляем глобальный обработчик движения мыши
+    document.removeEventListener("mousemove", this.handleMouseMoveGlobal)
   }
 
   /**
@@ -1047,9 +1102,16 @@ export class DragDropModule {
     // Удаляем обработчик клавиш
     document.removeEventListener("keydown", this.handleKeyDown)
 
-    // Удаляем обработчики mousedow и mouseup
+    // Удаляем обработчики mousedown и mouseup
     this.container.removeEventListener("mousedown", this.handleMouseDown)
     document.removeEventListener("mouseup", this.handleMouseUp)
+    document.removeEventListener("mousemove", this.handleMouseMoveGlobal)
+
+    // Очищаем все таймеры
+    if (this.mouseDownTimer) {
+      clearTimeout(this.mouseDownTimer)
+      this.mouseDownTimer = null
+    }
 
     // Скрываем подсказку
     this.hideDraggingTooltip()
