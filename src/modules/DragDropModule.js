@@ -197,13 +197,12 @@ export class DragDropModule {
     // Если мы уже применили эффект к этому элементу, не меняем его снова при движении курсора внутри элемента
     // Это предотвращает дрожание эффекта
     if (
-      (target.classList.contains("drop-target") &&
-        target.hasAttribute("data-shifted")) ||
-      (target.classList.contains("drop-target-above") &&
-        target.hasAttribute("data-shifted")) ||
-      (target.classList.contains("highlight") &&
-        target === this.lastHoveredFolder)
+      (target.classList.contains("drop-target") ||
+        target.classList.contains("drop-target-above") ||
+        target.classList.contains("highlight")) &&
+      target.hasAttribute("data-shifted")
     ) {
+      // Если уже применен эффект - возвращаемся, чтобы не вызывать повторных изменений DOM
       return
     }
 
@@ -215,22 +214,27 @@ export class DragDropModule {
     const mouseX = e.clientX
     const relativeX = ((mouseX - targetRect.left) / targetRect.width) * 100
 
-    // Если навели на папку
+    // Добавляем отступ для предотвращения дрожания
+    // Если последний активный элемент был тот же, что и текущий, и мы около границы зоны,
+    // сохраняем предыдущий эффект для стабильности
+    const edgeBuffer = 5 // 5% буфер на границах зон
+
     if (target.classList.contains("folder")) {
-      if (relativeX <= 20) {
+      // Определяем нужное действие с учетом буферной зоны
+      if (relativeX <= 20 - edgeBuffer) {
         // Левые 20% - вставить перед папкой
         target.classList.add("drop-target-above")
         target.style.transform = "translateX(15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
-      } else if (relativeX >= 80) {
+      } else if (relativeX >= 80 + edgeBuffer) {
         // Правые 20% - вставить после папки
         target.classList.add("drop-target")
         target.style.transform = "translateX(-15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
-      } else {
-        // Центральные 60% - вставить внутрь папки
+      } else if (relativeX >= 20 + edgeBuffer && relativeX <= 80 - edgeBuffer) {
+        // Центральная зона с учетом буфера
         target.classList.add("highlight")
         this.lastHoveredFolder = target
         // Применяем эффект масштабирования, который более стабилен
@@ -239,32 +243,45 @@ export class DragDropModule {
         this.showDraggingTooltip(i18n.t("DRAG_DROP.INTO_TIP"))
         target.setAttribute("data-hover-text", i18n.t("DRAG_DROP.FOLDER_HOVER"))
 
-        // Удаляем логику автоматического открытия папки по таймеру
-        // Оставляем только отслеживание времени начала наведения для возможного
-        // использования в будущем (например, для визуальных эффектов)
         if (!this.folderHoverStartTime) {
           this.folderHoverStartTime = Date.now()
         }
+      } else {
+        // В буферной зоне сохраняем предыдущий эффект, если он был
+        if (relativeX > 20 - edgeBuffer && relativeX < 20 + edgeBuffer) {
+          // Буферная зона между левой и центральной частью
+          target.classList.add("drop-target-above")
+          target.style.transform = "translateX(15px)"
+          target.setAttribute("data-shifted", "true")
+          this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
+        } else if (relativeX > 80 - edgeBuffer && relativeX < 80 + edgeBuffer) {
+          // Буферная зона между правой и центральной частью
+          target.classList.add("drop-target")
+          target.style.transform = "translateX(-15px)"
+          target.setAttribute("data-shifted", "true")
+          this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
+        }
       }
     } else {
-      // Если навели на обычную закладку
-      if (relativeX <= 20) {
+      // Обычная закладка (не папка)
+      if (relativeX <= 20 - edgeBuffer) {
         // Левые 20% - вставить перед
         target.classList.add("drop-target-above")
         target.style.transform = "translateX(15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
-      } else if (relativeX >= 80) {
+      } else if (relativeX >= 80 + edgeBuffer) {
         // Правые 20% - вставить после
         target.classList.add("drop-target")
         target.style.transform = "translateX(-15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
       } else {
-        // Средняя часть - определяем по вертикали
+        // Средняя часть
         const mouseY = e.clientY
         const threshold = targetRect.top + targetRect.height / 2
 
+        // Определяем с учетом вертикального положения курсора
         if (mouseY < threshold) {
           // Вставить перед
           target.classList.add("drop-target-above")
@@ -312,6 +329,27 @@ export class DragDropModule {
   handleDragLeave(e) {
     const target = e.target.closest(".bookmark-item")
     if (!target) return
+
+    // Проверяем, действительно ли мышь покинула элемент, а не ушла внутрь псевдоэлемента
+    // Получаем размеры элемента с учетом расширенной области
+    const rect = target.getBoundingClientRect()
+    // Расширяем границы элемента
+    const extendedRect = {
+      left: rect.left - 30,
+      right: rect.right + 30,
+      top: rect.top - 5,
+      bottom: rect.bottom + 5,
+    }
+
+    // Если курсор все еще в пределах расширенной зоны, не снимаем эффекты
+    if (
+      e.clientX >= extendedRect.left &&
+      e.clientX <= extendedRect.right &&
+      e.clientY >= extendedRect.top &&
+      e.clientY <= extendedRect.bottom
+    ) {
+      return
+    }
 
     // Удаляем индикаторы перетаскивания и сбрасываем трансформацию
     target.classList.remove("drop-target")
@@ -763,13 +801,26 @@ export class DragDropModule {
       ".drop-target, .drop-target-above, .highlight"
     )
 
+    // Обрабатываем каждый элемент
     dropTargets.forEach((el) => {
+      // Удаляем классы и атрибуты
       el.classList.remove("drop-target")
       el.classList.remove("drop-target-above")
       el.classList.remove("highlight")
-      el.style.transform = "" // Сбрасываем смещение
+
+      // Сбрасываем трансформацию плавно
+      // Это улучшает визуальное восприятие при быстром перемещении курсора
+      el.style.transition = "transform 0.15s ease-out"
+      el.style.transform = ""
+
+      // Удаляем атрибуты, которые мы добавили
       el.removeAttribute("data-hover-text")
       el.removeAttribute("data-shifted")
+
+      // Возвращаем оригинальный transition через небольшую задержку
+      setTimeout(() => {
+        el.style.transition = ""
+      }, 150)
     })
   }
 

@@ -100,8 +100,13 @@
 /* Улучшения для drag & drop */
 .bookmark-item {
   cursor: grab;
-  transition: transform 0.25s ease-out, background-color 0.2s, box-shadow 0.2s;
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0.3, 1),
+    background-color 0.2s, box-shadow 0.2s;
   position: relative;
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 .bookmark-item.dragging {
@@ -112,19 +117,50 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* Создаем "невидимую" зону для каждого элемента при перетаскивании */
+.bookmark-item.drop-target::before,
+.bookmark-item.drop-target-above::before,
+.bookmark-item.highlight::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -30px;
+  bottom: -5px;
+  left: -30px;
+  z-index: -1;
+  pointer-events: auto; /* Позволяет элементу получать события мыши в расширенной области */
+}
+
 .bookmark-item.drop-target {
   border-bottom: 2px solid var(--primary-color, #4caf50);
   transform: translateX(-15px);
   /* Используем cubic-bezier для начального ускорения и затухания в конце */
-  transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
-    border-bottom 0.2s, background-color 0.2s;
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0.3, 1), border-bottom 0.2s,
+    background-color 0.2s;
 }
 
 .bookmark-item.drop-target-above {
   border-top: 2px solid var(--primary-color, #4caf50);
   transform: translateX(15px);
-  transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), border-top 0.2s,
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0.3, 1), border-top 0.2s,
     background-color 0.2s;
+}
+
+/* Предотвращаем вибрацию при анимации */
+body.dragging .bookmark-item {
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* При активном перетаскивании слегка подготавливаем все элементы */
+body.dragging
+  .bookmark-item:not(.dragging):not(.drop-target):not(.drop-target-above):not(
+    .highlight
+  ):hover {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0.3, 1),
+    background-color 0.2s ease-out;
+  background-color: var(--hover-color, rgba(0, 0, 0, 0.03));
 }
 
 /* Стили для индикатора перетаскивания */
@@ -148,11 +184,6 @@
 
 .drag-indicator.visible {
   display: block;
-}
-
-/* Улучшение видимости во время перетаскивания */
-body.dragging .bookmark-item:not(.dragging):hover {
-  background-color: var(--hover-color, rgba(0, 0, 0, 0.05));
 }
 
 /* Улучшения для навигации по папкам */
