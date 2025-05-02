@@ -93,16 +93,17 @@ export const CONTEXT_MENU_CONFIG = {
 export const ADD_BUTTONS_CONFIG = [
   {
     type: "folder",
+    action: "addFolder",
     text: UI_TEXTS.BUTTONS.CREATE_FOLDER,
-    icons: {
-      light: ICONS.FOLDER.LIGHT,
-      dark: ICONS.FOLDER.DARK,
-    },
+    icon: ICONS.FOLDER.LIGHT,
+    iconDark: ICONS.FOLDER.DARK,
   },
   {
     type: "link",
+    action: "addBookmark",
     text: UI_TEXTS.BUTTONS.ADD_BOOKMARK,
     icon: ICONS.LINK,
+    iconDark: ICONS.LINK,
   },
 ]
 
@@ -118,6 +119,7 @@ export const DOM_IDS = {
   BACK_BUTTON: "backButton",
   ADD_BUTTON: "addButton",
   SETTINGS_BUTTON: "settingsButton",
+  TRASH_BUTTON: "trashButton",
   CURRENT_FOLDER: "currentFolder",
   THEME_TOGGLE: "themeToggle",
 }

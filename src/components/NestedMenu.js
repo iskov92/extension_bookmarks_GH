@@ -10,7 +10,7 @@ export class NestedMenu {
   // Получить текущую тему
   async getCurrentTheme() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get("theme", (result) => {
+      chrome.storage.local.get("theme", (result) => {
         resolve(result.theme || "light")
       })
     })
@@ -18,7 +18,8 @@ export class NestedMenu {
 
   // Получить дефолтную иконку папки в зависимости от темы
   async getDefaultFolderIcon() {
-    const theme = await this.getCurrentTheme()
+    // Проверяем текущую тему по атрибуту data-theme на body
+    const theme = document.body.getAttribute("data-theme") || "light"
     return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
   }
 
