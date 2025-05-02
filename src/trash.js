@@ -38,7 +38,7 @@ async function initializeUI() {
   const themeToggle = document.getElementById("themeToggle")
 
   // Получаем текущую тему из хранилища
-  const { isDarkTheme } = await chrome.storage.sync.get("isDarkTheme")
+  const { isDarkTheme } = await chrome.storage.local.get("isDarkTheme")
   const theme = isDarkTheme ? "dark" : "light"
   document.body.setAttribute("data-theme", theme)
   themeToggle.checked = isDarkTheme
@@ -79,7 +79,7 @@ async function handleThemeToggle(e) {
   const isDark = e.target.checked
   const theme = isDark ? "dark" : "light"
   document.body.setAttribute("data-theme", theme)
-  await chrome.storage.sync.set({ isDarkTheme: isDark })
+  await chrome.storage.local.set({ isDarkTheme: isDark })
   // Перерисовываем элементы с новыми иконками
   await renderTrashItems()
 }

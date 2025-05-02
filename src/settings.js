@@ -84,10 +84,9 @@ function translatePage() {
 // Обработчик переключения темы
 function handleThemeToggle(e) {
   const isDark = e.target.checked
-  document.body.classList.toggle("dark-theme", isDark)
-  const themeStylesheet = document.getElementById("theme-stylesheet")
-  themeStylesheet.href = `./styles/${isDark ? "dark" : "light"}-theme.css`
-  chrome.storage.sync.set({ isDarkTheme: isDark })
+  const theme = isDark ? "dark" : "light"
+  document.body.setAttribute("data-theme", theme)
+  chrome.storage.local.set({ isDarkTheme: isDark })
 }
 
 // Функция импорта закладок из браузера

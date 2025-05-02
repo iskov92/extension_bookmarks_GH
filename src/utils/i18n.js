@@ -14,14 +14,14 @@ export class I18n {
 
   async initLocale() {
     const { language = "ru" } = await new Promise((resolve) => {
-      chrome.storage.sync.get("language", resolve)
+      chrome.storage.local.get("language", resolve)
     })
     this.currentLocale = language
   }
 
   async setLocale(locale) {
     this.currentLocale = locale
-    await chrome.storage.sync.set({ language: locale })
+    await chrome.storage.local.set({ language: locale })
     this._notifyListeners()
   }
 
@@ -35,7 +35,12 @@ export class I18n {
       if (!value) break
     }
 
-    if (!value) return key
+    // Если перевод не найден, возвращаем последнюю часть ключа или весь ключ
+    if (!value) {
+      // Извлекаем последнюю часть ключа как запасной вариант
+      const fallbackText = keys[keys.length - 1].replace(/_/g, " ")
+      return fallbackText
+    }
 
     // Если есть параметры для замены, заменяем их
     if (Object.keys(params).length > 0) {
@@ -63,3 +68,7 @@ export class I18n {
 }
 
 export const i18n = new I18n()
+
+async function readFile() {
+  // Реализация, если потребуется
+}
