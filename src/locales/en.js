@@ -10,7 +10,7 @@ export default {
   BUTTONS: {
     CREATE_FOLDER: "Create Folder",
     ADD_BOOKMARK: "Add Bookmark",
-    ADDFOLFER: "Create Folder",
+    ADDFOLDER: "Create Folder",
     ADDBOOKMARK: "Add Bookmark",
     EDIT: "Edit",
     DELETE: "Delete",

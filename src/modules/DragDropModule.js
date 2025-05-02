@@ -277,14 +277,6 @@ export class DragDropModule {
     // Устанавливаем флаг активного перетаскивания
     window.isDragging = true
 
-    // Показываем подсказку о перетаскивании
-    const isFolder = target.classList.contains("folder")
-    if (isFolder) {
-      this.showDraggingTooltip(i18n.t("DRAG_DROP.FOLDER_TIP"))
-    } else {
-      this.showDraggingTooltip(i18n.t("DRAG_DROP.ITEM_TIP"))
-    }
-
     log(
       `Начало перетаскивания элемента ${this.draggedElementId} (${this.draggedElementType})`
     )
@@ -407,7 +399,6 @@ export class DragDropModule {
             lastItem.style.transform = "translateX(-15px)"
             lastItem.setAttribute("data-shifted", "true")
           }
-          this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
         }
       }
       return
@@ -491,20 +482,17 @@ export class DragDropModule {
         target.classList.add("drop-target-above")
         target.style.transform = "translateX(15px)"
         target.setAttribute("data-shifted", "true")
-        this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
       } else if (currentZone === "right") {
         // Правая часть - вставить после папки
         target.classList.add("drop-target")
         target.style.transform = "translateX(-15px)"
         target.setAttribute("data-shifted", "true")
-        this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
       } else {
         // Центральная часть - вставить внутрь папки
         target.classList.add("highlight")
         this.lastHoveredFolder = target
         target.style.transform = "scale(1.02)"
         target.setAttribute("data-shifted", "true")
-        this.showDraggingTooltip(i18n.t("DRAG_DROP.INTO_TIP"))
         target.setAttribute("data-hover-text", i18n.t("DRAG_DROP.FOLDER_HOVER"))
 
         if (!this.folderHoverStartTime) {
@@ -518,13 +506,11 @@ export class DragDropModule {
         target.classList.add("drop-target-above")
         target.style.transform = "translateX(15px)"
         target.setAttribute("data-shifted", "true")
-        this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
       } else if (currentZone === "right") {
         // Правая часть - вставить после
         target.classList.add("drop-target")
         target.style.transform = "translateX(-15px)"
         target.setAttribute("data-shifted", "true")
-        this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
       }
     }
   }
@@ -1183,19 +1169,8 @@ export class DragDropModule {
    * @param {string} text - Текст подсказки
    */
   showDraggingTooltip(text) {
-    if (!this.tooltipElement) {
-      this.tooltipElement = document.createElement("div")
-      this.tooltipElement.className = "dragging-tooltip"
-      document.body.appendChild(this.tooltipElement)
-    }
-
-    this.tooltipElement.textContent = text
-    this.tooltipElement.classList.add("visible")
-
-    // Автоматически скрываем через 3 секунды
-    setTimeout(() => {
-      this.hideDraggingTooltip()
-    }, 3000)
+    // Отключаем отображение всплывающих подсказок
+    return
   }
 
   /**

@@ -63,12 +63,18 @@
 }
 
 [data-theme="dark"] .add-type-button {
-  background-color: var(--background-secondary, #333);
-  border-color: var(--border-color, #444);
+  background-color: var(--bg-secondary, #252525);
+  border-color: var(--border-color, #383838);
+  color: var(--text-primary, #ffffff);
 }
 
 [data-theme="dark"] .add-type-button:hover {
-  background-color: var(--hover-color, rgba(76, 175, 80, 0.1));
+  background-color: var(--hover-color, #333333);
+}
+
+[data-theme="dark"] .modal {
+  background-color: var(--bg-primary, #1e1e1e);
+  color: var(--text-primary, #ffffff);
 }
 
 .modal-footer {
@@ -307,4 +313,11 @@ body.dragging * {
 
 [data-theme="dark"] .bookmark-item.folder.highlight .folder-center-zone {
   background-color: transparent;
+}
+
+/* Скрываем всплывающие подсказки при перетаскивании */
+.dragging-tooltip {
+  display: none;
+  opacity: 0;
+  visibility: hidden;
 }

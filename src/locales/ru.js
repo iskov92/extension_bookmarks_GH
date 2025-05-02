@@ -10,7 +10,7 @@ export default {
   BUTTONS: {
     CREATE_FOLDER: "Создать папку",
     ADD_BOOKMARK: "Добавить закладку",
-    ADDFOLFER: "Создать папку",
+    ADDFOLDER: "Создать папку",
     ADDBOOKMARK: "Добавить закладку",
     EDIT: "Редактировать",
     DELETE: "Удалить",
