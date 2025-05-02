@@ -47,6 +47,72 @@ export class DragDropModule {
     // Инициализируем перетаскивание
     this.initDragAndDrop()
     this.setupBackButtonDropTarget()
+    this.setupDragZoneObserver()
+  }
+
+  /**
+   * Настраивает наблюдатель DOM для добавления зон перетаскивания для новых элементов
+   */
+  setupDragZoneObserver() {
+    // Настраиваем MutationObserver для отслеживания изменений в DOM
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+          // Проверяем добавленные узлы
+          mutation.addedNodes.forEach((node) => {
+            // Если добавлен элемент с классом bookmark-item
+            if (
+              node.nodeType === 1 &&
+              node.classList.contains("bookmark-item")
+            ) {
+              this.setupDragZonesForElement(node)
+            }
+          })
+        }
+      })
+    })
+
+    // Начинаем наблюдать за контейнером
+    observer.observe(this.container, {
+      childList: true,
+      subtree: true,
+    })
+
+    // Также настраиваем зоны для всех существующих элементов
+    this.setupDragZonesForAllElements()
+
+    log("Наблюдатель зон перетаскивания инициализирован")
+  }
+
+  /**
+   * Настраивает зоны перетаскивания для всех существующих элементов
+   */
+  setupDragZonesForAllElements() {
+    // Получаем все элементы bookmark-item в контейнере
+    const items = this.container.querySelectorAll(".bookmark-item")
+    items.forEach((item) => {
+      this.setupDragZonesForElement(item)
+    })
+  }
+
+  /**
+   * Настраивает зоны перетаскивания для отдельного элемента
+   * @param {HTMLElement} element - Элемент, для которого нужно настроить зоны
+   */
+  setupDragZonesForElement(element) {
+    // Определяем тип элемента (папка или закладка)
+    const isFolder = element.classList.contains("folder")
+
+    // Если это папка, добавляем центральную зону
+    if (isFolder) {
+      // Проверяем, нет ли уже центральной зоны
+      if (!element.querySelector(".folder-center-zone")) {
+        const centerZone = document.createElement("div")
+        centerZone.className = "folder-center-zone"
+        centerZone.setAttribute("data-zone", "inside")
+        element.appendChild(centerZone)
+      }
+    }
   }
 
   /**
@@ -189,6 +255,15 @@ export class DragDropModule {
     e.dataTransfer.setData("text/plain", this.draggedElementId)
     e.dataTransfer.effectAllowed = "move"
 
+    // Проверка, является ли список пустым (только перетаскиваемый элемент)
+    const items = Array.from(
+      this.container.querySelectorAll(".bookmark-item")
+    ).filter((item) => item !== this.draggedElement)
+
+    if (items.length === 0) {
+      this.container.classList.add("empty-during-drag")
+    }
+
     // Устанавливаем немного прозрачности для лучшей видимости под курсором
     // Добавляем задержку для избежания мерцания
     setTimeout(() => {
@@ -223,6 +298,9 @@ export class DragDropModule {
     // Очищаем все классы и стили
     document.body.classList.remove("dragging")
     document.body.classList.remove("dragging-pending")
+
+    // Удаляем класс пустого списка при перетаскивании
+    this.container.classList.remove("empty-during-drag")
 
     // Очищаем все эффекты наведения
     this.clearHoverEffects()
@@ -296,20 +374,33 @@ export class DragDropModule {
       // Очищаем все предыдущие эффекты наведения
       this.clearHoverEffects()
 
+      // Проверяем, находится ли курсор над пустой областью контейнера
+      // Если да, то перестаем показывать индикатор последнего элемента
+      // Это исправляет проблему с предложением перемещения в конец списка при наведении на пустое место
       const isOverEmptyArea =
         e.target === this.container ||
         e.target.classList.contains("empty-message") ||
         e.target.classList.contains("main-content") ||
         e.target.closest(".main-content") === this.container
 
-      // Если над пустой областью и есть хотя бы один элемент - показываем индикатор для последнего
+      // Если над пустой областью и мы находимся не в пустом списке,
+      // проверяем, находится ли курсор вблизи последнего элемента
       if (isOverEmptyArea && this.container.children.length > 0) {
         const items = Array.from(
           this.container.querySelectorAll(".bookmark-item")
-        )
+        ).filter((item) => item !== this.draggedElement)
+
+        // Если в списке нет элементов (кроме перетаскиваемого), выходим
+        if (items.length === 0) return
+
         const lastItem = items[items.length - 1]
 
-        if (lastItem && lastItem !== this.draggedElement) {
+        // Получаем размеры и позицию последнего элемента
+        const lastItemRect = lastItem.getBoundingClientRect()
+        // Проверяем, находится ли курсор в пределах 30px по горизонтали от последнего элемента
+        const isNearLastItem = Math.abs(x - (lastItemRect.right + 15)) < 30
+
+        if (isNearLastItem && lastItem !== this.draggedElement) {
           lastItem.classList.add("drop-target")
           // Применяем стабильное смещение вместо динамического
           if (!lastItem.hasAttribute("data-shifted")) {
@@ -325,6 +416,8 @@ export class DragDropModule {
     // Определяем положение курсора относительно элемента
     const targetRect = target.getBoundingClientRect()
     const mouseX = e.clientX
+
+    // Вычисляем относительную позицию по горизонтали (в процентах)
     const relativeX = ((mouseX - targetRect.left) / targetRect.width) * 100
 
     // Отслеживаем текущее положение и сохраняем предыдущее состояние
@@ -340,19 +433,23 @@ export class DragDropModule {
       previousZone = "center"
     }
 
-    // Определяем текущую зону на основе положения курсора
-    const edgeBuffer = 2 // Уменьшаем буфер для лучшего отслеживания
-
-    if (relativeX <= 20) {
-      currentZone = "left"
-    } else if (relativeX >= 80) {
-      currentZone = "right"
+    // Определяем текущую зону на основе типа элемента и положения курсора
+    if (target.classList.contains("folder")) {
+      // Для папок: левый край (25%), середина (50%), правый край (25%)
+      if (relativeX <= 25) {
+        currentZone = "left"
+      } else if (relativeX >= 75) {
+        currentZone = "right"
+      } else {
+        currentZone = "center"
+      }
     } else {
-      currentZone = target.classList.contains("folder")
-        ? "center"
-        : relativeX < 50
-        ? "left"
-        : "right"
+      // Для закладок: левый край (50%), правый край (50%)
+      if (relativeX < 50) {
+        currentZone = "left"
+      } else {
+        currentZone = "right"
+      }
     }
 
     // Если зона не изменилась и элемент уже имеет соответствующий класс, выходим
@@ -598,9 +695,33 @@ export class DragDropModule {
           e.target.classList.contains("main-content") ||
           e.target.closest(".main-content") === this.container
 
-        if (isOverEmptyArea) {
-          log(`Перемещение в конец списка в папке ${currentFolderId}`)
-          await this.moveToEndOfList(currentFolderId)
+        // Проверяем, находится ли курсор вблизи последнего элемента
+        if (isOverEmptyArea && this.container.children.length > 0) {
+          const items = Array.from(
+            this.container.querySelectorAll(".bookmark-item")
+          ).filter((item) => item !== this.draggedElement)
+
+          // Если в списке нет элементов (кроме перетаскиваемого), просто перемещаем в текущую папку
+          if (items.length === 0) {
+            await this.moveToEndOfList(currentFolderId)
+            return
+          }
+
+          const lastItem = items[items.length - 1]
+
+          // Получаем размеры и позицию последнего элемента
+          const lastItemRect = lastItem.getBoundingClientRect()
+          // Проверяем, находится ли курсор в пределах 30px по горизонтали от последнего элемента
+          const isNearLastItem =
+            Math.abs(e.clientX - (lastItemRect.right + 15)) < 30
+
+          if (isNearLastItem) {
+            log(`Перемещение в конец списка в папке ${currentFolderId}`)
+            await this.moveToEndOfList(currentFolderId)
+            return
+          }
+
+          // Если курсор не близко к последнему элементу, игнорируем событие
           return
         }
 
@@ -669,8 +790,8 @@ export class DragDropModule {
 
         if (
           target.classList.contains("folder") &&
-          relativeX > 20 &&
-          relativeX < 80
+          relativeX > 25 &&
+          relativeX < 75
         ) {
           // Если это папка и курсор в центральной части
           const targetFolderId = target.dataset.id
@@ -688,41 +809,74 @@ export class DragDropModule {
           await this.moveIntoFolder(targetFolderId)
         } else {
           // Определяем положение относительно центра элемента
-          const mouseY = e.clientY
-          const threshold = targetRect.top + targetRect.height / 2
-
-          if (
-            relativeX <= 20 ||
-            (relativeX > 20 && relativeX < 80 && mouseY < threshold)
-          ) {
-            // Курсор выше середины или в левой части - вставить перед
-            log(
-              `Перемещение элемента ${this.draggedElementId} перед ${target.dataset.id} (по позиции мыши)`
-            )
-            await this.reorderBeforeTarget(target.dataset.id, currentFolderId)
-          } else {
-            // Курсор ниже середины или в правой части - вставить после
-            const allItems = Array.from(
-              this.container.querySelectorAll(".bookmark-item")
-            )
-            const targetIndex = allItems.indexOf(target)
-
-            if (targetIndex !== -1 && targetIndex < allItems.length - 1) {
-              // Есть следующий элемент - вставляем перед ним
-              const nextElement = allItems[targetIndex + 1]
+          if (target.classList.contains("folder")) {
+            // Для папок: делим на 3 зоны
+            if (relativeX <= 25) {
+              // Левый край 25% - вставить перед папкой
               log(
-                `Перемещение элемента ${this.draggedElementId} после ${target.dataset.id} (перед ${nextElement.dataset.id}, по позиции мыши)`
+                `Перемещение элемента ${this.draggedElementId} перед ${target.dataset.id} (по позиции мыши)`
               )
-              await this.reorderBeforeTarget(
-                nextElement.dataset.id,
-                currentFolderId
+              await this.reorderBeforeTarget(target.dataset.id, currentFolderId)
+            } else if (relativeX >= 75) {
+              // Правый край 25% - вставить после папки
+              const allItems = Array.from(
+                this.container.querySelectorAll(".bookmark-item")
               )
+              const targetIndex = allItems.indexOf(target)
+
+              if (targetIndex !== -1 && targetIndex < allItems.length - 1) {
+                // Есть следующий элемент - вставляем перед ним
+                const nextElement = allItems[targetIndex + 1]
+                log(
+                  `Перемещение элемента ${this.draggedElementId} после ${target.dataset.id} (перед ${nextElement.dataset.id}, по позиции мыши)`
+                )
+                await this.reorderBeforeTarget(
+                  nextElement.dataset.id,
+                  currentFolderId
+                )
+              } else {
+                // Последний элемент - вставляем в конец
+                log(
+                  `Перемещение элемента ${this.draggedElementId} в конец списка (после ${target.dataset.id}, по позиции мыши)`
+                )
+                await this.moveToEndOfList(currentFolderId)
+              }
             } else {
-              // Последний элемент - вставляем в конец
+              // Центральная 50% - вставить внутрь папки
+              await this.moveIntoFolder(target.dataset.id)
+            }
+          } else {
+            // Для закладок: делим на 2 зоны
+            if (relativeX < 50) {
+              // Левая 50% - вставить перед
               log(
-                `Перемещение элемента ${this.draggedElementId} в конец списка (после ${target.dataset.id}, по позиции мыши)`
+                `Перемещение элемента ${this.draggedElementId} перед ${target.dataset.id} (по позиции мыши)`
               )
-              await this.moveToEndOfList(currentFolderId)
+              await this.reorderBeforeTarget(target.dataset.id, currentFolderId)
+            } else {
+              // Правая 50% - вставить после
+              const allItems = Array.from(
+                this.container.querySelectorAll(".bookmark-item")
+              )
+              const targetIndex = allItems.indexOf(target)
+
+              if (targetIndex !== -1 && targetIndex < allItems.length - 1) {
+                // Есть следующий элемент - вставляем перед ним
+                const nextElement = allItems[targetIndex + 1]
+                log(
+                  `Перемещение элемента ${this.draggedElementId} после ${target.dataset.id} (перед ${nextElement.dataset.id}, по позиции мыши)`
+                )
+                await this.reorderBeforeTarget(
+                  nextElement.dataset.id,
+                  currentFolderId
+                )
+              } else {
+                // Последний элемент - вставляем в конец
+                log(
+                  `Перемещение элемента ${this.draggedElementId} в конец списка (после ${target.dataset.id}, по позиции мыши)`
+                )
+                await this.moveToEndOfList(currentFolderId)
+              }
             }
           }
         }
