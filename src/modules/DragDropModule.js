@@ -26,6 +26,12 @@ export class DragDropModule {
     this.lastHoveredFolder = null
     this.tooltipElement = null
 
+    // Переменные для оптимизации
+    this.lastX = 0
+    this.lastY = 0
+    this.lastTarget = null
+    this.debounceTimer = null
+
     // Флаги для управления процессом перетаскивания
     window.isDragging = false
     window.preventRefreshAfterDrop = false
@@ -73,6 +79,12 @@ export class DragDropModule {
     const target = e.target.closest(".bookmark-item")
     if (!target) return
 
+    // Очищаем все возможные эффекты перед началом перетаскивания
+    this.clearHoverEffects()
+
+    // Добавляем класс для активации оптимизаций CSS до начала движения
+    document.body.classList.add("dragging-pending")
+
     // Сохраняем информацию о перетаскиваемом элементе
     this.draggedElement = target
     this.draggedElementId = target.dataset.id
@@ -84,9 +96,15 @@ export class DragDropModule {
     e.dataTransfer.setData("text/plain", this.draggedElementId)
     e.dataTransfer.effectAllowed = "move"
 
-    // Добавляем класс для стилизации
-    target.classList.add("dragging")
-    document.body.classList.add("dragging")
+    // Устанавливаем немного прозрачности для лучшей видимости под курсором
+    // Добавляем задержку для избежания мерцания
+    setTimeout(() => {
+      if (this.draggedElement) {
+        this.draggedElement.classList.add("dragging")
+        document.body.classList.remove("dragging-pending")
+        document.body.classList.add("dragging")
+      }
+    }, 0)
 
     // Устанавливаем флаг активного перетаскивания
     window.isDragging = true
@@ -109,20 +127,23 @@ export class DragDropModule {
    * @param {DragEvent} e - Событие завершения перетаскивания
    */
   handleDragEnd(e) {
+    // Очищаем все классы и стили
+    document.body.classList.remove("dragging")
+    document.body.classList.remove("dragging-pending")
+
+    // Очищаем все эффекты наведения
+    this.clearHoverEffects()
+
     // Сбрасываем стили
     if (this.draggedElement) {
       this.draggedElement.classList.remove("dragging")
     }
-    document.body.classList.remove("dragging")
 
     // Сбрасываем время начала наведения на папку
     this.folderHoverStartTime = null
 
     // Сбрасываем выделение последней папки
     if (this.lastHoveredFolder) {
-      this.lastHoveredFolder.classList.remove("highlight")
-      this.lastHoveredFolder.style.transform = ""
-      this.lastHoveredFolder.removeAttribute("data-hover-text")
       this.lastHoveredFolder = null
     }
 
@@ -156,6 +177,20 @@ export class DragDropModule {
 
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
+
+    // Оптимизация: проверяем, изменилось ли положение курсора достаточно для обновления
+    // Это снижает количество обработок и предотвращает дрожание
+    const x = e.clientX
+    const y = e.clientY
+
+    // Если курсор переместился менее чем на 2 пикселя, игнорируем событие
+    if (Math.abs(x - this.lastX) < 2 && Math.abs(y - this.lastY) < 2) {
+      return
+    }
+
+    // Сохраняем текущие координаты
+    this.lastX = x
+    this.lastY = y
 
     // Получаем элемент, над которым находится курсор
     const target = e.target.closest(".bookmark-item")
@@ -194,50 +229,89 @@ export class DragDropModule {
       return
     }
 
-    // Если мы уже применили эффект к этому элементу, не меняем его снова при движении курсора внутри элемента
-    // Это предотвращает дрожание эффекта
-    if (
-      (target.classList.contains("drop-target") ||
-        target.classList.contains("drop-target-above") ||
-        target.classList.contains("highlight")) &&
-      target.hasAttribute("data-shifted")
-    ) {
-      // Если уже применен эффект - возвращаемся, чтобы не вызывать повторных изменений DOM
-      return
-    }
-
-    // Очищаем предыдущие эффекты наведения, только если меняем целевой элемент
-    this.clearHoverEffects()
-
     // Определяем положение курсора относительно элемента
     const targetRect = target.getBoundingClientRect()
     const mouseX = e.clientX
     const relativeX = ((mouseX - targetRect.left) / targetRect.width) * 100
 
-    // Добавляем отступ для предотвращения дрожания
-    // Если последний активный элемент был тот же, что и текущий, и мы около границы зоны,
-    // сохраняем предыдущий эффект для стабильности
-    const edgeBuffer = 5 // 5% буфер на границах зон
+    // Отслеживаем текущее положение и сохраняем предыдущее состояние
+    let currentZone = ""
+    let previousZone = ""
 
+    // Проверяем текущие классы элемента, чтобы определить предыдущее состояние
+    if (target.classList.contains("drop-target-above")) {
+      previousZone = "left"
+    } else if (target.classList.contains("drop-target")) {
+      previousZone = "right"
+    } else if (target.classList.contains("highlight")) {
+      previousZone = "center"
+    }
+
+    // Определяем текущую зону на основе положения курсора
+    const edgeBuffer = 2 // Уменьшаем буфер для лучшего отслеживания
+
+    if (relativeX <= 20) {
+      currentZone = "left"
+    } else if (relativeX >= 80) {
+      currentZone = "right"
+    } else {
+      currentZone = target.classList.contains("folder")
+        ? "center"
+        : relativeX < 50
+        ? "left"
+        : "right"
+    }
+
+    // Если зона не изменилась и элемент уже имеет соответствующий класс, выходим
+    if (currentZone === previousZone && target.hasAttribute("data-shifted")) {
+      return
+    }
+
+    // Очищаем предыдущие эффекты для этого элемента
+    target.classList.remove("drop-target")
+    target.classList.remove("drop-target-above")
+    target.classList.remove("highlight")
+    target.removeAttribute("data-hover-text")
+
+    // Убираем эффекты с других элементов
+    const otherElements = Array.from(
+      this.container.querySelectorAll(
+        ".bookmark-item:not([data-id='" + target.dataset.id + "'])"
+      )
+    ).filter(
+      (el) =>
+        el.classList.contains("drop-target") ||
+        el.classList.contains("drop-target-above") ||
+        el.classList.contains("highlight")
+    )
+
+    otherElements.forEach((el) => {
+      el.classList.remove("drop-target")
+      el.classList.remove("drop-target-above")
+      el.classList.remove("highlight")
+      el.style.transform = ""
+      el.removeAttribute("data-hover-text")
+      el.removeAttribute("data-shifted")
+    })
+
+    // Применяем соответствующий эффект в зависимости от зоны
     if (target.classList.contains("folder")) {
-      // Определяем нужное действие с учетом буферной зоны
-      if (relativeX <= 20 - edgeBuffer) {
-        // Левые 20% - вставить перед папкой
+      if (currentZone === "left") {
+        // Левая часть - вставить перед папкой
         target.classList.add("drop-target-above")
         target.style.transform = "translateX(15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
-      } else if (relativeX >= 80 + edgeBuffer) {
-        // Правые 20% - вставить после папки
+      } else if (currentZone === "right") {
+        // Правая часть - вставить после папки
         target.classList.add("drop-target")
         target.style.transform = "translateX(-15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
-      } else if (relativeX >= 20 + edgeBuffer && relativeX <= 80 - edgeBuffer) {
-        // Центральная зона с учетом буфера
+      } else {
+        // Центральная часть - вставить внутрь папки
         target.classList.add("highlight")
         this.lastHoveredFolder = target
-        // Применяем эффект масштабирования, который более стабилен
         target.style.transform = "scale(1.02)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.INTO_TIP"))
@@ -246,55 +320,21 @@ export class DragDropModule {
         if (!this.folderHoverStartTime) {
           this.folderHoverStartTime = Date.now()
         }
-      } else {
-        // В буферной зоне сохраняем предыдущий эффект, если он был
-        if (relativeX > 20 - edgeBuffer && relativeX < 20 + edgeBuffer) {
-          // Буферная зона между левой и центральной частью
-          target.classList.add("drop-target-above")
-          target.style.transform = "translateX(15px)"
-          target.setAttribute("data-shifted", "true")
-          this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
-        } else if (relativeX > 80 - edgeBuffer && relativeX < 80 + edgeBuffer) {
-          // Буферная зона между правой и центральной частью
-          target.classList.add("drop-target")
-          target.style.transform = "translateX(-15px)"
-          target.setAttribute("data-shifted", "true")
-          this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
-        }
       }
     } else {
       // Обычная закладка (не папка)
-      if (relativeX <= 20 - edgeBuffer) {
-        // Левые 20% - вставить перед
+      if (currentZone === "left") {
+        // Левая часть - вставить перед
         target.classList.add("drop-target-above")
         target.style.transform = "translateX(15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
-      } else if (relativeX >= 80 + edgeBuffer) {
-        // Правые 20% - вставить после
+      } else if (currentZone === "right") {
+        // Правая часть - вставить после
         target.classList.add("drop-target")
         target.style.transform = "translateX(-15px)"
         target.setAttribute("data-shifted", "true")
         this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
-      } else {
-        // Средняя часть
-        const mouseY = e.clientY
-        const threshold = targetRect.top + targetRect.height / 2
-
-        // Определяем с учетом вертикального положения курсора
-        if (mouseY < threshold) {
-          // Вставить перед
-          target.classList.add("drop-target-above")
-          target.style.transform = "translateX(15px)"
-          target.setAttribute("data-shifted", "true")
-          this.showDraggingTooltip(i18n.t("DRAG_DROP.BEFORE_TIP"))
-        } else {
-          // Вставить после
-          target.classList.add("drop-target")
-          target.style.transform = "translateX(-15px)"
-          target.setAttribute("data-shifted", "true")
-          this.showDraggingTooltip(i18n.t("DRAG_DROP.AFTER_TIP"))
-        }
       }
     }
   }
@@ -330,48 +370,103 @@ export class DragDropModule {
     const target = e.target.closest(".bookmark-item")
     if (!target) return
 
-    // Проверяем, действительно ли мышь покинула элемент, а не ушла внутрь псевдоэлемента
-    // Получаем размеры элемента с учетом расширенной области
-    const rect = target.getBoundingClientRect()
-    // Расширяем границы элемента
-    const extendedRect = {
-      left: rect.left - 30,
-      right: rect.right + 30,
-      top: rect.top - 5,
-      bottom: rect.bottom + 5,
-    }
+    // Не очищаем эффекты сразу, а проверяем, действительно ли курсор покинул элемент
+    // Получаем текущие координаты курсора
+    const x = e.clientX
+    const y = e.clientY
 
-    // Если курсор все еще в пределах расширенной зоны, не снимаем эффекты
-    if (
-      e.clientX >= extendedRect.left &&
-      e.clientX <= extendedRect.right &&
-      e.clientY >= extendedRect.top &&
-      e.clientY <= extendedRect.bottom
-    ) {
-      return
-    }
+    // Сохраняем ссылку на элемент для использования в setTimeout
+    const currentTarget = target
+
+    // Используем setTimeout с нулевой задержкой для обработки после текущего цикла событий
+    // Это позволит проверить не появились ли новые события dragenter/dragover
+    setTimeout(() => {
+      // Только если элемент всё ещё присутствует в DOM
+      if (!currentTarget || !currentTarget.parentNode) return
+
+      // Получаем самый верхний элемент по текущим координатам курсора
+      const elementAtPoint = document.elementFromPoint(x, y)
+
+      // Если элемент под курсором - null или body/html, значит курсор вне окна
+      if (
+        !elementAtPoint ||
+        elementAtPoint.tagName === "BODY" ||
+        elementAtPoint.tagName === "HTML"
+      ) {
+        this.clearEffectsForElement(currentTarget)
+        return
+      }
+
+      // Проверяем, покинул ли курсор элемент полностью (с учетом вложенности)
+      const isStillInTarget =
+        currentTarget.contains(elementAtPoint) ||
+        elementAtPoint.closest(".bookmark-item") === currentTarget
+
+      // Если курсор все еще над элементом или его дочерними элементами, сохраняем эффекты
+      if (isStillInTarget) {
+        return
+      }
+
+      // Проверяем по расширенным границам
+      const rect = currentTarget.getBoundingClientRect()
+      const extendedRect = {
+        left: rect.left - 30,
+        right: rect.right + 30,
+        top: rect.top - 5,
+        bottom: rect.bottom + 5,
+      }
+
+      // Если курсор все еще в пределах расширенной зоны, не снимаем эффекты
+      if (
+        x >= extendedRect.left &&
+        x <= extendedRect.right &&
+        y >= extendedRect.top &&
+        y <= extendedRect.bottom
+      ) {
+        return
+      }
+
+      // Если курсор действительно покинул элемент, очищаем эффекты
+      this.clearEffectsForElement(currentTarget)
+    }, 0)
+  }
+
+  /**
+   * Очищает эффекты для конкретного элемента
+   * @param {HTMLElement} element - Элемент, для которого нужно очистить эффекты
+   */
+  clearEffectsForElement(element) {
+    if (!element || !element.parentNode) return
 
     // Удаляем индикаторы перетаскивания и сбрасываем трансформацию
-    target.classList.remove("drop-target")
-    target.classList.remove("drop-target-above")
-    target.style.transform = "" // Сбрасываем смещение
+    element.classList.remove("drop-target")
+    element.classList.remove("drop-target-above")
+
+    // Плавно сбрасываем трансформацию
+    element.style.transition = "transform 0.15s ease-out"
+    element.style.transform = ""
+
+    // Через небольшую задержку возвращаем оригинальный transition
+    setTimeout(() => {
+      if (element && element.parentNode) {
+        element.style.transition = ""
+      }
+    }, 150)
 
     // Удаляем атрибут подсказки
-    target.removeAttribute("data-hover-text")
+    element.removeAttribute("data-hover-text")
+    element.removeAttribute("data-shifted")
 
     // Если это папка, удаляем выделение
     if (
-      target.classList.contains("folder") &&
-      target === this.lastHoveredFolder
+      element.classList.contains("folder") &&
+      element === this.lastHoveredFolder
     ) {
-      target.classList.remove("highlight")
+      element.classList.remove("highlight")
       this.lastHoveredFolder = null
 
       // Сбрасываем время начала наведения на папку
       this.folderHoverStartTime = null
-
-      // Удаляем атрибут смещения
-      target.removeAttribute("data-shifted")
     }
   }
 
@@ -390,10 +485,17 @@ export class DragDropModule {
     // Устанавливаем флаг для предотвращения автоматического обновления
     window.preventRefreshAfterDrop = true
 
+    // Добавляем класс для плавной анимации завершения перетаскивания
+    document.body.classList.add("dropping")
+
+    // Создаем переменные вне блока try для доступа из finally
+    let target = null
+    let currentFolderId = null
+
     try {
       // Получаем целевой элемент
-      let target = e.target.closest(".bookmark-item")
-      const currentFolderId = this.navigationModule.getCurrentParentId()
+      target = e.target.closest(".bookmark-item")
+      currentFolderId = this.navigationModule.getCurrentParentId()
 
       // Если сброс вне элементов (в пустую область)
       if (!target) {
@@ -406,18 +508,14 @@ export class DragDropModule {
         if (isOverEmptyArea) {
           log(`Перемещение в конец списка в папке ${currentFolderId}`)
           await this.moveToEndOfList(currentFolderId)
-          this.clearHoverEffects()
           return
         }
 
-        // Если не над пустой областью и не над элементом, просто выходим
-        this.clearHoverEffects()
         return
       }
 
       // Если пытаемся перетащить на самого себя
       if (target === this.draggedElement) {
-        this.clearHoverEffects()
         return
       }
 
@@ -436,7 +534,6 @@ export class DragDropModule {
             i18n.t("DRAG_DROP.FOLDER_SELF_ERROR"),
             "error"
           )
-          this.clearHoverEffects()
           return
         }
 
@@ -472,41 +569,68 @@ export class DragDropModule {
           await this.moveToEndOfList(currentFolderId)
         }
       } else {
-        // Если нет явных классов (например, при быстром перемещении)
-        // Определяем положение относительно центра элемента
+        // Если нет явных классов, определяем по положению курсора
         const targetRect = target.getBoundingClientRect()
-        const mouseY = e.clientY
-        const threshold = targetRect.top + targetRect.height / 2
+        const mouseX = e.clientX
+        const relativeX = ((mouseX - targetRect.left) / targetRect.width) * 100
 
-        if (mouseY < threshold) {
-          // Курсор выше середины - вставить перед
-          log(
-            `Перемещение элемента ${this.draggedElementId} перед ${target.dataset.id} (по позиции мыши)`
-          )
-          await this.reorderBeforeTarget(target.dataset.id, currentFolderId)
+        if (
+          target.classList.contains("folder") &&
+          relativeX > 20 &&
+          relativeX < 80
+        ) {
+          // Если это папка и курсор в центральной части
+          const targetFolderId = target.dataset.id
+
+          // Проверка, чтобы не перемещать папку в саму себя
+          if (this.draggedElementId === targetFolderId) {
+            logWarn("Нельзя переместить папку в саму себя")
+            this.uiModule.showNotification(
+              i18n.t("DRAG_DROP.FOLDER_SELF_ERROR"),
+              "error"
+            )
+            return
+          }
+
+          await this.moveIntoFolder(targetFolderId)
         } else {
-          // Курсор ниже середины - вставить после
-          const allItems = Array.from(
-            this.container.querySelectorAll(".bookmark-item")
-          )
-          const targetIndex = allItems.indexOf(target)
+          // Определяем положение относительно центра элемента
+          const mouseY = e.clientY
+          const threshold = targetRect.top + targetRect.height / 2
 
-          if (targetIndex !== -1 && targetIndex < allItems.length - 1) {
-            // Есть следующий элемент - вставляем перед ним
-            const nextElement = allItems[targetIndex + 1]
+          if (
+            relativeX <= 20 ||
+            (relativeX > 20 && relativeX < 80 && mouseY < threshold)
+          ) {
+            // Курсор выше середины или в левой части - вставить перед
             log(
-              `Перемещение элемента ${this.draggedElementId} после ${target.dataset.id} (перед ${nextElement.dataset.id}, по позиции мыши)`
+              `Перемещение элемента ${this.draggedElementId} перед ${target.dataset.id} (по позиции мыши)`
             )
-            await this.reorderBeforeTarget(
-              nextElement.dataset.id,
-              currentFolderId
-            )
+            await this.reorderBeforeTarget(target.dataset.id, currentFolderId)
           } else {
-            // Последний элемент - вставляем в конец
-            log(
-              `Перемещение элемента ${this.draggedElementId} в конец списка (после ${target.dataset.id}, по позиции мыши)`
+            // Курсор ниже середины или в правой части - вставить после
+            const allItems = Array.from(
+              this.container.querySelectorAll(".bookmark-item")
             )
-            await this.moveToEndOfList(currentFolderId)
+            const targetIndex = allItems.indexOf(target)
+
+            if (targetIndex !== -1 && targetIndex < allItems.length - 1) {
+              // Есть следующий элемент - вставляем перед ним
+              const nextElement = allItems[targetIndex + 1]
+              log(
+                `Перемещение элемента ${this.draggedElementId} после ${target.dataset.id} (перед ${nextElement.dataset.id}, по позиции мыши)`
+              )
+              await this.reorderBeforeTarget(
+                nextElement.dataset.id,
+                currentFolderId
+              )
+            } else {
+              // Последний элемент - вставляем в конец
+              log(
+                `Перемещение элемента ${this.draggedElementId} в конец списка (после ${target.dataset.id}, по позиции мыши)`
+              )
+              await this.moveToEndOfList(currentFolderId)
+            }
           }
         }
       }
@@ -517,13 +641,16 @@ export class DragDropModule {
         new CustomEvent("refresh-view", { detail: { force: true } })
       )
     } finally {
-      // Очищаем все эффекты
-      this.clearHoverEffects()
-
-      // Сбрасываем флаг блокировки обновления через некоторое время
+      // Очищаем все эффекты с небольшой задержкой для завершения анимации
       setTimeout(() => {
-        window.preventRefreshAfterDrop = false
-      }, 100)
+        this.clearHoverEffects()
+        document.body.classList.remove("dropping")
+
+        // Сбрасываем флаг блокировки обновления через некоторое время
+        setTimeout(() => {
+          window.preventRefreshAfterDrop = false
+        }, 100)
+      }, 50)
     }
   }
 
@@ -789,38 +916,18 @@ export class DragDropModule {
 
     // Сбрасываем выделение последней папки
     if (this.lastHoveredFolder) {
-      this.lastHoveredFolder.classList.remove("highlight")
-      this.lastHoveredFolder.style.transform = ""
-      this.lastHoveredFolder.removeAttribute("data-hover-text")
-      this.lastHoveredFolder.removeAttribute("data-shifted")
+      this.clearEffectsForElement(this.lastHoveredFolder)
       this.lastHoveredFolder = null
     }
 
-    // Очищаем все индикаторы перетаскивания и сбрасываем трансформации
+    // Очищаем все индикаторы перетаскивания
     const dropTargets = this.container.querySelectorAll(
       ".drop-target, .drop-target-above, .highlight"
     )
 
     // Обрабатываем каждый элемент
     dropTargets.forEach((el) => {
-      // Удаляем классы и атрибуты
-      el.classList.remove("drop-target")
-      el.classList.remove("drop-target-above")
-      el.classList.remove("highlight")
-
-      // Сбрасываем трансформацию плавно
-      // Это улучшает визуальное восприятие при быстром перемещении курсора
-      el.style.transition = "transform 0.15s ease-out"
-      el.style.transform = ""
-
-      // Удаляем атрибуты, которые мы добавили
-      el.removeAttribute("data-hover-text")
-      el.removeAttribute("data-shifted")
-
-      // Возвращаем оригинальный transition через небольшую задержку
-      setTimeout(() => {
-        el.style.transition = ""
-      }, 150)
+      this.clearEffectsForElement(el)
     })
   }
 

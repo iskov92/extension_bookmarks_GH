@@ -107,6 +107,8 @@
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   transform-style: preserve-3d;
+  /* Добавляем свойство, чтобы избежать прыжков при трансформации элемента */
+  contain: layout style paint;
 }
 
 .bookmark-item.dragging {
@@ -115,6 +117,8 @@
   z-index: 1000;
   transform: scale(1.02);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  /* Предотвращает мерцание и улучшает производительность GPU */
+  transition: opacity 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Создаем "невидимую" зону для каждого элемента при перетаскивании */
@@ -137,6 +141,9 @@
   /* Используем cubic-bezier для начального ускорения и затухания в конце */
   transition: transform 0.25s cubic-bezier(0.2, 0, 0.3, 1), border-bottom 0.2s,
     background-color 0.2s;
+  /* Предотвращаем репозиционирование соседних элементов при перемещении */
+  position: relative;
+  z-index: 2;
 }
 
 .bookmark-item.drop-target-above {
@@ -144,6 +151,20 @@
   transform: translateX(15px);
   transition: transform 0.25s cubic-bezier(0.2, 0, 0.3, 1), border-top 0.2s,
     background-color 0.2s;
+  /* Предотвращаем репозиционирование соседних элементов при перемещении */
+  position: relative;
+  z-index: 2;
+}
+
+/* Фиксируем положение всех элементов при перетаскивании */
+body.dragging-pending .bookmark-item,
+body.dragging
+  .bookmark-item:not(.dragging):not(.drop-target):not(.drop-target-above):not(
+    .highlight
+  ) {
+  transition: none; /* Отключаем анимацию для неактивных элементов */
+  transform: translateZ(0); /* Активирует GPU-ускорение */
+  contain: layout style paint; /* Изолируем перерисовку элемента */
 }
 
 /* Предотвращаем вибрацию при анимации */
@@ -151,6 +172,17 @@ body.dragging .bookmark-item {
   transform: translateZ(0);
   will-change: transform;
   -webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* Подготовка к перетаскиванию - убираем все анимации */
+body.dragging-pending * {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* Стили для плавного завершения перетаскивания */
+body.dropping .bookmark-item {
+  transition: all 0.25s cubic-bezier(0.2, 0, 0.3, 1) !important;
 }
 
 /* При активном перетаскивании слегка подготавливаем все элементы */
