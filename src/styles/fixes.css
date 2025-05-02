@@ -216,14 +216,29 @@
   justify-content: center;
 }
 
-/* Оптимизация перетаскивания */
-body.dragging * {
-  cursor: grabbing !important;
+/* Убираем курсор grab при наведении на элементы и заменяем на обычный */
+.bookmark-item {
+  cursor: default !important;
+  transition: transform 0.2s ease-out, background-color 0.3s ease;
 }
 
-/* Плавное перемещение элементов при наведении */
+/* Сохраняем обычный курсор всегда, даже при перетаскивании */
+body.dragging *,
+body.dragging-active *,
+.bookmark-item.dragging,
+.bookmark-item.transition-move,
+.bookmark-item.drag-over,
+.bookmark-item.drop-target,
+.bookmark-item.drop-target-above,
+.bookmark-item.folder.highlight {
+  cursor: default !important;
+}
+
+/* Для мобильных устройств, чтобы не было синего выделения */
 .bookmark-item {
-  transition: transform 0.2s ease-out, background-color 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 /* Улучшенная логика горизонтальных хитбоксов */

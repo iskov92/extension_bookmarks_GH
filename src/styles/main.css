@@ -159,7 +159,7 @@ body {
   gap: 8px;
   padding: 8px;
   border-radius: var(--border-radius);
-  cursor: grab;
+  cursor: default;
   transition: background-color var(--transition-speed);
   height: var(--button-height);
   width: var(--button-width);
@@ -175,7 +175,7 @@ body {
 
 .bookmark-item.dragging {
   opacity: 0.5;
-  cursor: grabbing;
+  cursor: default;
   transform: scale(0.95);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -974,12 +974,12 @@ body[data-theme="dark"] .dark-theme-icon {
 
 /* Стили для перетаскивания */
 .bookmark-item {
-  cursor: grab;
+  cursor: default;
 }
 
 .bookmark-item.dragging {
   opacity: 0.5;
-  cursor: grabbing;
+  cursor: default;
   transform: scale(0.95);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -1058,13 +1058,13 @@ body[data-theme="dark"] .dark-theme-icon {
 /* Улучшенные стили для перетаскивания */
 .bookmark-item {
   transition: transform 0.2s, opacity 0.2s, background-color 0.2s;
-  cursor: grab;
+  cursor: default;
   position: relative;
 }
 
 .bookmark-item.dragging {
   opacity: 0.6;
-  cursor: grabbing;
+  cursor: default;
   transform: scale(0.95);
   z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
@@ -1230,7 +1230,7 @@ body[data-theme="dark"] .dark-theme-icon {
 
 .sortable-drag {
   opacity: 0.95;
-  cursor: grabbing;
+  cursor: default;
 }
 
 /* Стили для выделения папки */
@@ -1246,12 +1246,12 @@ body[data-theme="dark"] .dark-theme-icon {
 
 /* Курсор при перетаскивании */
 .bookmark-item {
-  cursor: grab;
+  cursor: default;
 }
 
 .sortable-chosen,
 .sortable-drag {
-  cursor: grabbing !important;
+  cursor: default !important;
 }
 
 /* Анимированный индикатор перетаскивания */
