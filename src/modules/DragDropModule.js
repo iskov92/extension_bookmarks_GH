@@ -25,6 +25,7 @@ export class DragDropModule {
     this.folderHoverStartTime = null
     this.lastHoveredFolder = null
     this.tooltipElement = null
+    this.pendingDragElement = null
 
     // Переменные для оптимизации
     this.lastX = 0
@@ -62,6 +63,13 @@ export class DragDropModule {
     )
     this.container.addEventListener("drop", this.handleDrop.bind(this))
 
+    // Добавляем обработчики для изменения курсора
+    this.container.addEventListener(
+      "mousedown",
+      this.handleMouseDown.bind(this)
+    )
+    document.addEventListener("mouseup", this.handleMouseUp.bind(this))
+
     // Добавляем обработчик для нажатий клавиш
     document.addEventListener("keydown", this.handleKeyDown.bind(this))
 
@@ -69,6 +77,33 @@ export class DragDropModule {
     this.container.setAttribute("data-drag-container", "true")
 
     log("Инициализация drag-and-drop завершена")
+  }
+
+  /**
+   * Обрабатывает нажатие кнопки мыши
+   * @param {MouseEvent} e - Событие нажатия мыши
+   */
+  handleMouseDown(e) {
+    const target = e.target.closest(".bookmark-item")
+    if (!target) return
+
+    // Добавляем класс для изменения курсора на grab
+    document.body.classList.add("dragging-pending")
+
+    // Сохраняем целевой элемент для возможного перетаскивания
+    this.pendingDragElement = target
+  }
+
+  /**
+   * Обрабатывает отпускание кнопки мыши
+   * @param {MouseEvent} e - Событие отпускания мыши
+   */
+  handleMouseUp(e) {
+    // Если не началось перетаскивание, убираем класс dragging-pending
+    if (!window.isDragging) {
+      document.body.classList.remove("dragging-pending")
+      this.pendingDragElement = null
+    }
   }
 
   /**
@@ -83,7 +118,10 @@ export class DragDropModule {
     this.clearHoverEffects()
 
     // Добавляем класс для активации оптимизаций CSS до начала движения
-    document.body.classList.add("dragging-pending")
+    // Этот класс уже должен быть добавлен в mouseDown, но добавляем для надежности
+    if (!document.body.classList.contains("dragging-pending")) {
+      document.body.classList.add("dragging-pending")
+    }
 
     // Сохраняем информацию о перетаскиваемом элементе
     this.draggedElement = target
@@ -987,11 +1025,13 @@ export class DragDropModule {
       this.draggedElement.classList.remove("dragging")
     }
     document.body.classList.remove("dragging")
+    document.body.classList.remove("dragging-pending")
 
     // Сбрасываем переменные
     this.draggedElement = null
     this.draggedElementId = null
     this.draggedElementType = null
+    this.pendingDragElement = null
 
     // Скрываем подсказку
     this.hideDraggingTooltip()
@@ -1007,6 +1047,10 @@ export class DragDropModule {
     // Удаляем обработчик клавиш
     document.removeEventListener("keydown", this.handleKeyDown)
 
+    // Удаляем обработчики mousedow и mouseup
+    this.container.removeEventListener("mousedown", this.handleMouseDown)
+    document.removeEventListener("mouseup", this.handleMouseUp)
+
     // Скрываем подсказку
     this.hideDraggingTooltip()
 
@@ -1021,6 +1065,11 @@ export class DragDropModule {
     this.draggedElementId = null
     this.draggedElementType = null
     this.lastHoveredFolder = null
+    this.pendingDragElement = null
+
+    // Удаляем классы от body
+    document.body.classList.remove("dragging")
+    document.body.classList.remove("dragging-pending")
 
     log("DragDropModule уничтожен")
   }

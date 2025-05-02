@@ -99,7 +99,7 @@
 
 /* Улучшения для drag & drop */
 .bookmark-item {
-  cursor: grab;
+  cursor: default; /* Обычный курсор (стрелка) по умолчанию */
   transition: transform 0.25s cubic-bezier(0.2, 0, 0.3, 1),
     background-color 0.2s, box-shadow 0.2s;
   position: relative;
@@ -109,6 +109,12 @@
   transform-style: preserve-3d;
   /* Добавляем свойство, чтобы избежать прыжков при трансформации элемента */
   contain: layout style paint;
+}
+
+/* Изменяем курсор только когда начинается перетаскивание */
+body.dragging-pending .bookmark-item:not(.dragging),
+body.dragging .bookmark-item:not(.dragging) {
+  cursor: grab;
 }
 
 .bookmark-item.dragging {
