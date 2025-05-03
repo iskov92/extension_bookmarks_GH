@@ -178,10 +178,10 @@ body {
   background-color: var(--hover-color);
 }
 
-/* Стили для заметок */
+/* Стили для заметок 
 .bookmark-item.note {
   border-left: 3px solid #ffff00;
-}
+}*/
 
 .bookmark-item.note .bookmark-title {
   font-style: italic;
