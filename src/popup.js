@@ -612,9 +612,16 @@ async function showFolderEditDialog(folder) {
 
     const iconImg = document.createElement("img")
     iconImg.className = "folder-icon-preview"
-    iconImg.src = currentIconUrl || ICONS.FOLDER.LIGHT
+
+    // Определяем иконку в зависимости от текущей темы
+    const isDarkTheme =
+      document.body.classList.contains("dark-theme") ||
+      document.body.getAttribute("data-theme") === "dark"
+    iconImg.src =
+      currentIconUrl || (isDarkTheme ? ICONS.FOLDER.DARK : ICONS.FOLDER.LIGHT)
+
     iconImg.onerror = () => {
-      iconImg.src = ICONS.FOLDER.LIGHT
+      iconImg.src = isDarkTheme ? ICONS.FOLDER.DARK : ICONS.FOLDER.LIGHT
     }
 
     iconPreview.appendChild(iconImg)

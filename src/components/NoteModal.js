@@ -606,6 +606,7 @@ export class NoteModal extends Modal {
         "line",
         {
           name: "link",
+          icon: '<img src="/assets/logo/icon128.png" style="width: 16px; height: 16px; object-fit: contain;">',
           result: () => {
             const url = window.prompt(
               i18n.t("PROMPTS.ENTER_LINK") || "Введите URL ссылки"
