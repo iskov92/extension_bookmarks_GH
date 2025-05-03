@@ -1447,7 +1447,7 @@ body.dragging * {
   flex: 1;
   overflow: hidden;
   padding: 0;
-  margin: 0;
+  margin: 2px 0 0 0;
 }
 
 .note-editor-title {
@@ -1478,6 +1478,8 @@ body.dragging * {
   line-height: 1.5;
   margin: 0;
   overflow-y: auto;
+  width: calc(100% - 4px);
+  align-self: center;
 }
 
 .note-editor-content:focus {
@@ -1513,7 +1515,9 @@ body.dragging * {
   justify-content: space-between;
   align-items: center;
   border-top: 1px solid var(--border-color);
-  margin: 0;
+  margin: 2px 0 0 0 !important;
+  margin-top: 2px !important;
+  padding-top: 5px !important;
 }
 
 .note-created-at {
@@ -1565,21 +1569,16 @@ body.dragging * {
   background-color: var(--dark-accent);
 }
 
-[data-theme="dark"] .note-editor-title,
+[data-theme="dark"] .note-editor-title {
+  background-color: rgba(var(--bg-secondary-rgb), 0.2);
+}
+
 [data-theme="dark"] .note-editor-content {
-  background-color: var(--dark-bg-primary);
-  color: var(--dark-text-primary);
+  background-color: rgba(var(--bg-secondary-rgb), 0.3);
 }
 
-[data-theme="dark"] .note-created-at {
-  color: var(--dark-text-secondary);
-}
-
-[data-theme="dark"] .note-modal .cancel-button {
-  color: var(--dark-text-primary);
-  border-color: var(--dark-border-color);
-}
-
-[data-theme="dark"] .note-modal .cancel-button:hover {
-  background-color: var(--dark-bg-secondary);
+/* Стиль для заметок в дереве закладок */
+.bookmark-item.note {
+  background-color: rgba(var(--accent-color-rgb), 0.05);
+  border-left: 3px solid var(--accent-color);
 }
