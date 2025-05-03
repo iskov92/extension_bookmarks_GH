@@ -50,6 +50,9 @@ export class ContextMenuModule {
   async handleContextMenu(e) {
     e.preventDefault()
 
+    // Закрываем предыдущее меню перед открытием нового
+    this.contextMenu.close()
+
     // Находим элемент закладки или папки, на котором был сделан клик
     const bookmarkElement = e.target.closest(".bookmark-item")
 
@@ -315,7 +318,7 @@ export class ContextMenuModule {
    * @param {boolean} isFolder - Признак папки
    * @param {boolean} isNote - Признак заметки
    * @param {string} title - Заголовок элемента
-   * @param {string} url - URL закладки (если не папка и не заметка)
+   * @param {string} url - URL закладки (если не папка)
    * @param {string} content - Содержимое заметки (если заметка)
    * @param {number} createdAt - Время создания заметки (если заметка)
    */
@@ -328,6 +331,9 @@ export class ContextMenuModule {
     content,
     createdAt
   ) {
+    // Закрываем контекстное меню
+    this.contextMenu.close()
+
     if (confirm(i18n.t("CONFIRM_DELETE"))) {
       try {
         // Создаем объект для сохранения в корзину

@@ -49,6 +49,9 @@ let uiModule
 let dragDropModule
 let contextMenuModule
 
+// Глобальная переменная для контекстного меню
+let globalContextMenu = null
+
 // Инициализация темы
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -372,6 +375,9 @@ async function handleContextMenu(e) {
 
   // Если клик был не на закладке, выходим
   if (!bookmarkElement) {
+    if (globalContextMenu) {
+      globalContextMenu.close()
+    }
     return
   }
 
@@ -396,145 +402,157 @@ async function handleContextMenu(e) {
     items = CONTEXT_MENU_CONFIG.BOOKMARK
   }
 
-  // Создаем объект контекстного меню
-  const contextMenu = new ContextMenu()
+  // Создаем объект контекстного меню или используем существующий
+  if (!globalContextMenu) {
+    globalContextMenu = new ContextMenu()
+  } else {
+    globalContextMenu.close() // Закрываем предыдущее меню перед открытием нового
+  }
 
   // Показываем контекстное меню
-  contextMenu.show(e.pageX, e.pageY, items, bookmarkElement, async (action) => {
-    switch (action) {
-      case "rename":
-      case "edit":
-        if (isFolder) {
-          showFolderEditDialog({
-            id: id,
-            title: title,
-          })
-        } else if (isNote) {
-          showNoteEditDialog({
-            id: id,
-            title: title,
-            content: content,
-            createdAt: createdAt,
-          })
-        } else {
-          const modal = new Modal()
-          modal.show(
-            i18n.t("MODALS.EDIT_BOOKMARK"),
-            "link",
-            { title, url },
-            async (data) => {
-              try {
-                log("Обработчик сохранения с данными:", data)
+  globalContextMenu.show(
+    e.pageX,
+    e.pageY,
+    items,
+    bookmarkElement,
+    async (action) => {
+      switch (action) {
+        case "rename":
+        case "edit":
+          if (isFolder) {
+            showFolderEditDialog({
+              id: id,
+              title: title,
+            })
+          } else if (isNote) {
+            showNoteEditDialog({
+              id: id,
+              title: title,
+              content: content,
+              createdAt: createdAt,
+            })
+          } else {
+            const modal = new Modal()
+            modal.show(
+              i18n.t("MODALS.EDIT_BOOKMARK"),
+              "link",
+              { title, url },
+              async (data) => {
+                try {
+                  log("Обработчик сохранения с данными:", data)
 
-                // Обновляем закладку
-                const result = await ErrorHandler.wrapAsync(
-                  updateBookmark(id, data),
-                  ErrorType.UPDATE,
-                  "bookmark"
-                )
+                  // Обновляем закладку
+                  const result = await ErrorHandler.wrapAsync(
+                    updateBookmark(id, data),
+                    ErrorType.UPDATE,
+                    "bookmark"
+                  )
 
-                if (result) {
-                  modal.close()
+                  if (result) {
+                    modal.close()
 
-                  // Обновляем интерфейс
-                  refreshCurrentView(true)
-                  return true
-                } else {
-                  logError("Не удалось обновить закладку", result)
+                    // Обновляем интерфейс
+                    refreshCurrentView(true)
+                    return true
+                  } else {
+                    logError("Не удалось обновить закладку", result)
+                    return false
+                  }
+                } catch (error) {
+                  logError("Ошибка при обновлении закладки:", error)
                   return false
                 }
-              } catch (error) {
-                logError("Ошибка при обновлении закладки:", error)
-                return false
               }
-            }
-          )
-        }
-        break
+            )
+          }
+          break
 
-      case "delete":
-        if (confirm(i18n.t("CONFIRM_DELETE"))) {
+        case "delete":
+          if (confirm(i18n.t("CONFIRM_DELETE"))) {
+            try {
+              // Создаем объект для сохранения в корзину
+              let itemToTrash = {
+                id,
+                type: isFolder ? "folder" : isNote ? "note" : "bookmark",
+                title,
+                url,
+                content,
+              }
+
+              // Если это заметка, сохраняем дату создания
+              if (isNote && createdAt) {
+                itemToTrash.createdAt = createdAt
+              }
+
+              // Если это папка, получаем её содержимое рекурсивно
+              if (isFolder) {
+                const folderContents = await getFolderContentsRecursively(id)
+                itemToTrash.contents = folderContents
+              }
+
+              // Получаем стек навигации
+              const navigationStack = navigationModule
+                .getNavigation()
+                .getStack()
+
+              // Сохраняем в корзину перед удалением
+              await trashStorage.moveToTrash(itemToTrash, navigationStack)
+
+              // Удаляем из закладок
+              const deleted = await ErrorHandler.wrapAsync(
+                deleteBookmark(id),
+                ErrorType.DELETE,
+                isFolder ? "folder" : isNote ? "note" : "bookmark"
+              )
+
+              if (deleted) {
+                // Обновляем интерфейс
+                refreshCurrentView(true)
+              } else {
+                uiModule.showErrorMessage(i18n.t("ERROR.DELETE_FAILED"))
+              }
+            } catch (error) {
+              logError("Ошибка при удалении элемента:", error)
+              ErrorHandler.handle(
+                error,
+                ErrorType.DELETE,
+                isFolder ? "folder" : isNote ? "note" : "bookmark"
+              )
+            }
+          }
+          break
+
+        case "copy":
           try {
-            // Создаем объект для сохранения в корзину
-            let itemToTrash = {
-              id,
-              type: isFolder ? "folder" : isNote ? "note" : "bookmark",
-              title,
-              url,
-              content,
-            }
+            // Закрываем контекстное меню
+            globalContextMenu.close()
 
-            // Если это заметка, сохраняем дату создания
-            if (isNote && createdAt) {
-              itemToTrash.createdAt = createdAt
-            }
+            // Получаем ID текущей папки
+            const currentFolderId = navigationModule.getCurrentParentId()
 
-            // Если это папка, получаем её содержимое рекурсивно
-            if (isFolder) {
-              const folderContents = await getFolderContentsRecursively(id)
-              itemToTrash.contents = folderContents
-            }
-
-            // Получаем стек навигации
-            const navigationStack = navigationModule.getNavigation().getStack()
-
-            // Сохраняем в корзину перед удалением
-            await trashStorage.moveToTrash(itemToTrash, navigationStack)
-
-            // Удаляем из закладок
-            const deleted = await ErrorHandler.wrapAsync(
-              deleteBookmark(id),
-              ErrorType.DELETE,
+            // Копируем элемент
+            const result = await ErrorHandler.wrapAsync(
+              copyBookmark(id, currentFolderId),
+              ErrorType.COPY,
               isFolder ? "folder" : isNote ? "note" : "bookmark"
             )
 
-            if (deleted) {
+            if (result) {
+              uiModule.showNotification(i18n.t("CONTEXT_MENU.COPY_SUCCESS"))
+
               // Обновляем интерфейс
               refreshCurrentView(true)
-            } else {
-              uiModule.showErrorMessage(i18n.t("ERROR.DELETE_FAILED"))
             }
           } catch (error) {
-            logError("Ошибка при удалении элемента:", error)
-            ErrorHandler.handle(
-              error,
-              ErrorType.DELETE,
-              isFolder ? "folder" : isNote ? "note" : "bookmark"
-            )
+            logError("Ошибка при копировании элемента:", error)
           }
-        }
-        break
+          break
 
-      case "copy":
-        try {
-          // Закрываем контекстное меню
-          contextMenu.close()
-
-          // Получаем ID текущей папки
-          const currentFolderId = navigationModule.getCurrentParentId()
-
-          // Копируем элемент
-          const result = await ErrorHandler.wrapAsync(
-            copyBookmark(id, currentFolderId),
-            ErrorType.COPY,
-            isFolder ? "folder" : isNote ? "note" : "bookmark"
-          )
-
-          if (result) {
-            uiModule.showNotification(i18n.t("CONTEXT_MENU.COPY_SUCCESS"))
-
-            // Обновляем интерфейс
-            refreshCurrentView(true)
-          }
-        } catch (error) {
-          logError("Ошибка при копировании элемента:", error)
-        }
-        break
-
-      default:
-        logError("Неизвестное действие контекстного меню:", action)
+        default:
+          logError("Неизвестное действие контекстного меню:", action)
+      }
     }
-  })
+  )
 }
 
 /**
