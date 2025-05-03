@@ -911,15 +911,64 @@ export async function getFaviconFast(url) {
     }
 
     const domain = urlObj.hostname
+    const fullPath = urlObj.pathname
 
     // Кэш фавиконов в памяти
     if (!window.faviconDirectCache) {
       window.faviconDirectCache = {}
     }
 
-    // Проверяем кэш
-    if (window.faviconDirectCache[domain]) {
-      return window.faviconDirectCache[domain]
+    // Создаем уникальный ключ для сервисов Google (учитывая второй уровень пути)
+    let cacheKey = domain
+
+    // Специально обрабатываем сервисы Google, добавляя к ключу первую часть пути
+    if (domain.includes("google.com") || domain.includes("docs.google.com")) {
+      const pathParts = fullPath.split("/").filter((part) => part)
+      if (pathParts.length > 0) {
+        // Пытаемся добавить первый значимый сегмент пути
+        cacheKey = `${domain}/${pathParts[0]}`
+      }
+    }
+
+    // Проверяем кэш по уточненному ключу
+    if (window.faviconDirectCache[cacheKey]) {
+      return window.faviconDirectCache[cacheKey]
+    }
+
+    // Специальные фавиконы для разных сервисов Google
+    const googleServiceIcons = {
+      "docs.google.com/document":
+        "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png",
+      "docs.google.com/spreadsheets":
+        "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico",
+      "docs.google.com/presentation":
+        "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico",
+      "docs.google.com/forms":
+        "https://ssl.gstatic.com/docs/forms/device_home/android_192.png",
+      "docs.google.com/drawings":
+        "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png",
+      "drive.google.com":
+        "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png",
+      "mail.google.com":
+        "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico",
+      "calendar.google.com":
+        "https://ssl.gstatic.com/calendar/images/favicon.ico",
+      "meet.google.com":
+        "https://www.gstatic.com/meet/google_meet_icon_192.png",
+      "photos.google.com":
+        "https://ssl.gstatic.com/photos/favicon/favicon_beamshape_medium.ico",
+      "keep.google.com": "https://ssl.gstatic.com/keep/icon_2020q4v2_128.png",
+      "classroom.google.com": "https://ssl.gstatic.com/classroom/favicon.png",
+      "translate.google.com": "https://ssl.gstatic.com/translate/favicon.ico",
+    }
+
+    // Проверяем соответствие сервисам Google по доменам и путям
+    for (const googleService in googleServiceIcons) {
+      if (url.includes(googleService)) {
+        const googleIcon = googleServiceIcons[googleService]
+        window.faviconDirectCache[cacheKey] = googleIcon
+        return googleIcon
+      }
     }
 
     // Список специальных путей для популярных сайтов
@@ -958,8 +1007,6 @@ export async function getFaviconFast(url) {
         "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
 
       // Почтовые сервисы
-      "mail.google.com":
-        "https://www.gstatic.com/images/branding/product/1x/gmail_512dp.png",
       "gmail.com":
         "https://www.gstatic.com/images/branding/product/1x/gmail_512dp.png",
       "outlook.com":
@@ -1003,12 +1050,15 @@ export async function getFaviconFast(url) {
     // Проверяем, есть ли домен в специальных случаях
     if (specialCases[domain]) {
       const specialUrl = specialCases[domain]
-      window.faviconDirectCache[domain] = specialUrl // Кэшируем
+      window.faviconDirectCache[cacheKey] = specialUrl // Кэшируем
       return specialUrl
     }
 
+    // Максимальное количество автоматических повторных попыток
+    const MAX_AUTO_RETRIES = 3
+
     // Список приоритетных прямых путей к высококачественным фавиконам
-    const priorityPaths = [
+    const getPriorityPaths = (domain) => [
       // 1. Самые высококачественные источники (192px+)
       `https://${domain}/apple-touch-icon.png`,
       `https://${domain}/apple-touch-icon-precomposed.png`,
@@ -1026,55 +1076,85 @@ export async function getFaviconFast(url) {
       `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
     ]
 
-    // Проверяем каждый путь без ожидания задержки
-    const img = new Image()
-    let resolvePromise
-    const resultPromise = new Promise((resolve) => {
-      resolvePromise = resolve
-    })
+    // Функция для проверки размера изображения
+    const checkImageSize = (url) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () =>
+          resolve({
+            url,
+            width: img.width,
+            height: img.height,
+            quality:
+              img.width >= 64 ? "high" : img.width >= 32 ? "medium" : "low",
+          })
+        img.onerror = () => reject(new Error(`Failed to load ${url}`))
+        img.src = url
+        setTimeout(() => reject(new Error(`Timeout for ${url}`)), 1500)
+      })
+    }
 
-    let currentIndex = 0
+    // Функция для проверки одного источника с учетом качества
+    const trySource = async (src, retryCount = 0) => {
+      try {
+        const imgData = await checkImageSize(src)
 
-    // Функция для быстрой проверки следующего источника
-    const tryNextSource = () => {
-      if (currentIndex >= priorityPaths.length) {
-        // Если все пути проверены, возвращаем Google как наиболее надежный
-        const googleFallback = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-        window.faviconDirectCache[domain] = googleFallback
-        resolvePromise(googleFallback)
-        return
+        // Если качество низкое и у нас еще есть попытки, пробуем следующий источник
+        if (imgData.quality === "low" && retryCount < MAX_AUTO_RETRIES) {
+          console.log(
+            `Фавикон низкого качества (${imgData.width}x${
+              imgData.height
+            }), поиск лучшего варианта. Попытка ${
+              retryCount + 1
+            }/${MAX_AUTO_RETRIES}`
+          )
+          return null // Сигнал продолжить поиск
+        }
+
+        return imgData.url
+      } catch (e) {
+        return null // Ошибка загрузки, пробуем следующий
+      }
+    }
+
+    // Проверяем источники последовательно, но с учетом качества
+    let bestFavicon = null
+    let currentRetry = 0
+
+    while (currentRetry < MAX_AUTO_RETRIES && !bestFavicon) {
+      const paths = getPriorityPaths(domain)
+
+      for (let i = 0; i < paths.length; i++) {
+        const result = await trySource(paths[i], currentRetry)
+        if (result) {
+          bestFavicon = result
+          break
+        }
       }
 
-      const src = priorityPaths[currentIndex++]
-      img.src = src
-    }
+      currentRetry++
 
-    img.onload = () => {
-      // Сохраняем успешный источник в кэш
-      window.faviconDirectCache[domain] = img.src
-      resolvePromise(img.src)
-    }
-
-    img.onerror = () => {
-      // Если текущий источник не сработал, пробуем следующий
-      setTimeout(tryNextSource, 0) // Минимальная задержка для предотвращения блокировки UI
-    }
-
-    // Начинаем проверять первый источник
-    tryNextSource()
-
-    // Устанавливаем таймаут 1 секунда для всего процесса
-    setTimeout(() => {
-      if (currentIndex < priorityPaths.length) {
-        // Если не успели проверить все, сразу возвращаем Google
-        const googleFallback = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-        window.faviconDirectCache[domain] = googleFallback
-        resolvePromise(googleFallback)
+      // Если после всех путей не нашли ничего хорошего, но у нас еще остались попытки
+      if (!bestFavicon && currentRetry < MAX_AUTO_RETRIES) {
+        console.log(
+          `Не найден качественный фавикон после попытки ${currentRetry}/${MAX_AUTO_RETRIES}. Пробуем еще раз...`
+        )
       }
-    }, 1000)
+    }
 
-    return resultPromise
+    // Если после всех попыток не нашли ничего, используем Google
+    if (!bestFavicon) {
+      bestFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+      console.log(
+        `Используем запасной вариант Google после ${MAX_AUTO_RETRIES} попыток`
+      )
+    }
+
+    // Сохраняем в кэш и возвращаем
+    window.faviconDirectCache[cacheKey] = bestFavicon
+    return bestFavicon
   } catch (error) {
+    console.error("Ошибка в getFaviconFast:", error)
     return `/assets/icons/link.svg`
   }
 }
