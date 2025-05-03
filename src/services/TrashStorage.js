@@ -39,12 +39,22 @@ class TrashStorage {
         const transaction = this.db.transaction([this.storeName], "readwrite")
         const store = transaction.objectStore(this.storeName)
 
+        // Убедимся, что объект содержит все необходимые данные
         // Сохраняем путь навигации и содержимое папки
         const itemToStore = {
           ...item,
           deletedAt: new Date().toISOString(),
           navigationPath: navigationStack,
-          contents: item.contents || [], // Содержимое папки, если есть
+          contents: item.contents || [], // Явно сохраняем содержимое папки, если оно есть
+        }
+
+        // Дополнительная проверка для папок с содержимым
+        if (itemToStore.type === "folder" && !itemToStore.contents) {
+          console.warn(
+            "Папка без содержимого при перемещении в корзину:",
+            itemToStore.id,
+            itemToStore.title
+          )
         }
 
         const request = store.add(itemToStore)

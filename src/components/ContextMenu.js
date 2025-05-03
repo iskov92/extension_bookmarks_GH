@@ -36,7 +36,14 @@ export class ContextMenu {
   }
 
   show(x, y, items, target, onAction) {
+    // Закрываем текущее меню, если оно есть
     this.close()
+
+    // Дополнительно закрываем все контекстные меню на странице
+    document.querySelectorAll(".context-menu").forEach((menu) => {
+      menu.parentNode.removeChild(menu)
+    })
+
     this.target = target
     this.onAction = onAction
 

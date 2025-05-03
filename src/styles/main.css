@@ -14,6 +14,7 @@
 
   /* Цвета */
   --dark-accent: #24ffd0;
+  --dark-accent-secondary: #1abebd;
   --light-accent: #ff8a24;
   --scrollbar-thumb: rgb(68, 71, 70);
 
@@ -23,6 +24,10 @@
   --hover-color: rgba(180, 180, 180, 0.2);
   --highlight-color: rgba(100, 149, 237, 0.3);
   --highlight-color-shadow: rgba(100, 149, 237, 0.5);
+
+  /* Новые переменные для заметок */
+  --accent-color-rgb: 255, 138, 36; /* Light theme - соответствует #ff8a24 */
+  --bg-secondary-rgb: 245, 245, 245; /* Light theme - соответствует #f5f5f5 */
 }
 
 * {
@@ -159,7 +164,7 @@ body {
   gap: 8px;
   padding: 8px;
   border-radius: var(--border-radius);
-  cursor: grab;
+  cursor: default;
   transition: background-color var(--transition-speed);
   height: var(--button-height);
   width: var(--button-width);
@@ -173,9 +178,22 @@ body {
   background-color: var(--hover-color);
 }
 
+/* Стили для заметок 
+.bookmark-item.note {
+  border-left: 3px solid #ffff00;
+}*/
+
+.bookmark-item.note .bookmark-title {
+  font-style: italic;
+}
+
+.bookmark-item.note:hover {
+  background-color: rgba(var(--accent-color-rgb), 0.1);
+}
+
 .bookmark-item.dragging {
   opacity: 0.5;
-  cursor: grabbing;
+  cursor: default;
   transform: scale(0.95);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -901,12 +919,14 @@ body[data-theme="dark"] .dark-theme-icon {
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   --input-background: #ffffff;
   --accent-color: var(--light-accent);
+  --accent-color-rgb: 255, 138, 36; /* Light theme - соответствует #ff8a24 */
 }
 
 /* Стили для темной темы */
 [data-theme="dark"] {
   --bg-primary: #1e1e1e;
   --bg-secondary: #2d2d2d;
+  --bg-secondary-rgb: 45, 45, 45; /* Dark theme - соответствует #2d2d2d */
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
   --border-color: #404040;
@@ -914,6 +934,7 @@ body[data-theme="dark"] .dark-theme-icon {
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   --input-background: #2d2d2d;
   --accent-color: var(--dark-accent);
+  --accent-color-rgb: 36, 255, 208; /* Dark theme - соответствует #24ffd0 */
 }
 
 /* Специфичные стили для светлой темы */
@@ -974,12 +995,12 @@ body[data-theme="dark"] .dark-theme-icon {
 
 /* Стили для перетаскивания */
 .bookmark-item {
-  cursor: grab;
+  cursor: default;
 }
 
 .bookmark-item.dragging {
   opacity: 0.5;
-  cursor: grabbing;
+  cursor: default;
   transform: scale(0.95);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   position: relative;
@@ -1058,13 +1079,13 @@ body[data-theme="dark"] .dark-theme-icon {
 /* Улучшенные стили для перетаскивания */
 .bookmark-item {
   transition: transform 0.2s, opacity 0.2s, background-color 0.2s;
-  cursor: grab;
+  cursor: default;
   position: relative;
 }
 
 .bookmark-item.dragging {
   opacity: 0.6;
-  cursor: grabbing;
+  cursor: default;
   transform: scale(0.95);
   z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
@@ -1230,7 +1251,7 @@ body[data-theme="dark"] .dark-theme-icon {
 
 .sortable-drag {
   opacity: 0.95;
-  cursor: grabbing;
+  cursor: default;
 }
 
 /* Стили для выделения папки */
@@ -1246,12 +1267,12 @@ body[data-theme="dark"] .dark-theme-icon {
 
 /* Курсор при перетаскивании */
 .bookmark-item {
-  cursor: grab;
+  cursor: default;
 }
 
 .sortable-chosen,
 .sortable-drag {
-  cursor: grabbing !important;
+  cursor: default !important;
 }
 
 /* Анимированный индикатор перетаскивания */
@@ -1384,4 +1405,345 @@ body.dragging * {
   background-color: var(--dark-accent);
   color: #ffffff;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* Стили для модального окна редактора заметок */
+.note-modal {
+  width: 600px;
+  max-width: 95vw;
+  height: 500px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-modal .modal-header {
+  padding: 0;
+  height: 20px;
+  min-height: 20px;
+  max-height: 20px;
+  border-bottom: 1px solid var(--border-color);
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.note-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.note-editor-label {
+  font-size: 11px;
+  padding-right: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.note-editor-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  margin: 2px 0 0 0;
+}
+
+.note-editor-title {
+  font-size: 12px;
+  padding: 0 10px;
+  border: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  font-weight: bold;
+  height: 18px;
+  flex: 1;
+}
+
+.note-editor-title:focus {
+  outline: none;
+}
+
+/* Стили для редактора Pell */
+.pell-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 2px;
+  background-color: transparent;
+}
+
+.pell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  border: none !important;
+  background-color: transparent;
+}
+
+.pell-actionbar {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex;
+  flex-wrap: wrap;
+  padding: 2px;
+  height: 24px;
+  min-height: 24px;
+  overflow: hidden;
+}
+
+.pell-button {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  height: 20px !important;
+  width: 24px !important;
+  font-size: 12px;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.pell-button:hover {
+  background-color: var(--accent-color);
+  border-radius: 2px;
+}
+
+.pell-button-selected {
+  background-color: var(--accent-color) !important;
+  border-radius: 2px;
+}
+
+.pell-content {
+  flex: 1;
+  padding: 15px !important;
+  overflow-y: auto !important;
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  height: auto !important;
+}
+
+/* Для кликабельности ссылок внутри заметки */
+.pell-content a {
+  color: var(--accent-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pell-content a:hover {
+  opacity: 0.8;
+}
+
+/* Выделенный текст в pell-редакторе */
+.pell-content ::selection {
+  background-color: rgba(var(--accent-color-rgb), 0.3);
+  color: var(--text-primary);
+}
+
+/* Стили для темной темы */
+[data-theme="dark"] .pell-actionbar {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .pell-button {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .pell-button-selected {
+  background-color: var(--dark-accent) !important;
+}
+
+[data-theme="dark"] .pell-content {
+  background-color: var(--bg-primary) !important;
+}
+
+[data-theme="dark"] .pell-content a {
+  color: var(--dark-accent);
+}
+
+[data-theme="dark"] .pell-content ::selection {
+  background-color: rgba(var(--accent-color-rgb), 0.3);
+  color: var(--text-primary);
+}
+
+.note-editor-content {
+  flex: 1;
+  resize: none;
+  padding: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.note-editor-content:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* Стиль для скроллбара в редакторе, как в основном интерфейсе */
+.note-editor-content::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.note-editor-content::-webkit-scrollbar-track {
+  background: var(--light-accent);
+  border-radius: calc(var(--scrollbar-width) / 2);
+}
+
+.note-editor-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: calc(var(--scrollbar-width) / 2);
+}
+
+[data-theme="dark"] .note-editor-content::-webkit-scrollbar-track {
+  background: var(--dark-accent);
+}
+
+.note-modal-footer {
+  padding: 5px 10px;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  margin: 2px 0 0 0 !important;
+  margin-top: 2px !important;
+  padding-top: 5px !important;
+}
+
+.note-created-at {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.note-buttons-container {
+  display: flex;
+  gap: 6px;
+}
+
+.note-modal .cancel-button,
+.note-modal .save-button {
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-weight: normal;
+  cursor: pointer;
+  border: none;
+  font-size: 12px;
+  height: 20px;
+  line-height: 1;
+  min-width: 60px;
+  transition: all 0.2s ease;
+}
+
+.note-modal .cancel-button {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.note-modal .cancel-button:hover {
+  background-color: var(--bg-secondary);
+}
+
+.note-modal .save-button {
+  background-color: var(--accent-color);
+  color: black;
+}
+
+.note-modal .save-button:hover {
+  filter: brightness(110%);
+}
+
+/* Темная тема для модального окна заметок */
+[data-theme="dark"] .note-modal .save-button {
+  background-color: var(--dark-accent);
+}
+
+[data-theme="dark"] .note-editor-title {
+  background-color: rgba(var(--bg-secondary-rgb), 0.2);
+}
+
+[data-theme="dark"] .note-editor-content {
+  background-color: rgba(var(--bg-secondary-rgb), 0.3);
+}
+
+/* Стили для режима просмотра */
+.note-view-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.note-content-view {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  background-color: transparent;
+}
+
+.note-edit-button {
+  position: relative;
+  margin: 6px 0;
+  align-self: flex-end;
+  padding: 3px 10px;
+  background-color: var(--accent-color);
+  color: #000;
+  border: none;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.note-edit-button:hover {
+  filter: brightness(110%);
+}
+
+[data-theme="dark"] .note-edit-button {
+  background-color: var(--dark-accent);
+  color: #000;
+}
+
+/* Для кликабельности ссылок в режиме просмотра */
+.note-content-view a {
+  color: var(--accent-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.note-content-view a:hover {
+  opacity: 0.8;
+}
+
+[data-theme="dark"] .note-content-view a {
+  color: var(--dark-accent);
 }

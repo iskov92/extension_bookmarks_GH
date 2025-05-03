@@ -61,56 +61,164 @@ export async function getStoredBookmarks() {
 
 // Создать новую закладку в хранилище
 export async function createStoredBookmark(parentId, title, url = "") {
-  const bookmarks = await getStoredBookmarks()
+  console.log(
+    `Запрос на создание элемента: ${title} в родительской папке: ${parentId}`
+  )
 
-  // Если есть URL, проверяем и добавляем протокол если нужно
-  if (url) {
-    // Убираем пробелы в начале и конце
-    url = url.trim()
-
-    // Проверяем наличие протокола
-    if (!url.match(/^https?:\/\//i)) {
-      // Если нет протокола, добавляем https://
-      url = `https://${url}`
+  try {
+    // Проверки входных данных
+    if (!parentId) {
+      console.error("Ошибка: parentId не может быть пустым")
+      return null
     }
-  }
 
-  const newBookmark = {
-    id: Date.now().toString(36) + Math.random().toString(36).substr(2),
-    title,
-    type: url ? "bookmark" : "folder",
-    children: [],
-  }
+    if (!title || title.trim() === "") {
+      console.error("Ошибка: title не может быть пустым")
+      return null
+    }
 
-  if (url) {
-    newBookmark.url = url
-    // Получаем favicon через новую функцию
-    newBookmark.favicon = await getFavicon(url)
-  }
+    const bookmarks = await getStoredBookmarks()
+    console.log(
+      `Получены закладки из хранилища, количество: ${bookmarks.length}`
+    )
 
-  if (parentId === "0") {
-    bookmarks.push(newBookmark)
-  } else {
-    function addToFolder(items) {
-      for (const item of items) {
-        if (item.id === parentId) {
-          item.children = item.children || []
-          item.children.push(newBookmark)
-          return true
+    // Если есть URL, проверяем и добавляем протокол если нужно
+    if (url) {
+      // Убираем пробелы в начале и конце
+      url = url.trim()
+
+      // Проверяем наличие протокола
+      if (!url.match(/^https?:\/\//i)) {
+        // Если нет протокола, добавляем https://
+        url = `https://${url}`
+      }
+    }
+
+    const newBookmark = {
+      id: generateUniqueId(),
+      title: title.trim(),
+      type: url ? "bookmark" : "folder",
+      children: [],
+    }
+
+    console.log(`Создан новый элемент: ${JSON.stringify(newBookmark)}`)
+
+    if (url) {
+      newBookmark.url = url
+      // Получаем favicon через новую функцию
+      try {
+        newBookmark.favicon = await getFavicon(url)
+      } catch (error) {
+        console.error("Ошибка при получении favicon:", error)
+        newBookmark.favicon = "/assets/icons/link.svg"
+      }
+    }
+
+    let added = false
+
+    if (parentId === "0") {
+      // Добавляем в корневую папку
+      bookmarks.push(newBookmark)
+      added = true
+      console.log(`Элемент добавлен в корневую папку`)
+    } else {
+      // Проверка существования родительской папки
+      const folderExists = findFolderById(bookmarks, parentId) !== null
+
+      if (!folderExists) {
+        console.error(`Родительская папка с ID ${parentId} не существует!`)
+
+        // Логируем все папки для отладки
+        const allFolders = []
+        function collectFolders(items) {
+          for (const item of items) {
+            if (item.type === "folder") {
+              allFolders.push({ id: item.id, title: item.title })
+              if (item.children && item.children.length > 0) {
+                collectFolders(item.children)
+              }
+            }
+          }
         }
-        if (item.type === "folder" && item.children) {
-          if (addToFolder(item.children)) {
-            return true
+        collectFolders(bookmarks)
+        console.log(`Доступные папки:`, allFolders)
+
+        // Добавляем в корневую папку вместо отсутствующей
+        bookmarks.push(newBookmark)
+        added = true
+        console.log(
+          `Элемент добавлен в корневую папку вместо отсутствующей родительской папки`
+        )
+      } else {
+        // Добавляем элемент в найденную родительскую папку
+        function addToFolder(items) {
+          for (const item of items) {
+            if (item.id === parentId) {
+              // Убедимся, что у папки есть свойство children
+              if (!item.children) {
+                item.children = []
+                console.log(
+                  `Инициализировано свойство children для папки ${item.title} (ID: ${item.id})`
+                )
+              }
+
+              item.children.push(newBookmark)
+              console.log(
+                `Элемент добавлен в папку ${item.title} (ID: ${item.id})`
+              )
+              return true
+            }
+
+            if (item.type === "folder" && Array.isArray(item.children)) {
+              if (addToFolder(item.children)) {
+                return true
+              }
+            }
+          }
+          return false
+        }
+
+        added = addToFolder(bookmarks)
+
+        if (!added) {
+          console.warn(
+            `Не удалось найти родительскую папку с ID: ${parentId} для добавления элемента`
+          )
+
+          // Последняя попытка найти папку через прямой поиск по ID
+          const parentFolder = findFolderById(bookmarks, parentId)
+          if (parentFolder) {
+            // Инициализируем children если нужно
+            if (!parentFolder.children) {
+              parentFolder.children = []
+            }
+            parentFolder.children.push(newBookmark)
+            added = true
+            console.log(
+              `Элемент добавлен в папку ${parentFolder.title} (ID: ${parentId}) через прямой поиск`
+            )
+          } else {
+            // Добавляем в корневую папку, если не смогли найти родительскую
+            bookmarks.push(newBookmark)
+            added = true
+            console.log(`Элемент добавлен в корневую папку (запасной вариант)`)
           }
         }
       }
-      return false
     }
-    addToFolder(bookmarks)
-  }
 
-  await storage.set("gh_bookmarks", bookmarks)
-  return newBookmark
+    if (added) {
+      console.log(`Сохранение обновленных закладок в хранилище`)
+      await storage.set("gh_bookmarks", bookmarks)
+      return newBookmark
+    } else {
+      console.error(`Не удалось добавить элемент ${title} в папку ${parentId}`)
+      return null
+    }
+  } catch (error) {
+    console.error(`Ошибка при создании элемента ${title}:`, error)
+    return null
+  }
 }
 
 // Получить закладки из папки
