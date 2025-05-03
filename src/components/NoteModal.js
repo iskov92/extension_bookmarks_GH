@@ -254,6 +254,335 @@ export class NoteModal extends Modal {
       return
     }
 
+    // Создаем собственные кнопки цвета с иконками
+    const textColorButton = {
+      name: "foreColor",
+      icon: '<span style="font-weight: bold; color: red; font-family: serif;">A</span>',
+      title: i18n.t("LABELS.TEXT_COLOR") || "Цвет текста",
+      result: () => {
+        // Получаем текущее выделение
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        // Сохраняем выделение для последующего применения цвета
+        const selRange = selection.getRangeAt(0)
+
+        // Создаем контейнер для палитры
+        const palette = document.createElement("div")
+        palette.className = "color-palette"
+        palette.style.position = "fixed" // фиксированное позиционирование
+        palette.style.zIndex = "9999" // высокий z-index чтобы быть поверх всего
+        palette.style.display = "flex"
+        palette.style.flexDirection = "column" // вертикальное расположение с полем ввода внизу
+        palette.style.width = "180px"
+        palette.style.background = "var(--bg-primary)"
+        palette.style.border = "1px solid var(--border-color)"
+        palette.style.borderRadius = "4px"
+        palette.style.padding = "5px"
+        palette.style.boxShadow = "0 3px 8px rgba(0,0,0,0.3)"
+
+        // Создаем контейнер для цветов
+        const colorsContainer = document.createElement("div")
+        colorsContainer.style.display = "flex"
+        colorsContainer.style.flexWrap = "wrap"
+        colorsContainer.style.marginBottom = "5px"
+
+        // Предопределенные цвета
+        const colors = [
+          "#000000",
+          "#434343",
+          "#666666",
+          "#999999",
+          "#b7b7b7",
+          "#cccccc",
+          "#d9d9d9",
+          "#efefef",
+          "#f3f3f3",
+          "#ffffff",
+          "#980000",
+          "#ff0000",
+          "#ff9900",
+          "#ffff00",
+          "#00ff00",
+          "#00ffff",
+          "#4a86e8",
+          "#0000ff",
+          "#9900ff",
+          "#ff00ff",
+        ]
+
+        // Добавляем цветовые ячейки
+        colors.forEach((color) => {
+          const colorCell = document.createElement("div")
+          colorCell.style.width = "20px"
+          colorCell.style.height = "20px"
+          colorCell.style.margin = "2px"
+          colorCell.style.backgroundColor = color
+          colorCell.style.cursor = "pointer"
+          colorCell.style.borderRadius = "2px"
+          colorCell.title = color
+
+          colorCell.addEventListener("click", () => {
+            // Восстанавливаем выделение и применяем цвет
+            selection.removeAllRanges()
+            selection.addRange(selRange)
+            window.pell.exec("foreColor", color)
+            document.body.removeChild(palette)
+          })
+
+          colorsContainer.appendChild(colorCell)
+        })
+
+        // Создаем контейнер для поля ввода и кнопки
+        const inputContainer = document.createElement("div")
+        inputContainer.style.display = "flex"
+        inputContainer.style.marginTop = "5px"
+
+        // Поле для ввода HTML-кода цвета
+        const colorInput = document.createElement("input")
+        colorInput.type = "text"
+        colorInput.placeholder = "#hex или имя цвета"
+        colorInput.style.flex = "1"
+        colorInput.style.marginRight = "5px"
+        colorInput.style.padding = "3px 5px"
+        colorInput.style.border = "1px solid var(--border-color)"
+        colorInput.style.borderRadius = "3px"
+        colorInput.style.fontSize = "12px"
+
+        // Кнопка OK
+        const okButton = document.createElement("button")
+        okButton.textContent = "OK"
+        okButton.style.padding = "3px 8px"
+        okButton.style.background = "var(--accent-color)"
+        okButton.style.border = "none"
+        okButton.style.borderRadius = "3px"
+        okButton.style.cursor = "pointer"
+        okButton.style.fontSize = "12px"
+        okButton.style.color = "#000"
+
+        // При клике на кнопку OK применяем введенный цвет
+        okButton.addEventListener("click", () => {
+          if (colorInput.value) {
+            // Восстанавливаем выделение и применяем цвет
+            selection.removeAllRanges()
+            selection.addRange(selRange)
+            window.pell.exec("foreColor", colorInput.value)
+          }
+          document.body.removeChild(palette)
+        })
+
+        // Добавляем элементы в контейнеры
+        inputContainer.appendChild(colorInput)
+        inputContainer.appendChild(okButton)
+
+        palette.appendChild(colorsContainer)
+        palette.appendChild(inputContainer)
+
+        // Определяем позицию для палитры относительно курсора
+        const range = selRange
+        const rect = range.getBoundingClientRect()
+
+        // Позиционируем палитру над курсором
+        palette.style.top = `${rect.top - palette.offsetHeight - 10}px`
+        palette.style.left = `${rect.left}px`
+
+        // Добавляем палитру к DOM
+        document.body.appendChild(palette)
+
+        // Корректируем позицию, если выходит за пределы окна
+        const paletteRect = palette.getBoundingClientRect()
+        if (paletteRect.top < 10) {
+          // Если палитра выходит за верхнюю границу, размещаем под курсором
+          palette.style.top = `${rect.bottom + 10}px`
+        }
+
+        if (paletteRect.right > window.innerWidth - 10) {
+          // Если палитра выходит за правую границу
+          palette.style.left = `${window.innerWidth - paletteRect.width - 10}px`
+        }
+
+        // Добавляем обработчик для закрытия палитры при клике вне неё
+        const closeOnClickOutside = (e) => {
+          if (!palette.contains(e.target)) {
+            document.body.removeChild(palette)
+            document.removeEventListener("mousedown", closeOnClickOutside)
+          }
+        }
+
+        // Регистрируем обработчик
+        setTimeout(() => {
+          document.addEventListener("mousedown", closeOnClickOutside)
+        }, 10)
+
+        // Фокус на поле ввода
+        colorInput.focus()
+      },
+    }
+
+    const backColorButton = {
+      name: "backColor",
+      icon: '<span style="background-color: red; color: white; font-family: serif; border: 1px solid #000; display: inline-block; width: 14px; height: 14px; text-align: center; line-height: 14px;">A</span>',
+      title: i18n.t("LABELS.BACKGROUND_COLOR") || "Цвет фона",
+      result: () => {
+        // Получаем текущее выделение
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        // Сохраняем выделение для последующего применения цвета
+        const selRange = selection.getRangeAt(0)
+
+        // Создаем контейнер для палитры
+        const palette = document.createElement("div")
+        palette.className = "color-palette"
+        palette.style.position = "fixed" // фиксированное позиционирование
+        palette.style.zIndex = "9999" // высокий z-index чтобы быть поверх всего
+        palette.style.display = "flex"
+        palette.style.flexDirection = "column" // вертикальное расположение с полем ввода внизу
+        palette.style.width = "180px"
+        palette.style.background = "var(--bg-primary)"
+        palette.style.border = "1px solid var(--border-color)"
+        palette.style.borderRadius = "4px"
+        palette.style.padding = "5px"
+        palette.style.boxShadow = "0 3px 8px rgba(0,0,0,0.3)"
+
+        // Создаем контейнер для цветов
+        const colorsContainer = document.createElement("div")
+        colorsContainer.style.display = "flex"
+        colorsContainer.style.flexWrap = "wrap"
+        colorsContainer.style.marginBottom = "5px"
+
+        // Предопределенные цвета
+        const colors = [
+          "#000000",
+          "#434343",
+          "#666666",
+          "#999999",
+          "#b7b7b7",
+          "#cccccc",
+          "#d9d9d9",
+          "#efefef",
+          "#f3f3f3",
+          "#ffffff",
+          "#980000",
+          "#ff0000",
+          "#ff9900",
+          "#ffff00",
+          "#00ff00",
+          "#00ffff",
+          "#4a86e8",
+          "#0000ff",
+          "#9900ff",
+          "#ff00ff",
+        ]
+
+        // Добавляем цветовые ячейки
+        colors.forEach((color) => {
+          const colorCell = document.createElement("div")
+          colorCell.style.width = "20px"
+          colorCell.style.height = "20px"
+          colorCell.style.margin = "2px"
+          colorCell.style.backgroundColor = color
+          colorCell.style.cursor = "pointer"
+          colorCell.style.borderRadius = "2px"
+          colorCell.title = color
+
+          colorCell.addEventListener("click", () => {
+            // Восстанавливаем выделение и применяем цвет
+            selection.removeAllRanges()
+            selection.addRange(selRange)
+            window.pell.exec("backColor", color)
+            document.body.removeChild(palette)
+          })
+
+          colorsContainer.appendChild(colorCell)
+        })
+
+        // Создаем контейнер для поля ввода и кнопки
+        const inputContainer = document.createElement("div")
+        inputContainer.style.display = "flex"
+        inputContainer.style.marginTop = "5px"
+
+        // Поле для ввода HTML-кода цвета
+        const colorInput = document.createElement("input")
+        colorInput.type = "text"
+        colorInput.placeholder = "#hex или имя цвета"
+        colorInput.style.flex = "1"
+        colorInput.style.marginRight = "5px"
+        colorInput.style.padding = "3px 5px"
+        colorInput.style.border = "1px solid var(--border-color)"
+        colorInput.style.borderRadius = "3px"
+        colorInput.style.fontSize = "12px"
+
+        // Кнопка OK
+        const okButton = document.createElement("button")
+        okButton.textContent = "OK"
+        okButton.style.padding = "3px 8px"
+        okButton.style.background = "var(--accent-color)"
+        okButton.style.border = "none"
+        okButton.style.borderRadius = "3px"
+        okButton.style.cursor = "pointer"
+        okButton.style.fontSize = "12px"
+        okButton.style.color = "#000"
+
+        // При клике на кнопку OK применяем введенный цвет
+        okButton.addEventListener("click", () => {
+          if (colorInput.value) {
+            // Восстанавливаем выделение и применяем цвет
+            selection.removeAllRanges()
+            selection.addRange(selRange)
+            window.pell.exec("backColor", colorInput.value)
+          }
+          document.body.removeChild(palette)
+        })
+
+        // Добавляем элементы в контейнеры
+        inputContainer.appendChild(colorInput)
+        inputContainer.appendChild(okButton)
+
+        palette.appendChild(colorsContainer)
+        palette.appendChild(inputContainer)
+
+        // Определяем позицию для палитры относительно курсора
+        const range = selRange
+        const rect = range.getBoundingClientRect()
+
+        // Позиционируем палитру над курсором
+        palette.style.top = `${rect.top - palette.offsetHeight - 10}px`
+        palette.style.left = `${rect.left}px`
+
+        // Добавляем палитру к DOM
+        document.body.appendChild(palette)
+
+        // Корректируем позицию, если выходит за пределы окна
+        const paletteRect = palette.getBoundingClientRect()
+        if (paletteRect.top < 10) {
+          // Если палитра выходит за верхнюю границу, размещаем под курсором
+          palette.style.top = `${rect.bottom + 10}px`
+        }
+
+        if (paletteRect.right > window.innerWidth - 10) {
+          // Если палитра выходит за правую границу
+          palette.style.left = `${window.innerWidth - paletteRect.width - 10}px`
+        }
+
+        // Добавляем обработчик для закрытия палитры при клике вне неё
+        const closeOnClickOutside = (e) => {
+          if (!palette.contains(e.target)) {
+            document.body.removeChild(palette)
+            document.removeEventListener("mousedown", closeOnClickOutside)
+          }
+        }
+
+        // Регистрируем обработчик
+        setTimeout(() => {
+          document.addEventListener("mousedown", closeOnClickOutside)
+        }, 10)
+
+        // Фокус на поле ввода
+        colorInput.focus()
+      },
+    }
+
     // Инициализация редактора
     this.pellEditor = window.pell.init({
       element: document.getElementById(this.pellContainerId),
@@ -261,7 +590,7 @@ export class NoteModal extends Modal {
         // HTML контент обновляется автоматически
       },
       defaultParagraphSeparator: "p",
-      styleWithCSS: true,
+      styleWithCSS: true, // Устанавливаем true для поддержки изменения цвета текста
       actions: [
         "bold",
         "italic",
@@ -269,9 +598,10 @@ export class NoteModal extends Modal {
         "strikethrough",
         "heading1",
         "heading2",
-        "paragraph",
-        "quote",
-        "olist",
+        {
+          name: "olist",
+          icon: "1.",
+        },
         "ulist",
         "line",
         {
@@ -280,35 +610,19 @@ export class NoteModal extends Modal {
             const url = window.prompt(
               i18n.t("PROMPTS.ENTER_LINK") || "Введите URL ссылки"
             )
-            if (url) window.pell.exec("createLink", url)
+            if (url) {
+              // Проверяем, содержит ли URL протокол
+              let formattedUrl = url.trim()
+              if (formattedUrl && !formattedUrl.match(/^https?:\/\//i)) {
+                formattedUrl = "https://" + formattedUrl
+              }
+              window.pell.exec("createLink", formattedUrl)
+            }
           },
         },
-        {
-          name: "foreColor",
-          icon: "⬤",
-          title: "Цвет текста",
-          result: () => {
-            const color = window.prompt(
-              i18n.t("PROMPTS.ENTER_COLOR") ||
-                "Введите цвет (например, #24ffd0 или red)",
-              "#24ffd0"
-            )
-            if (color) window.pell.exec("foreColor", color)
-          },
-        },
-        {
-          name: "backColor",
-          icon: "◼",
-          title: "Цвет фона",
-          result: () => {
-            const color = window.prompt(
-              i18n.t("PROMPTS.ENTER_BACKGROUND_COLOR") ||
-                "Введите цвет фона (например, #f0f0f0 или yellow)",
-              "#f0f0f0"
-            )
-            if (color) window.pell.exec("backColor", color)
-          },
-        },
+        // Добавляем кастомные кнопки для изменения цвета текста
+        textColorButton,
+        backColorButton,
       ],
       classes: {
         actionbar: "pell-actionbar",
@@ -323,17 +637,53 @@ export class NoteModal extends Modal {
       this.pellEditor.content.innerHTML = content
     }
 
-    // Делаем ссылки в редакторе кликабельными
+    // Добавляем обработчики для ссылок в редакторе
     if (this.pellEditor.content) {
       this.pellEditor.content.addEventListener("click", (e) => {
         // Проверяем, был ли клик по ссылке
         if (e.target.tagName === "A") {
-          // Открываем ссылку в новой вкладке
+          // Всегда предотвращаем переход по ссылке
           e.preventDefault()
-          const url = e.target.getAttribute("href")
-          if (url) {
-            window.open(url, "_blank")
+
+          // Если мы в режиме редактирования, предлагаем отредактировать ссылку
+          if (this.isEditing) {
+            const currentUrl = e.target.getAttribute("href")
+            const newUrl = window.prompt(
+              i18n.t("PROMPTS.EDIT_LINK") || "Редактировать URL ссылки",
+              currentUrl || ""
+            )
+
+            if (newUrl !== null) {
+              // Если не нажата кнопка "Отмена"
+              if (newUrl.trim() === "") {
+                // Если URL пустой, удаляем ссылку, оставляя текст
+                const textContent = e.target.textContent
+                const textNode = document.createTextNode(textContent)
+                e.target.parentNode.replaceChild(textNode, e.target)
+              } else {
+                // Иначе обновляем URL ссылки
+                let formattedUrl = newUrl.trim()
+                if (formattedUrl && !formattedUrl.match(/^https?:\/\//i)) {
+                  formattedUrl = "https://" + formattedUrl
+                }
+                e.target.setAttribute("href", formattedUrl)
+              }
+            }
+          } else {
+            // Если мы не в режиме редактирования, открываем ссылку в новой вкладке
+            const url = e.target.getAttribute("href")
+            if (url) {
+              window.open(url, "_blank")
+            }
           }
+        }
+      })
+
+      // Отключаем стандартное поведение ссылок в режиме редактирования
+      this.pellEditor.content.addEventListener("mousedown", (e) => {
+        if (e.target.tagName === "A" && this.isEditing) {
+          // Предотвращаем обычное поведение ссылки
+          e.preventDefault()
         }
       })
     }
