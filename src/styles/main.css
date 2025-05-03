@@ -14,6 +14,7 @@
 
   /* Цвета */
   --dark-accent: #24ffd0;
+  --dark-accent-secondary: #1abebd;
   --light-accent: #ff8a24;
   --scrollbar-thumb: rgb(68, 71, 70);
 
@@ -1423,6 +1424,8 @@ body.dragging * {
   max-height: 20px;
   border-bottom: 1px solid var(--border-color);
   margin: 0;
+  display: flex;
+  align-items: center;
 }
 
 .note-header-container {
@@ -1434,7 +1437,7 @@ body.dragging * {
 }
 
 .note-editor-label {
-  font-size: 12px;
+  font-size: 11px;
   padding-right: 10px;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -1450,7 +1453,7 @@ body.dragging * {
 }
 
 .note-editor-title {
-  font-size: 14px;
+  font-size: 12px;
   padding: 0 10px;
   border: none;
   background-color: transparent;
@@ -1464,13 +1467,121 @@ body.dragging * {
   outline: none;
 }
 
+/* Стили для редактора Pell */
+.pell-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 2px;
+  background-color: transparent;
+}
+
+.pell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  border: none !important;
+  background-color: transparent;
+}
+
+.pell-actionbar {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex;
+  flex-wrap: wrap;
+  padding: 2px;
+  height: 24px;
+  min-height: 24px;
+  overflow: hidden;
+}
+
+.pell-button {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  height: 20px !important;
+  width: 24px !important;
+  font-size: 12px;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.pell-button:hover {
+  background-color: var(--accent-color);
+  border-radius: 2px;
+}
+
+.pell-button-selected {
+  background-color: var(--accent-color) !important;
+  border-radius: 2px;
+}
+
+.pell-content {
+  flex: 1;
+  padding: 15px !important;
+  overflow-y: auto !important;
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  height: auto !important;
+}
+
+/* Для кликабельности ссылок внутри заметки */
+.pell-content a {
+  color: var(--accent-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pell-content a:hover {
+  opacity: 0.8;
+}
+
+/* Выделенный текст в pell-редакторе */
+.pell-content ::selection {
+  background-color: rgba(var(--accent-color-rgb), 0.3);
+  color: var(--text-primary);
+}
+
+/* Стили для темной темы */
+[data-theme="dark"] .pell-actionbar {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .pell-button {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .pell-button-selected {
+  background-color: var(--dark-accent) !important;
+}
+
+[data-theme="dark"] .pell-content {
+  background-color: var(--bg-primary) !important;
+}
+
+[data-theme="dark"] .pell-content a {
+  color: var(--dark-accent);
+}
+
+[data-theme="dark"] .pell-content ::selection {
+  background-color: rgba(var(--accent-color-rgb), 0.3);
+  color: var(--text-primary);
+}
+
 .note-editor-content {
   flex: 1;
   resize: none;
-  padding: 10px;
+  padding: 15px;
   border: 1px solid var(--border-color);
   border-radius: 9px;
-  background-color: rgba(var(--bg-secondary-rgb), 0.5);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 14px;
@@ -1574,4 +1685,65 @@ body.dragging * {
 
 [data-theme="dark"] .note-editor-content {
   background-color: rgba(var(--bg-secondary-rgb), 0.3);
+}
+
+/* Стили для режима просмотра */
+.note-view-mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.note-content-view {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  background-color: transparent;
+}
+
+.note-edit-button {
+  position: relative;
+  margin: 6px 0;
+  align-self: flex-end;
+  padding: 3px 10px;
+  background-color: var(--accent-color);
+  color: #000;
+  border: none;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.note-edit-button:hover {
+  filter: brightness(110%);
+}
+
+[data-theme="dark"] .note-edit-button {
+  background-color: var(--dark-accent);
+  color: #000;
+}
+
+/* Для кликабельности ссылок в режиме просмотра */
+.note-content-view a {
+  color: var(--accent-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.note-content-view a:hover {
+  opacity: 0.8;
+}
+
+[data-theme="dark"] .note-content-view a {
+  color: var(--dark-accent);
 }
