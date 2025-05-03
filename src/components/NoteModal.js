@@ -333,6 +333,27 @@ export class NoteModal extends Modal {
           colorsContainer.appendChild(colorCell)
         })
 
+        // Кнопка сброса цвета текста
+        const resetButton = document.createElement("button")
+        resetButton.textContent = "Сбросить"
+        resetButton.style.margin = "5px 0"
+        resetButton.style.padding = "3px 8px"
+        resetButton.style.background = "var(--bg-secondary)"
+        resetButton.style.border = "1px solid var(--border-color)"
+        resetButton.style.borderRadius = "3px"
+        resetButton.style.cursor = "pointer"
+        resetButton.style.fontSize = "12px"
+        resetButton.style.width = "100%"
+        resetButton.title = "Вернуть цвет текста по умолчанию"
+
+        resetButton.addEventListener("click", () => {
+          // Восстанавливаем выделение и сбрасываем цвет к цвету, заданному в CSS
+          selection.removeAllRanges()
+          selection.addRange(selRange)
+          window.pell.exec("foreColor", "inherit")
+          document.body.removeChild(palette)
+        })
+
         // Создаем контейнер для поля ввода и кнопки
         const inputContainer = document.createElement("div")
         inputContainer.style.display = "flex"
@@ -376,6 +397,7 @@ export class NoteModal extends Modal {
         inputContainer.appendChild(okButton)
 
         palette.appendChild(colorsContainer)
+        palette.appendChild(resetButton)
         palette.appendChild(inputContainer)
 
         // Определяем позицию для палитры относительно курсора
@@ -497,6 +519,27 @@ export class NoteModal extends Modal {
           colorsContainer.appendChild(colorCell)
         })
 
+        // Кнопка сброса цвета фона
+        const resetButton = document.createElement("button")
+        resetButton.textContent = "Сбросить"
+        resetButton.style.margin = "5px 0"
+        resetButton.style.padding = "3px 8px"
+        resetButton.style.background = "var(--bg-secondary)"
+        resetButton.style.border = "1px solid var(--border-color)"
+        resetButton.style.borderRadius = "3px"
+        resetButton.style.cursor = "pointer"
+        resetButton.style.fontSize = "12px"
+        resetButton.style.width = "100%"
+        resetButton.title = "Вернуть цвет фона по умолчанию"
+
+        resetButton.addEventListener("click", () => {
+          // Восстанавливаем выделение и сбрасываем цвет фона к прозрачному
+          selection.removeAllRanges()
+          selection.addRange(selRange)
+          window.pell.exec("backColor", "transparent")
+          document.body.removeChild(palette)
+        })
+
         // Создаем контейнер для поля ввода и кнопки
         const inputContainer = document.createElement("div")
         inputContainer.style.display = "flex"
@@ -540,6 +583,7 @@ export class NoteModal extends Modal {
         inputContainer.appendChild(okButton)
 
         palette.appendChild(colorsContainer)
+        palette.appendChild(resetButton)
         palette.appendChild(inputContainer)
 
         // Определяем позицию для палитры относительно курсора
