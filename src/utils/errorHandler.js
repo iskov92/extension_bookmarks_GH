@@ -53,14 +53,14 @@ const errorMessages = {
 }
 
 export class ErrorHandler {
-  static handle(error, type, subtype = null) {
+  static handle(error, type, subtype = null, customMessage = null) {
     // Логируем ошибку с полным контекстом
     console.error(`Error [${type}${subtype ? ":" + subtype : ""}]:`, error)
 
     // Получаем сообщение об ошибке
-    const message = subtype
-      ? errorMessages[type]?.[subtype]
-      : errorMessages[type]
+    const message =
+      customMessage ||
+      (subtype ? errorMessages[type]?.[subtype] : errorMessages[type])
 
     // Показываем пользователю
     alert(message || "Произошла неизвестная ошибка")
@@ -69,11 +69,86 @@ export class ErrorHandler {
     return false
   }
 
-  static async wrapAsync(promise, type, subtype = null) {
+  static async wrapAsync(
+    promise,
+    type,
+    subtype = null,
+    customMessage = null,
+    showLoading = false
+  ) {
     try {
-      return await promise
+      console.log(`Выполнение операции: ${type}${subtype ? ":" + subtype : ""}`)
+
+      // Отображаем индикатор загрузки, если нужно
+      if (showLoading && window.showLoadingIndicator) {
+        window.showLoadingIndicator(customMessage)
+      }
+
+      // Проверка входных данных перед выполнением операции
+      if (!promise || typeof promise.then !== "function") {
+        console.error("wrapAsync получил не Promise:", promise)
+        throw new Error("Неверный формат Promise")
+      }
+
+      // Выполняем операцию
+      const result = await promise
+
+      // Скрываем индикатор загрузки
+      if (showLoading && window.hideLoadingIndicator) {
+        window.hideLoadingIndicator()
+      }
+
+      // Проверяем результат на null/undefined
+      if (result === null || result === undefined) {
+        console.warn(
+          `Операция ${type}${subtype ? ":" + subtype : ""} вернула ${result}`
+        )
+
+        if (type === ErrorType.CREATE) {
+          // В случае создания элементов показываем ошибку пользователю
+          const error = new Error("Операция вернула пустой результат")
+          return this.handle(
+            error,
+            type,
+            subtype,
+            customMessage ||
+              (subtype === "folder"
+                ? "Не удалось создать папку. Возможно, проблема с правами доступа или папка с таким именем уже существует."
+                : "Не удалось создать закладку. Проверьте корректность URL и попробуйте снова.")
+          )
+        }
+
+        // Для других типов операций не считаем null результат критичной ошибкой
+        console.log(`Некритичный пустой результат для операции ${type}`)
+        return result
+      }
+
+      return result
     } catch (error) {
-      return this.handle(error, type, subtype)
+      // Скрываем индикатор загрузки в случае ошибки
+      if (showLoading && window.hideLoadingIndicator) {
+        window.hideLoadingIndicator()
+      }
+
+      console.error(
+        `Ошибка при выполнении операции ${type}:${subtype || ""}:`,
+        error
+      )
+
+      // Добавляем дополнительную информацию об ошибке, если это возможно
+      let enhancedMessage = customMessage
+      if (!enhancedMessage) {
+        if (error.message) {
+          enhancedMessage = `${
+            errorMessages[type]?.[subtype] || "Ошибка операции"
+          }: ${error.message}`
+        } else {
+          enhancedMessage =
+            errorMessages[type]?.[subtype] || "Произошла неизвестная ошибка"
+        }
+      }
+
+      return this.handle(error, type, subtype, enhancedMessage)
     }
   }
 }

@@ -6,9 +6,12 @@ export class Modal {
     this.overlay = null
     this.onSave = null
     this.onClose = null
+    this.inputs = {} // Кеширование полей ввода
+    this.type = null // Сохранение типа модального окна
   }
 
   create(title, type, initialData = {}, customContent = null) {
+    this.type = type // Сохраняем тип окна
     this.overlay = document.createElement("div")
     this.overlay.className = "modal-overlay"
 
@@ -26,28 +29,78 @@ export class Modal {
     if (customContent) {
       content.appendChild(customContent)
     } else if (type === "link") {
-      content.appendChild(
-        this.createInputGroup(
-          "name",
-          i18n.t("LABELS.BOOKMARK_NAME"),
-          initialData.title || ""
-        )
+      const nameGroup = this.createInputGroup(
+        "name",
+        i18n.t("LABELS.BOOKMARK_NAME"),
+        initialData.title || ""
       )
-      content.appendChild(
-        this.createInputGroup(
-          "url",
-          i18n.t("LABELS.BOOKMARK_URL"),
-          initialData.url || ""
-        )
+      const urlGroup = this.createInputGroup(
+        "url",
+        i18n.t("LABELS.BOOKMARK_URL"),
+        initialData.url || ""
       )
+
+      content.appendChild(nameGroup)
+      content.appendChild(urlGroup)
+
+      // Сохраняем ссылки на поля ввода
+      this.inputs.name = nameGroup.querySelector("input")
+      this.inputs.url = urlGroup.querySelector("input")
+
+      // Добавляем обработчик нажатия Enter в поля ввода
+      this.inputs.name.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault() // Предотвращаем действие по умолчанию
+          if (this.onSave) {
+            this.handleSave()
+          }
+        }
+      })
+
+      this.inputs.url.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault() // Предотвращаем действие по умолчанию
+          if (this.onSave) {
+            this.handleSave()
+          }
+        }
+      })
+
+      // Устанавливаем автофокус на первое поле
+      setTimeout(() => {
+        if (this.inputs.name) {
+          this.inputs.name.focus()
+          this.inputs.name.select() // Выделяем текст для быстрого редактирования
+        }
+      }, 100)
     } else if (type === "folder") {
-      content.appendChild(
-        this.createInputGroup(
-          "name",
-          i18n.t("LABELS.FOLDER_NAME"),
-          initialData.title || ""
-        )
+      const nameGroup = this.createInputGroup(
+        "name",
+        i18n.t("LABELS.FOLDER_NAME"),
+        initialData.title || ""
       )
+      content.appendChild(nameGroup)
+
+      // Сохраняем ссылку на поле ввода
+      this.inputs.name = nameGroup.querySelector("input")
+
+      // Добавляем обработчик нажатия Enter в поле ввода
+      this.inputs.name.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault() // Предотвращаем действие по умолчанию
+          if (this.onSave) {
+            this.handleSave()
+          }
+        }
+      })
+
+      // Устанавливаем автофокус на поле ввода
+      setTimeout(() => {
+        if (this.inputs.name) {
+          this.inputs.name.focus()
+          this.inputs.name.select() // Выделяем текст для быстрого редактирования
+        }
+      }, 100)
     }
 
     const buttons = document.createElement("div")
@@ -74,7 +127,7 @@ export class Modal {
         if (customContent) {
           this.onSave()
         } else {
-          this.handleSave(type)
+          this.handleSave()
         }
       }
     }
@@ -95,6 +148,20 @@ export class Modal {
         this.close()
       }
     })
+
+    // Предотвращаем закрытие по клику внутри модального окна
+    this.modal.addEventListener("click", (e) => {
+      e.stopPropagation()
+    })
+
+    // Добавляем обработчик клавиши Escape для закрытия
+    const escHandler = (e) => {
+      if (e.key === "Escape") {
+        this.close()
+        document.removeEventListener("keydown", escHandler)
+      }
+    }
+    document.addEventListener("keydown", escHandler)
   }
 
   createInputGroup(id, label, value) {
@@ -110,6 +177,16 @@ export class Modal {
     input.id = id
     input.type = id === "url" ? "url" : "text"
     input.value = value
+    input.autocomplete = "off" // Отключаем автозаполнение для лучшего UX
+
+    // Добавляем подсветку при фокусе
+    input.addEventListener("focus", () => {
+      group.classList.add("focused")
+    })
+
+    input.addEventListener("blur", () => {
+      group.classList.remove("focused")
+    })
 
     group.appendChild(labelElement)
     group.appendChild(input)
@@ -117,17 +194,43 @@ export class Modal {
     return group
   }
 
-  handleSave(type) {
+  handleSave() {
     const data = {}
-    if (type === "link") {
-      data.title = document.getElementById("name").value
-      data.url = document.getElementById("url").value
-    } else if (type === "folder") {
-      data.title = document.getElementById("name").value
+
+    // Используем сохраненные ссылки на поля ввода
+    if (this.type === "link") {
+      data.title = this.inputs.name?.value?.trim() || ""
+      data.url = this.inputs.url?.value?.trim() || ""
+
+      // Валидация данных перед отправкой
+      if (!data.title) {
+        alert(i18n.t("VALIDATIONS.EMPTY_BOOKMARK_NAME"))
+        if (this.inputs.name) {
+          this.inputs.name.focus()
+        }
+        return
+      }
+
+      // Если URL пустой, добавляем протокол по умолчанию
+      if (data.url && !data.url.match(/^https?:\/\//i)) {
+        data.url = `https://${data.url}`
+      }
+    } else if (this.type === "folder") {
+      data.title = this.inputs.name?.value?.trim() || ""
+
+      // Валидация данных перед отправкой
+      if (!data.title) {
+        alert(i18n.t("VALIDATIONS.EMPTY_FOLDER_NAME"))
+        if (this.inputs.name) {
+          this.inputs.name.focus()
+        }
+        return
+      }
     }
 
     if (this.onSave) {
-      this.onSave(data)
+      // Создаем копию данных, чтобы избежать изменений оригинала
+      this.onSave({ ...data })
     }
   }
 
@@ -136,6 +239,9 @@ export class Modal {
       document.body.removeChild(this.overlay)
       this.overlay = null
       this.modal = null
+      this.inputs = {} // Очищаем кэш полей ввода
+      this.onSave = null
+      this.onClose = null
     }
   }
 

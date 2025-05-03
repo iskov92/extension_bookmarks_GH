@@ -279,9 +279,7 @@ export async function importFromBrowser() {
     let allBookmarks = []
     for (const folder of systemFolders) {
       if (folder.children) {
-        const processedBookmarks = await processBasicBookmarkTree(
-          folder.children
-        )
+        const processedBookmarks = await processBookmarkTree(folder.children)
         allBookmarks = [...allBookmarks, ...processedBookmarks]
       }
     }
@@ -295,7 +293,7 @@ export async function importFromBrowser() {
 }
 
 // Рекурсивно обработать дерево закладок
-async function processBasicBookmarkTree(bookmarks) {
+async function processBookmarkTree(bookmarks) {
   const processedBookmarks = []
 
   for (const bookmark of bookmarks) {
@@ -314,7 +312,7 @@ async function processBasicBookmarkTree(bookmarks) {
       newBookmark.favicon = `chrome://favicon/size/16@2x/${bookmark.url}`
     } else if (bookmark.children && bookmark.children.length > 0) {
       // Добавляем папку только если в ней есть содержимое
-      newBookmark.children = await processBasicBookmarkTree(bookmark.children)
+      newBookmark.children = await processBookmarkTree(bookmark.children)
       // Если после обработки в папке нет содержимого, пропускаем её
       if (newBookmark.children.length === 0) continue
     }
@@ -333,6 +331,8 @@ function generateUniqueId() {
 export async function exportBookmarksToHTML() {
   try {
     const bookmarks = await getStoredBookmarks()
+    // Используем единую функцию generateBookmarksHTML из нижней части файла,
+    // которая поддерживает заметки
     return generateBookmarksHTML(bookmarks)
   } catch (error) {
     console.error("Ошибка при экспорте закладок:", error)
@@ -340,7 +340,7 @@ export async function exportBookmarksToHTML() {
   }
 }
 
-// Обновленная версия generateBookmarksHTML с поддержкой заметок
+// Сгенерировать HTML для закладок
 function generateBookmarksHTML(bookmarks, level = 0) {
   let html =
     level === 0
@@ -371,84 +371,6 @@ function generateBookmarksHTML(bookmarks, level = 0) {
   }
 
   return html
-}
-
-// Расширяем существующую функцию импорта для поддержки заметок
-async function processBookmarkTreeWithNotes(bookmarks) {
-  const result = []
-
-  // Функция для обработки HTML-строки с заметкой
-  function extractNoteContent(html) {
-    const titleMatch = html.match(/TITLE="([^"]*)"/)
-    const createdAtMatch = html.match(/CREATED_AT="([^"]*)"/)
-
-    let content = html
-
-    // Удаляем открывающий тег EXT-NOTE с атрибутами
-    content = content.replace(/<EXT-NOTE[^>]*>/, "")
-    // Удаляем закрывающий тег
-    content = content.replace(/<\/EXT-NOTE>/, "")
-    // Убираем лишние пробелы
-    content = content.trim()
-
-    return {
-      title: titleMatch ? titleMatch[1] : "Заметка",
-      content: content,
-      createdAt: createdAtMatch ? parseInt(createdAtMatch[1]) : Date.now(),
-    }
-  }
-
-  for (const item of bookmarks) {
-    if (item.title && item.url) {
-      // Это закладка
-      result.push({
-        id: generateUniqueId(),
-        title: item.title,
-        url: item.url,
-        type: "bookmark",
-      })
-    } else if (item.title && item.children) {
-      // Это папка
-      const folder = {
-        id: generateUniqueId(),
-        title: item.title,
-        type: "folder",
-        children: await processBookmarkTreeWithNotes(item.children),
-      }
-      result.push(folder)
-    } else if (item.html && item.html.includes("<EXT-NOTE")) {
-      // Проверяем, это заметка?
-      const html = item.html
-      const noteData = extractNoteContent(html)
-      result.push({
-        id: generateUniqueId(),
-        title: noteData.title,
-        type: "note",
-        content: noteData.content,
-        createdAt: noteData.createdAt,
-      })
-    } else if (item.tagName === "EXT-NOTE") {
-      // Это заметка из нашего парсера
-      const title = item.getAttribute("TITLE") || "Заметка"
-      const createdAt = parseInt(item.getAttribute("CREATED_AT") || Date.now())
-      const content = item.textContent.trim()
-
-      result.push({
-        id: generateUniqueId(),
-        title: title,
-        content: content,
-        createdAt: createdAt,
-        type: "note",
-      })
-    }
-  }
-
-  return result
-}
-
-// Обновляем функцию processBookmarkTree для использования расширенной версии
-export async function processBookmarkTree(bookmarks) {
-  return processBookmarkTreeWithNotes(bookmarks)
 }
 
 /**
@@ -1086,12 +1008,6 @@ export async function createNote(parentId, title, content = "") {
     // Создаем заметку с типом note
     const note = await createStoredNote(parentId, title, content, timestamp)
 
-    // Дополнительная проверка типа
-    if (note && !note.type) {
-      note.type = "note"
-      console.log("Исправлен тип заметки: добавлен тип 'note'")
-    }
-
     // Очищаем кэш для принудительного обновления данных
     if (window._folderContentsCache) {
       delete window._folderContentsCache[parentId]
@@ -1192,11 +1108,6 @@ export async function createStoredNote(
 
     if (added) {
       await storage.set("gh_bookmarks", bookmarks)
-      // Проверка типа перед возвратом
-      if (!newNote.type) {
-        newNote.type = "note"
-        console.log("Исправлен тип заметки перед возвратом")
-      }
       return newNote
     } else {
       console.error(`Не удалось добавить заметку ${title} в папку ${parentId}`)
@@ -1264,4 +1175,71 @@ export async function updateNote(id, data) {
     console.error("Ошибка при обновлении заметки:", error)
     return false
   }
+}
+
+// Расширяем существующую функцию импорта для поддержки заметок
+async function processBookmarkTreeWithNotes(bookmarks) {
+  const result = []
+
+  // Функция для обработки HTML-строки с заметкой
+  function extractNoteContent(html) {
+    const titleMatch = html.match(/TITLE="([^"]*)"/)
+    const createdAtMatch = html.match(/CREATED_AT="([^"]*)"/)
+
+    let content = html
+
+    // Удаляем открывающий тег EXT-NOTE с атрибутами
+    content = content.replace(/<EXT-NOTE[^>]*>/, "")
+    // Удаляем закрывающий тег
+    content = content.replace(/<\/EXT-NOTE>/, "")
+    // Убираем лишние пробелы
+    content = content.trim()
+
+    return {
+      title: titleMatch ? titleMatch[1] : "Заметка",
+      content: content,
+      createdAt: createdAtMatch ? parseInt(createdAtMatch[1]) : Date.now(),
+    }
+  }
+
+  for (const item of bookmarks) {
+    if (item.title && item.url) {
+      // Это закладка
+      result.push({
+        id: generateUniqueId(),
+        title: item.title,
+        url: item.url,
+        type: "bookmark",
+      })
+    } else if (item.title && item.children) {
+      // Это папка
+      const folder = {
+        id: generateUniqueId(),
+        title: item.title,
+        type: "folder",
+        children: await processBookmarkTreeWithNotes(item.children),
+      }
+      result.push(folder)
+    } else if (item.title && item.html) {
+      // Проверяем, это заметка?
+      const html = item.html
+      if (html.includes("<EXT-NOTE")) {
+        const noteData = extractNoteContent(html)
+        result.push({
+          id: generateUniqueId(),
+          title: noteData.title,
+          type: "note",
+          content: noteData.content,
+          createdAt: noteData.createdAt,
+        })
+      }
+    }
+  }
+
+  return result
+}
+
+// Обновляем функцию processBookmarkTree для использования расширенной версии
+export async function processBookmarkTree(bookmarks) {
+  return processBookmarkTreeWithNotes(bookmarks)
 }
