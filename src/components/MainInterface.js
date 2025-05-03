@@ -102,6 +102,25 @@ export class MainInterface {
 
       if (bookmark.url) {
         bookmarkElement.dataset.url = bookmark.url
+
+        // Добавляем специальный обработчик для закладок
+        console.log("Добавляем обработчик клика на закладку:", bookmark.title)
+        bookmarkElement.addEventListener("click", (e) => {
+          console.log(
+            "Клик по закладке в MainInterface:",
+            bookmark.title,
+            "URL:",
+            bookmark.url
+          )
+
+          // Предотвращаем дальнейшую обработку события
+          e.stopPropagation()
+
+          // Открываем URL в новой вкладке
+          if (bookmark.url) {
+            chrome.tabs.create({ url: bookmark.url })
+          }
+        })
       }
 
       // Для заметок сохраняем содержимое и дату создания
@@ -110,6 +129,27 @@ export class MainInterface {
         if (bookmark.createdAt) {
           bookmarkElement.dataset.createdAt = bookmark.createdAt
         }
+
+        // Добавляем специальный обработчик для заметок прямо здесь
+        console.log("Добавляем обработчик клика на заметку:", bookmark.title)
+        bookmarkElement.addEventListener("click", (e) => {
+          console.log("Клик по заметке в MainInterface:", bookmark.title)
+
+          // Предотвращаем дальнейшую обработку события, чтобы исключить конфликты
+          e.stopPropagation()
+
+          // Вызываем функцию отображения диалога редактирования
+          if (typeof showNoteEditDialog === "function") {
+            showNoteEditDialog({
+              id: bookmark.id,
+              title: bookmark.title,
+              content: bookmark.content || "",
+              createdAt: bookmark.createdAt,
+            })
+          } else {
+            console.error("Функция showNoteEditDialog не определена")
+          }
+        })
       }
 
       const icon = document.createElement("img")
