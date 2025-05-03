@@ -165,6 +165,7 @@ async function restoreContents(parentId, contents) {
         "folder",
         i18n.t("TRASH.WAIT_RESTORE")
       )
+
       // Рекурсивно восстанавливаем содержимое вложенной папки
       if (content.contents && content.contents.length > 0) {
         await restoreContents(newFolder.id, content.contents)

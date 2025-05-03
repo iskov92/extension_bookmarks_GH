@@ -435,6 +435,12 @@ async function handleContextMenu(e) {
               url,
             }
 
+            // Если это папка, получаем её содержимое рекурсивно
+            if (isFolder) {
+              const folderContents = await getFolderContentsRecursively(id)
+              itemToTrash.contents = folderContents
+            }
+
             // Получаем стек навигации
             const navigationStack = navigationModule.getNavigation().getStack()
 
