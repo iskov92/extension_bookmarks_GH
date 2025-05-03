@@ -253,22 +253,36 @@ async function initFaviconToggle() {
     // Устанавливаем состояние переключателя
     faviconToggle.checked = isEnabled
 
-    // Обновляем текст статуса
+    // Обновляем текст статуса и класс
     if (toggleStatus) {
       toggleStatus.textContent = isEnabled
         ? i18n.t("SETTINGS.FAVICONS_ENABLED") || "Включено"
         : i18n.t("SETTINGS.FAVICONS_DISABLED") || "Выключено"
+
+      // Добавляем класс для стилизации
+      if (isEnabled) {
+        toggleStatus.classList.add("active-status")
+      } else {
+        toggleStatus.classList.remove("active-status")
+      }
     }
 
     // Добавляем обработчик события
     faviconToggle.addEventListener("change", async () => {
       const enabled = faviconToggle.checked
 
-      // Обновляем текст статуса
+      // Обновляем текст статуса и класс
       if (toggleStatus) {
         toggleStatus.textContent = enabled
           ? i18n.t("SETTINGS.FAVICONS_ENABLED") || "Включено"
           : i18n.t("SETTINGS.FAVICONS_DISABLED") || "Выключено"
+
+        // Обновляем класс для стилизации
+        if (enabled) {
+          toggleStatus.classList.add("active-status")
+        } else {
+          toggleStatus.classList.remove("active-status")
+        }
       }
 
       // Сохраняем состояние в хранилище

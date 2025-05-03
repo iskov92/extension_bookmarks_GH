@@ -244,65 +244,110 @@
   color: var(--text-primary);
 }
 
+/* Стиль для блока с фавиконами */
+.favicon-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.favicon-setting:hover {
+  background: var(--bg-hover);
+}
+
+.favicon-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Стили для переключателя фавиконов */
-.toggle-wrapper {
+.toggle-control {
   position: relative;
-  display: inline-flex;
-  margin-top: 10px;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  margin: 0;
 }
 
 #faviconToggle {
-  position: absolute;
   opacity: 0;
   width: 0;
   height: 0;
 }
 
 .toggle-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  padding: 2px;
+  position: absolute;
   cursor: pointer;
-  position: relative;
-  width: 60px;
-  height: 30px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgb(142, 145, 143);
+  transition: var(--transition-speed);
+  border-radius: 24px;
 }
 
 .toggle-label::after {
-  content: "";
   position: absolute;
-  top: 2px;
+  content: "";
+  height: 12px;
+  width: 12px;
   left: 2px;
-  width: 26px;
-  height: 26px;
-  background: var(--dark-accent);
+  bottom: 2px;
+  background-color: rgb(68, 71, 70);
   border-radius: 50%;
-  transition: transform var(--transition-speed);
+  transition: var(--transition-speed);
 }
 
-#faviconToggle:checked ~ .toggle-label::after {
-  transform: translateX(30px);
-  background: var(--accent-color);
+/* Активное состояние для темной темы */
+#faviconToggle:checked + .toggle-label {
+  background-color: var(--dark-accent);
+}
+
+/* Активное состояние для светлой темы */
+[data-theme="light"] #faviconToggle:checked + .toggle-label {
+  background-color: var(--light-accent);
+}
+
+#faviconToggle:checked + .toggle-label::after {
+  transform: translateX(12px);
+  background-color: rgb(68, 71, 70);
 }
 
 .toggle-status {
   font-size: 12px;
-  position: absolute;
-  right: -80px;
+  color: var(--text-secondary);
+  margin-left: auto;
+  transition: color var(--transition-speed);
+}
+
+/* Стили для активного статуса */
+.toggle-status.active-status {
+  color: var(--dark-accent);
+  font-weight: 500;
+}
+
+/* Цвет для светлой темы */
+[data-theme="light"] .toggle-status.active-status {
+  color: var(--light-accent);
 }
 
 /* Индикатор процесса установки фавиконов */
 .favicon-loading-indicator {
   display: none;
   align-items: center;
-  margin-top: 10px;
   font-size: 12px;
   color: var(--text-secondary);
   animation: pulse 1.5s infinite;
+  margin-top: 4px;
 }
 
 .favicon-loading-indicator.active {
@@ -323,8 +368,8 @@
 
 .favicon-loading-indicator .spinner {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   margin-right: 8px;
   border: 2px solid var(--text-secondary);
   border-radius: 50%;
