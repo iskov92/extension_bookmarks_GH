@@ -38,6 +38,7 @@ export default {
     NOTE_TITLE: "Note title",
     NOTE_CONTENT: "Note content",
     CREATED_AT: "Created",
+    NOTE_EDITOR: "Note editor",
   },
   CONFIRMATIONS: {
     DELETE: "Are you sure you want to delete this item?",

@@ -38,6 +38,7 @@ export default {
     NOTE_TITLE: "Название заметки",
     NOTE_CONTENT: "Содержимое заметки",
     CREATED_AT: "Создано",
+    NOTE_EDITOR: "Редактор заметки",
   },
   CONFIRMATIONS: {
     DELETE: "Вы уверены, что хотите удалить этот элемент?",
