@@ -124,27 +124,11 @@ export async function createStoredBookmark(parentId, title, url = "") {
 
     if (url) {
       newBookmark.url = url
-      // Получаем favicon через новую функцию
+      // Получаем favicon через новую быструю функцию
       try {
         console.log(`Загрузка фавикона для ${url}...`)
-        newBookmark.favicon = await getFavicon(url)
+        newBookmark.favicon = await getFaviconFast(url)
         console.log(`Получен фавикон: ${newBookmark.favicon}`)
-
-        // Если получен стандартный фавикон, пробуем еще через Google
-        if (newBookmark.favicon === "/assets/icons/link.svg") {
-          try {
-            const urlObj = new URL(url)
-            const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-              urlObj.hostname
-            )}&sz=32`
-            console.log(
-              `Дополнительная попытка через Google: ${googleFaviconUrl}`
-            )
-            newBookmark.favicon = googleFaviconUrl
-          } catch (e) {
-            console.warn("Не удалось получить фавикон через Google:", e)
-          }
-        }
       } catch (error) {
         console.error("Ошибка при получении favicon:", error)
         newBookmark.favicon = "/assets/icons/link.svg"
@@ -287,7 +271,153 @@ export async function saveBookmarks(bookmarks) {
   await storage.set("gh_bookmarks", bookmarks)
 }
 
-// Получить favicon для URL
+// Получить фавикон из HTML-документа
+async function getFaviconFromHTML(url) {
+  try {
+    // Проверка, является ли URL валидным
+    let urlObj
+    try {
+      urlObj = new URL(url)
+    } catch (e) {
+      console.warn(`Неверный формат URL для getFaviconFromHTML: ${url}`)
+      return null
+    }
+
+    console.log(
+      `Пробуем получить HTML документ для: ${url} через background script`
+    )
+
+    // Отправляем запрос в background script для получения HTML
+    const htmlResponse = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: "getHtmlContent", url },
+        (response) => resolve(response)
+      )
+    })
+
+    if (!htmlResponse || !htmlResponse.success) {
+      console.warn(
+        `Не удалось получить HTML через background script: ${
+          htmlResponse?.error || "Неизвестная ошибка"
+        }`
+      )
+
+      // Пробуем запросить проверку известных путей через background script
+      const knownPaths = [
+        "/favicon.ico",
+        "/favicon.png",
+        "/apple-touch-icon.png",
+        "/apple-touch-icon-precomposed.png",
+        "/static/favicon.ico",
+        "/static/favicon.png",
+        "/assets/favicon.ico",
+        "/assets/favicon.png",
+      ]
+
+      const pathCheckResponse = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            action: "checkFaviconPaths",
+            url: urlObj.origin,
+            paths: knownPaths,
+          },
+          (response) => resolve(response)
+        )
+      })
+
+      if (
+        pathCheckResponse &&
+        pathCheckResponse.success &&
+        pathCheckResponse.results
+      ) {
+        // Находим первый существующий фавикон
+        const existingFavicon = pathCheckResponse.results.find(
+          (result) => result.exists
+        )
+        if (existingFavicon) {
+          console.log(
+            `Найден фавикон по известному пути: ${existingFavicon.url}`
+          )
+          return existingFavicon.url
+        }
+      }
+
+      return null
+    }
+
+    // Отправляем HTML в background script для извлечения фавиконов
+    const extractResponse = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          action: "extractFavicons",
+          html: htmlResponse.htmlContent,
+          baseUrl: url,
+        },
+        (response) => resolve(response)
+      )
+    })
+
+    if (
+      !extractResponse ||
+      !extractResponse.success ||
+      !extractResponse.favicons ||
+      extractResponse.favicons.length === 0
+    ) {
+      console.warn(
+        `Не удалось извлечь фавиконы из HTML: ${
+          extractResponse?.error || "Нет доступных фавиконов"
+        }`
+      )
+      return null
+    }
+
+    console.log(`Найдено ${extractResponse.favicons.length} фавиконов в HTML`)
+    return extractResponse.favicons[0].url
+  } catch (error) {
+    console.error("Ошибка при извлечении фавикона из HTML:", error)
+    return null
+  }
+}
+
+// Кэш фавиконов для оптимизации производительности
+const faviconCache = new Map()
+const FAVICON_CACHE_MAX_SIZE = 200 // Ограничиваем размер кэша
+const FAVICON_CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000 // Неделя в миллисекундах
+
+// Очистка устаревших записей в кэше
+function cleanupFaviconCache() {
+  if (faviconCache.size > FAVICON_CACHE_MAX_SIZE) {
+    console.log(`Очистка кэша фавиконов (размер: ${faviconCache.size})`)
+    const now = Date.now()
+    const keysToDelete = []
+
+    // Находим устаревшие записи
+    faviconCache.forEach((value, key) => {
+      if (now - value.timestamp > FAVICON_CACHE_EXPIRY) {
+        keysToDelete.push(key)
+      }
+    })
+
+    // Удаляем устаревшие записи
+    keysToDelete.forEach((key) => faviconCache.delete(key))
+    console.log(`Удалено ${keysToDelete.length} устаревших фавиконов из кэша`)
+
+    // Если кэш все еще слишком большой, удаляем самые старые записи
+    if (faviconCache.size > FAVICON_CACHE_MAX_SIZE * 0.8) {
+      const entries = Array.from(faviconCache.entries()).sort(
+        (a, b) => a[1].timestamp - b[1].timestamp
+      )
+
+      const toDelete = Math.floor(entries.length * 0.3) // Удаляем 30% самых старых
+      for (let i = 0; i < toDelete; i++) {
+        faviconCache.delete(entries[i][0])
+      }
+      console.log(`Дополнительно удалено ${toDelete} старых фавиконов из кэша`)
+    }
+  }
+}
+
+// Получить favicon для URL с кэшированием
 export async function getFavicon(url) {
   try {
     if (!url) {
@@ -304,47 +434,164 @@ export async function getFavicon(url) {
       return "/assets/icons/link.svg"
     }
 
-    // Прямая ссылка на favicon.ico (самый надежный метод)
-    try {
-      const faviconUrl = `${urlObj.origin}/favicon.ico`
-      // Проверяем доступность
-      console.log(`Пробуем получить фавикон напрямую: ${faviconUrl}`)
-      const response = await fetch(faviconUrl, {
-        method: "HEAD",
-        mode: "no-cors",
-        cache: "no-cache",
+    // Домен для использования в запросах фавиконов
+    const domain = urlObj.hostname
+
+    // Проверяем кэш по домену
+    if (faviconCache.has(domain)) {
+      const cachedFavicon = faviconCache.get(domain)
+
+      // Проверяем срок действия кэша (24 часа)
+      if (Date.now() - cachedFavicon.timestamp < 24 * 60 * 60 * 1000) {
+        console.log(
+          `Использован кэшированный фавикон для ${domain}: ${cachedFavicon.url}`
+        )
+        return cachedFavicon.url
+      } else {
+        console.log(
+          `Кэшированный фавикон для ${domain} устарел, загружаем новый`
+        )
+        // Кэш устарел, удаляем запись
+        faviconCache.delete(domain)
+      }
+    }
+
+    // Список возможных высококачественных источников фавиконов
+    const sources = [
+      // 1. Высококачественные Apple Touch Icons (обычно имеют размер 180x180 или 192x192)
+      `https://${domain}/apple-touch-icon.png`,
+      `https://${domain}/apple-touch-icon-precomposed.png`,
+
+      // 2. favicon.svg - векторный формат (наивысшее качество при любом масштабировании)
+      `https://${domain}/favicon.svg`,
+
+      // 3. Распространенные HD фавиконы (192px - стандарт для PWA)
+      `https://${domain}/favicon-192x192.png`,
+      `https://${domain}/favicon-196x196.png`,
+      `https://${domain}/favicon-152x152.png`,
+
+      // 4. DuckDuckGo - улучшенные фавиконы
+      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+
+      // 5. Google Favicon Service - надежный, но не HD (используем максимальный доступный размер)
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+        domain
+      )}&sz=128`,
+
+      // 6. Стандартные пути к favicon.ico
+      `https://${domain}/favicon.ico`,
+    ]
+
+    // Функция для проверки, что изображение загружается
+    const checkImage = (url) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () =>
+          resolve({ url, width: img.width, height: img.height })
+        img.onerror = () => reject(new Error(`Не удалось загрузить ${url}`))
+        img.src = url
+
+        // Таймаут 1.5 секунды для каждой проверки, чтобы не задерживать UI
+        setTimeout(() => reject(new Error(`Таймаут для ${url}`)), 1500)
       })
-      // Если получили ответ, используем этот URL
-      return faviconUrl
-    } catch (error) {
-      console.warn("Не удалось получить favicon напрямую:", error)
-      // Продолжаем со следующей стратегией
     }
 
-    // Google Favicon Service (очень надежный сервис для иконок)
     try {
-      const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-        urlObj.hostname
-      )}&sz=32`
-      console.log(`Пробуем получить фавикон через Google: ${googleFaviconUrl}`)
-      return googleFaviconUrl
-    } catch (error) {
-      console.warn("Не удалось получить favicon через Google:", error)
-      // Продолжаем со следующей стратегией
-    }
+      // Для сверхнадежности добавим проверку manifest.json, который часто содержит высококачественные иконки
+      try {
+        // Запрашиваем manifest.json, который может содержать HD фавиконы
+        const manifestResponse = await fetch(
+          `https://${domain}/manifest.json`,
+          {
+            method: "GET",
+            mode: "cors",
+            cache: "force-cache",
+            credentials: "omit",
+            headers: { Accept: "application/json" },
+            timeout: 2000,
+          }
+        ).then((response) => {
+          if (!response.ok) throw new Error("Манифест не найден")
+          return response.json()
+        })
 
-    // Chrome Favicon API (работает только в расширениях)
-    try {
-      return `chrome://favicon/${urlObj.origin}`
-    } catch (error) {
-      console.warn("Не удалось получить favicon через Chrome API:", error)
-    }
+        // Если манифест содержит иконки, добавляем их в начало списка источников
+        if (
+          manifestResponse &&
+          manifestResponse.icons &&
+          manifestResponse.icons.length > 0
+        ) {
+          // Сортируем иконки по размеру (от большего к меньшему)
+          const manifestIcons = manifestResponse.icons
+            .filter((icon) => icon.src && (icon.sizes || icon.size))
+            .sort((a, b) => {
+              const sizeA = parseInt((a.sizes || a.size || "0x0").split("x")[0])
+              const sizeB = parseInt((b.sizes || b.size || "0x0").split("x")[0])
+              return sizeB - sizeA
+            })
 
-    console.warn(`Не удалось получить favicon для URL: ${url}`)
-    return "/assets/icons/link.svg"
+          if (manifestIcons.length > 0) {
+            // Берем самую большую иконку и добавляем ее в начало списка
+            const largestIcon = manifestIcons[0]
+            const iconUrl = new URL(largestIcon.src, `https://${domain}`).href
+            sources.unshift(iconUrl)
+            console.log(`Добавлен фавикон из манифеста: ${iconUrl}`)
+          }
+        }
+      } catch (e) {
+        console.warn("Не удалось получить манифест:", e)
+      }
+
+      // Проверяем параллельно все источники и используем первый успешный
+      const results = await Promise.any(sources.map((src) => checkImage(src)))
+      console.log(
+        `Успешно получен фавикон высокого качества: ${results.url} (${results.width}x${results.height}px)`
+      )
+
+      // Сохраняем в кэш
+      faviconCache.set(domain, {
+        url: results.url,
+        timestamp: Date.now(),
+        width: results.width,
+        height: results.height,
+      })
+
+      // Очищаем кэш при необходимости
+      cleanupFaviconCache()
+
+      return results.url
+    } catch (error) {
+      // Если все проверки провалились, возвращаем Google как наиболее надежный
+      console.warn(
+        "Не удалось проверить все источники фавиконов, используем Google:",
+        error
+      )
+      const fallbackUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+        domain
+      )}&sz=128`
+
+      // Сохраняем в кэш запасной вариант
+      faviconCache.set(domain, {
+        url: fallbackUrl,
+        timestamp: Date.now(),
+        width: 128,
+        height: 128,
+      })
+
+      return fallbackUrl
+    }
   } catch (error) {
     console.error("Ошибка при получении favicon:", error)
-    return "/assets/icons/link.svg"
+
+    // В случае любой ошибки, возвращаем Google Favicon как самый надежный вариант
+    try {
+      const domain = new URL(url).hostname
+      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+        domain
+      )}&sz=128`
+    } catch (e) {
+      return "/assets/icons/link.svg"
+    }
   }
 }
 
@@ -395,6 +642,7 @@ export async function updateAllFavicons(progressCallback) {
     const bookmarks = await getStoredBookmarks()
     let total = 0
     let processed = 0
+    let successfullyUpdated = 0
 
     // Сначала подсчитаем общее количество закладок
     function countBookmarks(items) {
@@ -410,7 +658,16 @@ export async function updateAllFavicons(progressCallback) {
 
     countBookmarks(bookmarks)
 
-    // Теперь обновляем фавиконы
+    // Если нет закладок, сразу возвращаем результат
+    if (total === 0) {
+      return {
+        success: true,
+        total: 0,
+        updated: 0,
+      }
+    }
+
+    // Быстрое обновление фавиконов с новой функцией
     async function updateFavicons(items) {
       const updatedItems = [...items]
 
@@ -419,17 +676,23 @@ export async function updateAllFavicons(progressCallback) {
 
         if (item.type === "bookmark" && item.url) {
           try {
-            const faviconUrl = await getFavicon(item.url)
-            if (faviconUrl && faviconUrl !== "/assets/icons/link.svg") {
+            // Используем быструю функцию для получения фавикона
+            const faviconUrl = await getFaviconFast(item.url)
+
+            // Если получили фавикон и он отличается от существующего или его не было
+            if (faviconUrl && (!item.favicon || faviconUrl !== item.favicon)) {
               updatedItems[i] = {
                 ...item,
                 favicon: faviconUrl,
               }
+
+              successfullyUpdated++
+              console.log(`Обновлен фавикон для ${item.url}: ${faviconUrl}`)
             }
 
             processed++
             if (progressCallback) {
-              progressCallback(processed, total)
+              progressCallback(processed, total, successfullyUpdated)
             }
           } catch (error) {
             console.warn(
@@ -438,7 +701,7 @@ export async function updateAllFavicons(progressCallback) {
             )
             processed++
             if (progressCallback) {
-              progressCallback(processed, total)
+              progressCallback(processed, total, successfullyUpdated)
             }
           }
         }
@@ -454,13 +717,16 @@ export async function updateAllFavicons(progressCallback) {
       return updatedItems
     }
 
+    // Запускаем обновление
     const updatedBookmarks = await updateFavicons(bookmarks)
+
+    // Сохраняем результат
     await saveBookmarks(updatedBookmarks)
 
     return {
       success: true,
       total,
-      updated: processed,
+      updated: successfullyUpdated,
     }
   } catch (error) {
     console.error("Ошибка при массовом обновлении фавиконов:", error)
@@ -535,5 +801,280 @@ export async function clearAllFavicons() {
       success: false,
       error: error.message,
     }
+  }
+}
+
+// Обновить фавикон для отдельной закладки
+export async function updateBookmarkFavicon(bookmarkId) {
+  try {
+    // Получаем все закладки
+    const bookmarks = await getStoredBookmarks()
+    let updated = false
+    let bookmarkUrl = null
+    let bookmarkTitle = null
+
+    // Функция для поиска и обновления фавикона закладки по ID
+    async function updateFavicon(items) {
+      const updatedItems = [...items]
+
+      for (let i = 0; i < updatedItems.length; i++) {
+        const item = updatedItems[i]
+
+        if (item.id === bookmarkId && item.type === "bookmark" && item.url) {
+          // Запоминаем URL и заголовок для логирования
+          bookmarkUrl = item.url
+          bookmarkTitle = item.title
+          console.log(
+            `Обновляем фавикон для закладки: ${item.title} (${item.url})`
+          )
+
+          // Форсированное обновление: используем новую быструю функцию
+          const faviconUrl = await getFaviconFast(item.url)
+
+          // Используем полученный фавикон напрямую без дополнительных проверок
+          if (faviconUrl && (!item.favicon || faviconUrl !== item.favicon)) {
+            updatedItems[i] = {
+              ...item,
+              favicon: faviconUrl,
+            }
+            updated = true
+            console.log(`Фавикон обновлен на: ${faviconUrl}`)
+          } else if (!faviconUrl) {
+            console.warn(`Не удалось получить новый фавикон для: ${item.url}`)
+          } else {
+            console.log(`Фавикон не изменился: ${faviconUrl}`)
+          }
+        }
+
+        if (item.type === "folder" && item.children) {
+          updatedItems[i] = {
+            ...item,
+            children: await updateFavicon(item.children),
+          }
+        }
+      }
+
+      return updatedItems
+    }
+
+    // Обновляем фавикон в дереве закладок
+    const updatedBookmarks = await updateFavicon(bookmarks)
+
+    // Сохраняем изменения только если фавикон был обновлен
+    if (updated) {
+      await saveBookmarks(updatedBookmarks)
+    }
+
+    return {
+      success: true,
+      updated,
+      url: bookmarkUrl,
+      title: bookmarkTitle,
+    }
+  } catch (error) {
+    console.error("Ошибка при обновлении фавикона закладки:", error)
+    return {
+      success: false,
+      error: error.message,
+    }
+  }
+}
+
+// Функция для получения размера изображения
+async function getImageSize(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.width, height: img.height })
+    img.onerror = (err) =>
+      reject(new Error(`Не удалось загрузить изображение: ${err}`))
+    img.src = url
+
+    // Таймаут 2 секунды
+    setTimeout(
+      () => reject(new Error("Таймаут при загрузке изображения")),
+      2000
+    )
+  })
+}
+
+// Быстрый прямой доступ к фавиконам высокого качества без дополнительных проверок
+export async function getFaviconFast(url) {
+  try {
+    if (!url) return "/assets/icons/link.svg"
+
+    // Быстрая проверка URL
+    let urlObj
+    try {
+      urlObj = new URL(url)
+    } catch (e) {
+      return "/assets/icons/link.svg"
+    }
+
+    const domain = urlObj.hostname
+
+    // Кэш фавиконов в памяти
+    if (!window.faviconDirectCache) {
+      window.faviconDirectCache = {}
+    }
+
+    // Проверяем кэш
+    if (window.faviconDirectCache[domain]) {
+      return window.faviconDirectCache[domain]
+    }
+
+    // Список специальных путей для популярных сайтов
+    const specialCases = {
+      // Популярные социальные сети
+      "youtube.com":
+        "https://www.youtube.com/s/desktop/1c3cebd9/img/favicon_144x144.png",
+      "www.youtube.com":
+        "https://www.youtube.com/s/desktop/1c3cebd9/img/favicon_144x144.png",
+      "facebook.com":
+        "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZIVX-5C-b.ico",
+      "www.facebook.com":
+        "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZIVX-5C-b.ico",
+      "twitter.com":
+        "https://abs.twimg.com/responsive-web/web/icon-ios.b1fc727a.png",
+      "www.twitter.com":
+        "https://abs.twimg.com/responsive-web/web/icon-ios.b1fc727a.png",
+      "instagram.com":
+        "https://www.instagram.com/static/images/ico/apple-touch-icon-180x180-precomposed.png/c06fdb2357bd.png",
+      "www.instagram.com":
+        "https://www.instagram.com/static/images/ico/apple-touch-icon-180x180-precomposed.png/c06fdb2357bd.png",
+      "linkedin.com": "https://static.licdn.com/sc/h/2if24wp7oqlodqdlgei1n1520",
+      "www.linkedin.com":
+        "https://static.licdn.com/sc/h/2if24wp7oqlodqdlgei1n1520",
+
+      // Поисковые системы
+      "google.com":
+        "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
+      "www.google.com":
+        "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
+      "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
+      "www.bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
+      "yandex.ru":
+        "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
+      "www.yandex.ru":
+        "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
+
+      // Почтовые сервисы
+      "mail.google.com":
+        "https://www.gstatic.com/images/branding/product/1x/gmail_512dp.png",
+      "gmail.com":
+        "https://www.gstatic.com/images/branding/product/1x/gmail_512dp.png",
+      "outlook.com":
+        "https://outlook-1.cdn.office.net/assets/clear.r7KmX24vzmV.png",
+      "www.outlook.com":
+        "https://outlook-1.cdn.office.net/assets/clear.r7KmX24vzmV.png",
+
+      // Популярные магазины
+      "amazon.com": "https://www.amazon.com/favicon.ico",
+      "www.amazon.com": "https://www.amazon.com/favicon.ico",
+      "ebay.com": "https://pages.ebay.com/favicon.ico",
+      "www.ebay.com": "https://pages.ebay.com/favicon.ico",
+
+      // Развлекательные платформы
+      "netflix.com":
+        "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico",
+      "www.netflix.com":
+        "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico",
+      "twitch.tv":
+        "https://static.twitchcdn.net/assets/favicon-32-d6025c14e900565d6177.png",
+      "www.twitch.tv":
+        "https://static.twitchcdn.net/assets/favicon-32-d6025c14e900565d6177.png",
+
+      // Популярные новостные сайты
+      "cnn.com": "https://www.cnn.com/media/sites/cnn/apple-touch-icon.png",
+      "www.cnn.com": "https://www.cnn.com/media/sites/cnn/apple-touch-icon.png",
+      "bbc.com":
+        "https://static.files.bbci.co.uk/core/website/assets/static/bbc-icon-196.d36e7f0c85ccd9a3e10c2be8964c0d67.png",
+      "www.bbc.com":
+        "https://static.files.bbci.co.uk/core/website/assets/static/bbc-icon-196.d36e7f0c85ccd9a3e10c2be8964c0d67.png",
+
+      // Технологические компании
+      "apple.com": "https://www.apple.com/favicon.ico",
+      "www.apple.com": "https://www.apple.com/favicon.ico",
+      "microsoft.com": "https://c.s-microsoft.com/favicon.ico",
+      "www.microsoft.com": "https://c.s-microsoft.com/favicon.ico",
+      "github.com": "https://github.githubassets.com/favicons/favicon.svg",
+      "www.github.com": "https://github.githubassets.com/favicons/favicon.svg",
+    }
+
+    // Проверяем, есть ли домен в специальных случаях
+    if (specialCases[domain]) {
+      const specialUrl = specialCases[domain]
+      window.faviconDirectCache[domain] = specialUrl // Кэшируем
+      return specialUrl
+    }
+
+    // Список приоритетных прямых путей к высококачественным фавиконам
+    const priorityPaths = [
+      // 1. Самые высококачественные источники (192px+)
+      `https://${domain}/apple-touch-icon.png`,
+      `https://${domain}/apple-touch-icon-precomposed.png`,
+      `https://${domain}/touch-icon-192x192.png`,
+      `https://${domain}/icon-192x192.png`,
+      `https://${domain}/favicon-192x192.png`,
+
+      // 2. DuckDuckGo (обычно даёт лучшие иконки чем Google)
+      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+
+      // 3. Iconify - новый сервис иконок с хорошим качеством
+      `https://icon.horse/icon/${domain}`,
+
+      // 4. Всегда работающий Google (резервный вариант)
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    ]
+
+    // Проверяем каждый путь без ожидания задержки
+    const img = new Image()
+    let resolvePromise
+    const resultPromise = new Promise((resolve) => {
+      resolvePromise = resolve
+    })
+
+    let currentIndex = 0
+
+    // Функция для быстрой проверки следующего источника
+    const tryNextSource = () => {
+      if (currentIndex >= priorityPaths.length) {
+        // Если все пути проверены, возвращаем Google как наиболее надежный
+        const googleFallback = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+        window.faviconDirectCache[domain] = googleFallback
+        resolvePromise(googleFallback)
+        return
+      }
+
+      const src = priorityPaths[currentIndex++]
+      img.src = src
+    }
+
+    img.onload = () => {
+      // Сохраняем успешный источник в кэш
+      window.faviconDirectCache[domain] = img.src
+      resolvePromise(img.src)
+    }
+
+    img.onerror = () => {
+      // Если текущий источник не сработал, пробуем следующий
+      setTimeout(tryNextSource, 0) // Минимальная задержка для предотвращения блокировки UI
+    }
+
+    // Начинаем проверять первый источник
+    tryNextSource()
+
+    // Устанавливаем таймаут 1 секунда для всего процесса
+    setTimeout(() => {
+      if (currentIndex < priorityPaths.length) {
+        // Если не успели проверить все, сразу возвращаем Google
+        const googleFallback = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+        window.faviconDirectCache[domain] = googleFallback
+        resolvePromise(googleFallback)
+      }
+    }, 1000)
+
+    return resultPromise
+  } catch (error) {
+    return `/assets/icons/link.svg`
   }
 }
