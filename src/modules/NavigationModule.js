@@ -58,10 +58,9 @@ export class NavigationModule {
     if (!bookmarkElement) return
 
     const isFolder = bookmarkElement.classList.contains("folder")
+    // Для заметок будет использоваться отдельный обработчик в popup.js
     if (isFolder) {
       await this.handleFolderClick(bookmarkElement)
-    } else if (bookmarkElement.dataset.url) {
-      chrome.tabs.create({ url: bookmarkElement.dataset.url })
     }
   }
 

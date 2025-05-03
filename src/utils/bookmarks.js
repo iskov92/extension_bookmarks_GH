@@ -279,7 +279,9 @@ export async function importFromBrowser() {
     let allBookmarks = []
     for (const folder of systemFolders) {
       if (folder.children) {
-        const processedBookmarks = await processBookmarkTree(folder.children)
+        const processedBookmarks = await processBasicBookmarkTree(
+          folder.children
+        )
         allBookmarks = [...allBookmarks, ...processedBookmarks]
       }
     }
@@ -293,7 +295,7 @@ export async function importFromBrowser() {
 }
 
 // Рекурсивно обработать дерево закладок
-async function processBookmarkTree(bookmarks) {
+async function processBasicBookmarkTree(bookmarks) {
   const processedBookmarks = []
 
   for (const bookmark of bookmarks) {
@@ -312,7 +314,7 @@ async function processBookmarkTree(bookmarks) {
       newBookmark.favicon = `chrome://favicon/size/16@2x/${bookmark.url}`
     } else if (bookmark.children && bookmark.children.length > 0) {
       // Добавляем папку только если в ней есть содержимое
-      newBookmark.children = await processBookmarkTree(bookmark.children)
+      newBookmark.children = await processBasicBookmarkTree(bookmark.children)
       // Если после обработки в папке нет содержимого, пропускаем её
       if (newBookmark.children.length === 0) continue
     }
@@ -338,7 +340,7 @@ export async function exportBookmarksToHTML() {
   }
 }
 
-// Сгенерировать HTML для закладок
+// Обновленная версия generateBookmarksHTML с поддержкой заметок
 function generateBookmarksHTML(bookmarks, level = 0) {
   let html =
     level === 0
@@ -348,9 +350,16 @@ function generateBookmarksHTML(bookmarks, level = 0) {
   for (const bookmark of bookmarks) {
     const indent = "    ".repeat(level + 1)
 
-    if (bookmark.url) {
+    if (bookmark.type === "bookmark" || bookmark.url) {
       html += `${indent}<DT><A HREF="${bookmark.url}">${bookmark.title}</A>\n`
+    } else if (bookmark.type === "note") {
+      // Добавляем заметку в специальном формате, который можно распознать при импорте
+      const createdAt = bookmark.createdAt || Date.now()
+      html += `${indent}<DT><EXT-NOTE TITLE="${bookmark.title}" CREATED_AT="${createdAt}">\n`
+      html += `${indent}${indent}${bookmark.content || ""}\n`
+      html += `${indent}</EXT-NOTE>\n`
     } else {
+      // Это папка
       html += `${indent}<DT><H3>${bookmark.title}</H3>\n${indent}<DL><p>\n`
       html += generateBookmarksHTML(bookmark.children || [], level + 1)
       html += `${indent}</DL><p>\n`
@@ -362,6 +371,73 @@ function generateBookmarksHTML(bookmarks, level = 0) {
   }
 
   return html
+}
+
+// Расширяем существующую функцию импорта для поддержки заметок
+async function processBookmarkTreeWithNotes(bookmarks) {
+  const result = []
+
+  // Функция для обработки HTML-строки с заметкой
+  function extractNoteContent(html) {
+    const titleMatch = html.match(/TITLE="([^"]*)"/)
+    const createdAtMatch = html.match(/CREATED_AT="([^"]*)"/)
+
+    let content = html
+
+    // Удаляем открывающий тег EXT-NOTE с атрибутами
+    content = content.replace(/<EXT-NOTE[^>]*>/, "")
+    // Удаляем закрывающий тег
+    content = content.replace(/<\/EXT-NOTE>/, "")
+    // Убираем лишние пробелы
+    content = content.trim()
+
+    return {
+      title: titleMatch ? titleMatch[1] : "Заметка",
+      content: content,
+      createdAt: createdAtMatch ? parseInt(createdAtMatch[1]) : Date.now(),
+    }
+  }
+
+  for (const item of bookmarks) {
+    if (item.title && item.url) {
+      // Это закладка
+      result.push({
+        id: generateUniqueId(),
+        title: item.title,
+        url: item.url,
+        type: "bookmark",
+      })
+    } else if (item.title && item.children) {
+      // Это папка
+      const folder = {
+        id: generateUniqueId(),
+        title: item.title,
+        type: "folder",
+        children: await processBookmarkTreeWithNotes(item.children),
+      }
+      result.push(folder)
+    } else if (item.title && item.html) {
+      // Проверяем, это заметка?
+      const html = item.html
+      if (html.includes("<EXT-NOTE")) {
+        const noteData = extractNoteContent(html)
+        result.push({
+          id: generateUniqueId(),
+          title: noteData.title,
+          type: "note",
+          content: noteData.content,
+          createdAt: noteData.createdAt,
+        })
+      }
+    }
+  }
+
+  return result
+}
+
+// Обновляем функцию processBookmarkTree для использования расширенной версии
+export async function processBookmarkTree(bookmarks) {
+  return processBookmarkTreeWithNotes(bookmarks)
 }
 
 /**
@@ -968,6 +1044,213 @@ async function isChildOf(parentId, childId) {
     return checkIsChild(parentFolder.children, childId)
   } catch (error) {
     console.error("isChildOf: ошибка при проверке вложенности папок", error)
+    return false
+  }
+}
+
+/**
+ * Создает новую заметку
+ * @param {string} parentId - ID родительской папки
+ * @param {string} title - Заголовок заметки
+ * @param {string} content - Содержимое заметки
+ * @returns {Promise<Object|null>} - Возвращает созданную заметку или null при ошибке
+ */
+export async function createNote(parentId, title, content = "") {
+  console.log(`createNote: создание заметки '${title}' в папке ${parentId}`)
+
+  // Проверяем parentId на валидность
+  if (!parentId || typeof parentId !== "string") {
+    console.error(`Ошибка в createNote: недопустимый parentId: ${parentId}`)
+    return null
+  }
+
+  // Проверяем title на валидность
+  if (!title || typeof title !== "string" || title.trim() === "") {
+    console.error(`Ошибка в createNote: недопустимый title: ${title}`)
+    return null
+  }
+
+  try {
+    const timestamp = Date.now()
+    // Создаем заметку с типом note
+    const note = await createStoredNote(parentId, title, content, timestamp)
+
+    // Дополнительная проверка типа
+    if (note && !note.type) {
+      note.type = "note"
+      console.log("Исправлен тип заметки: добавлен тип 'note'")
+    }
+
+    // Очищаем кэш для принудительного обновления данных
+    if (window._folderContentsCache) {
+      delete window._folderContentsCache[parentId]
+      console.log(`Кэш для папки ${parentId} очищен после создания заметки`)
+    }
+
+    return note
+  } catch (error) {
+    console.error(`Ошибка в createNote:`, error)
+    return null
+  }
+}
+
+/**
+ * Создаёт заметку в хранилище
+ * @param {string} parentId - ID родительской папки
+ * @param {string} title - Заголовок заметки
+ * @param {string} content - Содержимое заметки
+ * @param {number} createdAt - Временная метка создания
+ * @returns {Promise<Object|null>} - Созданная заметка или null при ошибке
+ */
+export async function createStoredNote(
+  parentId,
+  title,
+  content = "",
+  createdAt = Date.now()
+) {
+  console.log(
+    `Запрос на создание заметки: ${title} в родительской папке: ${parentId}`
+  )
+
+  try {
+    const bookmarks = await getStoredBookmarks()
+
+    const newNote = {
+      id: generateUniqueId(),
+      title: title.trim(),
+      type: "note",
+      content: content || "",
+      createdAt: createdAt,
+    }
+
+    console.log(`Создана новая заметка: ${JSON.stringify(newNote)}`)
+
+    let added = false
+
+    if (parentId === "0") {
+      // Добавляем в корневую папку
+      bookmarks.push(newNote)
+      added = true
+      console.log(`Заметка добавлена в корневую папку`)
+    } else {
+      // Добавляем заметку в указанную папку
+      function addToFolder(items) {
+        for (const item of items) {
+          if (item.id === parentId) {
+            // Инициализируем children если нужно
+            if (!item.children) {
+              item.children = []
+            }
+            item.children.push(newNote)
+            console.log(
+              `Заметка добавлена в папку ${item.title} (ID: ${item.id})`
+            )
+            return true
+          }
+
+          if (item.type === "folder" && Array.isArray(item.children)) {
+            if (addToFolder(item.children)) {
+              return true
+            }
+          }
+        }
+        return false
+      }
+
+      added = addToFolder(bookmarks)
+
+      if (!added) {
+        // Последняя попытка найти папку
+        const parentFolder = findFolderById(bookmarks, parentId)
+        if (parentFolder) {
+          if (!parentFolder.children) {
+            parentFolder.children = []
+          }
+          parentFolder.children.push(newNote)
+          added = true
+          console.log(
+            `Заметка добавлена в папку ${parentFolder.title} (ID: ${parentId}) через прямой поиск`
+          )
+        } else {
+          bookmarks.push(newNote)
+          added = true
+          console.log(`Заметка добавлена в корневую папку (запасной вариант)`)
+        }
+      }
+    }
+
+    if (added) {
+      await storage.set("gh_bookmarks", bookmarks)
+      // Проверка типа перед возвратом
+      if (!newNote.type) {
+        newNote.type = "note"
+        console.log("Исправлен тип заметки перед возвратом")
+      }
+      return newNote
+    } else {
+      console.error(`Не удалось добавить заметку ${title} в папку ${parentId}`)
+      return null
+    }
+  } catch (error) {
+    console.error(`Ошибка при создании заметки ${title}:`, error)
+    return null
+  }
+}
+
+/**
+ * Обновляет заметку
+ * @param {string} id - ID заметки
+ * @param {Object} data - Данные для обновления (title, content)
+ * @returns {Promise<boolean>} - Результат операции
+ */
+export async function updateNote(id, data) {
+  try {
+    if (!id) {
+      console.error("ID заметки не указан")
+      return false
+    }
+
+    const bookmarks = await getStoredBookmarks()
+
+    function updateInTree(items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+
+        if (item.id === id) {
+          // Обновляем поля заметки
+          if (data.title !== undefined) {
+            item.title = data.title.trim()
+          }
+          if (data.content !== undefined) {
+            item.content = data.content
+          }
+          // Обновляем время последнего редактирования
+          item.editedAt = Date.now()
+
+          console.log(`Заметка ${id} успешно обновлена:`, item)
+          return true
+        }
+
+        if (item.children && item.children.length > 0) {
+          const updated = updateInTree(item.children)
+          if (updated) {
+            return true
+          }
+        }
+      }
+      return false
+    }
+
+    const updated = updateInTree(bookmarks)
+    if (updated) {
+      await saveBookmarks(bookmarks)
+      return true
+    } else {
+      console.error(`Заметка с ID ${id} не найдена для обновления`)
+      return false
+    }
+  } catch (error) {
+    console.error("Ошибка при обновлении заметки:", error)
     return false
   }
 }

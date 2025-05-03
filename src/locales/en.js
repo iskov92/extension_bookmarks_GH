@@ -1,15 +1,18 @@
 export default {
   MODALS: {
-    CREATE_FOLDER: "Create Folder",
-    ADD_BOOKMARK: "Add Bookmark",
-    EDIT_BOOKMARK: "Edit Bookmark",
-    EDIT_FOLDER: "Edit Folder",
+    CREATE_FOLDER: "Create folder",
+    ADD_BOOKMARK: "Add bookmark",
+    EDIT_BOOKMARK: "Edit bookmark",
+    EDIT_FOLDER: "Edit folder",
     SELECT_TYPE: "Select Type",
-    ADD_ITEM: "Add Item",
+    ADD_ITEM: "Add item",
+    CREATE_BOOKMARK: "Create bookmark",
+    CREATE_NOTE: "Create note",
+    EDIT_NOTE: "Edit note",
   },
   BUTTONS: {
-    CREATE_FOLDER: "Create Folder",
-    ADD_BOOKMARK: "Add Bookmark",
+    CREATE_FOLDER: "Create folder",
+    ADD_BOOKMARK: "Add bookmark",
     ADDFOLDER: "Create Folder",
     ADDBOOKMARK: "Add Bookmark",
     EDIT: "Edit",
@@ -19,17 +22,22 @@ export default {
     SAVE: "Save",
     BACK: "Back",
     SETTINGS: "Settings",
+    CREATE_NOTE: "Create note",
+    ADDNOTE: "Create note",
   },
   LABELS: {
     FOLDER_NAME: "Folder name",
     UPLOAD_ICON: "Upload icon",
     THEME: "Theme",
     LANGUAGE: "Language",
-    BOOKMARK_NAME: "Name",
-    BOOKMARK_URL: "URL",
+    BOOKMARK_NAME: "Bookmark name",
+    BOOKMARK_URL: "Bookmark URL",
     FILE_NOT_SELECTED: "No file selected",
     PREVIEW: "Preview",
     CHOOSE_FILE: "Choose file",
+    NOTE_TITLE: "Note title",
+    NOTE_CONTENT: "Note content",
+    CREATED_AT: "Created",
   },
   CONFIRMATIONS: {
     DELETE: "Are you sure you want to delete this item?",
@@ -37,6 +45,7 @@ export default {
   VALIDATIONS: {
     EMPTY_FOLDER_NAME: "Folder name cannot be empty",
     EMPTY_BOOKMARK_NAME: "Bookmark name cannot be empty",
+    EMPTY_NOTE_TITLE: "Note title cannot be empty",
     INVALID_IMAGE: "Please select an image",
   },
   MESSAGES: {
@@ -87,5 +96,8 @@ export default {
     AFTER_TIP: "Moving after item",
     INTO_TIP: "Moving into folder (release to complete)",
     MOVE_TO_PARENT: "Moving up one level",
+  },
+  PLACEHOLDERS: {
+    NOTE_CONTENT: "Enter note text...",
   },
 }

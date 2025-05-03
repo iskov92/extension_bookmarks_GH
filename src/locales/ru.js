@@ -6,6 +6,9 @@ export default {
     EDIT_FOLDER: "Редактировать папку",
     SELECT_TYPE: "Выберите тип",
     ADD_ITEM: "Добавить элемент",
+    CREATE_BOOKMARK: "Создать закладку",
+    CREATE_NOTE: "Создать заметку",
+    EDIT_NOTE: "Редактировать заметку",
   },
   BUTTONS: {
     CREATE_FOLDER: "Создать папку",
@@ -19,17 +22,22 @@ export default {
     SAVE: "Сохранить",
     BACK: "Назад",
     SETTINGS: "Настройки",
+    CREATE_NOTE: "Создать заметку",
+    ADDNOTE: "Создать заметку",
   },
   LABELS: {
     FOLDER_NAME: "Название папки",
     UPLOAD_ICON: "Загрузить иконку",
     THEME: "Тема",
     LANGUAGE: "Язык",
-    BOOKMARK_NAME: "Название",
-    BOOKMARK_URL: "URL",
+    BOOKMARK_NAME: "Название закладки",
+    BOOKMARK_URL: "URL закладки",
     FILE_NOT_SELECTED: "Файл не выбран",
     PREVIEW: "Предпросмотр",
     CHOOSE_FILE: "Выбрать файл",
+    NOTE_TITLE: "Название заметки",
+    NOTE_CONTENT: "Содержимое заметки",
+    CREATED_AT: "Создано",
   },
   CONFIRMATIONS: {
     DELETE: "Вы уверены, что хотите удалить этот элемент?",
@@ -37,6 +45,7 @@ export default {
   VALIDATIONS: {
     EMPTY_FOLDER_NAME: "Название папки не может быть пустым",
     EMPTY_BOOKMARK_NAME: "Название закладки не может быть пустым",
+    EMPTY_NOTE_TITLE: "Название заметки не может быть пустым",
     INVALID_IMAGE: "Пожалуйста, выберите изображение",
   },
   MESSAGES: {
@@ -87,5 +96,8 @@ export default {
     AFTER_TIP: "Перемещение после элемента",
     INTO_TIP: "Перемещение внутрь папки (отпустите для завершения)",
     MOVE_TO_PARENT: "Перемещение на уровень выше",
+  },
+  PLACEHOLDERS: {
+    NOTE_CONTENT: "Введите текст заметки...",
   },
 }

@@ -111,7 +111,7 @@ async function exportBookmarksToFile() {
     }
 
     // Создаем HTML файл с закладками
-    const html = generateBookmarksHTML(bookmarks)
+    const html = generateSettingsBookmarksHTML(bookmarks)
 
     // Создаем Blob и скачиваем файл
     const blob = new Blob([html], { type: "text/html" })
@@ -133,7 +133,7 @@ async function exportBookmarksToFile() {
 }
 
 // Функция генерации HTML файла с закладками
-function generateBookmarksHTML(bookmarks) {
+function generateSettingsBookmarksHTML(bookmarks) {
   const header = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
      It will be read and overwritten.

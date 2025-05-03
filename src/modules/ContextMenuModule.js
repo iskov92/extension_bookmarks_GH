@@ -8,9 +8,10 @@ import { i18n } from "../utils/i18n.js"
 import { ErrorHandler, ErrorType } from "../utils/errorHandler.js"
 import {
   updateBookmark,
+  updateFolder,
   deleteBookmark,
   copyBookmark,
-  updateFolder,
+  updateNote,
   getBookmarksInFolder,
 } from "../utils/bookmarks.js"
 import { trashStorage } from "../services/TrashStorage.js"
@@ -60,14 +61,24 @@ export class ContextMenuModule {
 
     // Получаем данные о элементе
     const isFolder = bookmarkElement.classList.contains("folder")
+    const isNote = bookmarkElement.classList.contains("note")
     const id = bookmarkElement.dataset.id
     const title = bookmarkElement.querySelector(".bookmark-title").textContent
     const url = bookmarkElement.dataset.url
+    const content = bookmarkElement.dataset.content
+    const createdAt = bookmarkElement.dataset.createdAt
+      ? parseInt(bookmarkElement.dataset.createdAt)
+      : null
 
     // Определяем набор пунктов меню в зависимости от типа элемента
-    const items = isFolder
-      ? CONTEXT_MENU_CONFIG.FOLDER
-      : CONTEXT_MENU_CONFIG.BOOKMARK
+    let items
+    if (isFolder) {
+      items = CONTEXT_MENU_CONFIG.FOLDER
+    } else if (isNote) {
+      items = CONTEXT_MENU_CONFIG.NOTE
+    } else {
+      items = CONTEXT_MENU_CONFIG.BOOKMARK
+    }
 
     // Показываем контекстное меню
     this.contextMenu.show(
@@ -81,8 +92,11 @@ export class ContextMenuModule {
           bookmarkElement,
           id,
           isFolder,
+          isNote,
           title,
-          url
+          url,
+          content,
+          createdAt
         )
       }
     )
@@ -94,26 +108,49 @@ export class ContextMenuModule {
    * @param {HTMLElement} element - Элемент, для которого открыто меню
    * @param {string} id - ID закладки или папки
    * @param {boolean} isFolder - Признак папки
+   * @param {boolean} isNote - Признак заметки
    * @param {string} title - Заголовок элемента
-   * @param {string} url - URL закладки (если не папка)
+   * @param {string} url - URL закладки (если не папка и не заметка)
+   * @param {string} content - Содержимое заметки (если заметка)
+   * @param {number} createdAt - Время создания заметки (если заметка)
    */
-  async _handleMenuAction(action, element, id, isFolder, title, url) {
+  async _handleMenuAction(
+    action,
+    element,
+    id,
+    isFolder,
+    isNote,
+    title,
+    url,
+    content,
+    createdAt
+  ) {
     switch (action) {
       case "rename":
       case "edit":
         if (isFolder) {
           this._showFolderEditDialog(element, id, title)
+        } else if (isNote) {
+          this._showNoteEditDialog(element, id, title, content, createdAt)
         } else {
           this._showBookmarkEditDialog(element, id, title, url)
         }
         break
 
       case "delete":
-        await this._handleDeleteAction(id, isFolder, title, url)
+        await this._handleDeleteAction(
+          id,
+          isFolder,
+          isNote,
+          title,
+          url,
+          content,
+          createdAt
+        )
         break
 
       case "copy":
-        await this._handleCopyAction(id, isFolder)
+        await this._handleCopyAction(id, isFolder, isNote)
         break
 
       default:
@@ -213,21 +250,100 @@ export class ContextMenuModule {
   }
 
   /**
+   * Показывает диалог редактирования заметки
+   * @param {HTMLElement} element - Элемент заметки
+   * @param {string} id - ID заметки
+   * @param {string} title - Заголовок заметки
+   * @param {string} content - Содержимое заметки
+   * @param {number} createdAt - Время создания заметки
+   */
+  _showNoteEditDialog(element, id, title, content, createdAt) {
+    try {
+      // Импортируем компонент NoteModal
+      import("../components/NoteModal.js").then(({ NoteModal }) => {
+        const modal = new NoteModal()
+        modal.show(
+          i18n.t("MODALS.EDIT_NOTE"),
+          {
+            id,
+            title,
+            content: content || "",
+            createdAt,
+          },
+          async (data) => {
+            try {
+              // Валидация данных
+              if (!data || !data.title || data.title.trim() === "") {
+                alert(i18n.t("VALIDATIONS.EMPTY_NOTE_TITLE"))
+                return false
+              }
+
+              // Обновляем заметку
+              const result = await ErrorHandler.wrapAsync(
+                updateNote(id, data),
+                ErrorType.UPDATE,
+                "note"
+              )
+
+              if (result) {
+                modal.close()
+
+                // Обновляем интерфейс
+                window.dispatchEvent(
+                  new CustomEvent("refresh-view", { detail: { force: true } })
+                )
+                return true
+              } else {
+                this.uiModule.showErrorMessage(i18n.t("ERROR.UPDATE_FAILED"))
+                return false
+              }
+            } catch (error) {
+              logError("Ошибка при обновлении заметки:", error)
+              return false
+            }
+          }
+        )
+      })
+    } catch (error) {
+      logError("Ошибка при создании диалога редактирования заметки:", error)
+    }
+  }
+
+  /**
    * Обрабатывает действие удаления элемента
    * @param {string} id - ID закладки или папки
    * @param {boolean} isFolder - Признак папки
+   * @param {boolean} isNote - Признак заметки
    * @param {string} title - Заголовок элемента
-   * @param {string} url - URL закладки (если не папка)
+   * @param {string} url - URL закладки (если не папка и не заметка)
+   * @param {string} content - Содержимое заметки (если заметка)
+   * @param {number} createdAt - Время создания заметки (если заметка)
    */
-  async _handleDeleteAction(id, isFolder, title, url) {
+  async _handleDeleteAction(
+    id,
+    isFolder,
+    isNote,
+    title,
+    url,
+    content,
+    createdAt
+  ) {
     if (confirm(i18n.t("CONFIRM_DELETE"))) {
       try {
         // Создаем объект для сохранения в корзину
         let itemToTrash = {
           id,
-          type: isFolder ? "folder" : "bookmark",
+          type: isFolder ? "folder" : isNote ? "note" : "bookmark",
           title,
           url,
+        }
+
+        // Добавляем поля для заметки
+        if (isNote) {
+          itemToTrash.content = content || ""
+          if (createdAt) {
+            itemToTrash.createdAt = createdAt
+          }
         }
 
         // Если это папка, получаем её содержимое рекурсивно
@@ -246,7 +362,7 @@ export class ContextMenuModule {
         const deleted = await ErrorHandler.wrapAsync(
           deleteBookmark(id),
           ErrorType.DELETE,
-          isFolder ? "folder" : "bookmark"
+          isFolder ? "folder" : isNote ? "note" : "bookmark"
         )
 
         if (deleted) {
@@ -262,7 +378,7 @@ export class ContextMenuModule {
         ErrorHandler.handle(
           error,
           ErrorType.DELETE,
-          isFolder ? "folder" : "bookmark"
+          isFolder ? "folder" : isNote ? "note" : "bookmark"
         )
       }
     }
@@ -272,8 +388,9 @@ export class ContextMenuModule {
    * Обрабатывает действие копирования элемента
    * @param {string} id - ID закладки или папки
    * @param {boolean} isFolder - Признак папки
+   * @param {boolean} isNote - Признак заметки
    */
-  async _handleCopyAction(id, isFolder) {
+  async _handleCopyAction(id, isFolder, isNote) {
     try {
       // Закрываем контекстное меню
       this.contextMenu.close()
@@ -281,11 +398,11 @@ export class ContextMenuModule {
       // Получаем ID текущей папки
       const currentFolderId = this.navigationModule.getCurrentParentId()
 
-      // Копируем закладку
+      // Копируем элемент
       const result = await ErrorHandler.wrapAsync(
         copyBookmark(id, currentFolderId),
         ErrorType.COPY,
-        isFolder ? "folder" : "bookmark"
+        isFolder ? "folder" : isNote ? "note" : "bookmark"
       )
 
       if (result) {

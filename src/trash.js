@@ -1,7 +1,7 @@
 import { initTheme } from "./utils/theme.js"
 import { i18n } from "./utils/i18n.js"
 import { trashStorage } from "./services/TrashStorage.js"
-import { createBookmark, createFolder } from "./utils/bookmarks.js"
+import { createBookmark, createFolder, createNote } from "./utils/bookmarks.js"
 import { ErrorHandler, ErrorType } from "./utils/errorHandler.js"
 
 let mainContent
@@ -104,10 +104,15 @@ async function renderTrashItems() {
         ? "../assets/icons/folder_white.svg"
         : "../assets/icons/folder_black.svg"
 
+    const noteIcon =
+      currentTheme === "light"
+        ? "../assets/icons/note_white.svg"
+        : "../assets/icons/note_black.svg"
+
     for (const item of items) {
       const itemElement = document.createElement("div")
       itemElement.className = `bookmark-item ${
-        item.type === "folder" ? "folder" : ""
+        item.type === "folder" ? "folder" : item.type === "note" ? "note" : ""
       }`
       itemElement.dataset.id = item.id
       itemElement.dataset.type = item.type
@@ -116,10 +121,23 @@ async function renderTrashItems() {
         itemElement.dataset.url = item.url
       }
 
+      // Для заметок сохраняем содержимое и дату создания
+      if (item.type === "note") {
+        itemElement.dataset.content = item.content || ""
+        if (item.createdAt) {
+          itemElement.dataset.createdAt = item.createdAt
+        }
+      }
+
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
-      icon.src =
-        item.type === "folder" ? folderIcon : "../assets/icons/link.svg"
+      if (item.type === "folder") {
+        icon.src = folderIcon
+      } else if (item.type === "note") {
+        icon.src = noteIcon
+      } else {
+        icon.src = "../assets/icons/link.svg"
+      }
       icon.alt = item.type
 
       const title = document.createElement("span")
@@ -170,7 +188,16 @@ async function restoreContents(parentId, contents) {
       if (content.contents && content.contents.length > 0) {
         await restoreContents(newFolder.id, content.contents)
       }
+    } else if (content.type === "note") {
+      // Восстанавливаем заметку
+      await ErrorHandler.wrapAsync(
+        createNote(parentId, content.title, content.content || ""),
+        ErrorType.RESTORE,
+        "note",
+        i18n.t("TRASH.WAIT_RESTORE")
+      )
     } else {
+      // Восстанавливаем закладку
       await ErrorHandler.wrapAsync(
         createBookmark(parentId, content.title, content.url),
         ErrorType.RESTORE,
@@ -222,7 +249,17 @@ async function handleRestore(item) {
       if (restoredItem.contents && restoredItem.contents.length > 0) {
         await restoreContents(newFolder.id, restoredItem.contents)
       }
+    } else if (item.type === "note") {
+      // Восстанавливаем заметку
+      const newNote = await ErrorHandler.wrapAsync(
+        createNote(parentId, item.title, item.content || ""),
+        ErrorType.RESTORE,
+        "note",
+        i18n.t("TRASH.WAIT_RESTORE")
+      )
+      restoredItemId = newNote.id
     } else {
+      // Восстанавливаем закладку
       const newBookmark = await ErrorHandler.wrapAsync(
         createBookmark(parentId, item.title, item.url),
         ErrorType.RESTORE,

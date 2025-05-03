@@ -2,8 +2,10 @@ import {
   getAllBookmarks,
   createBookmark,
   createFolder,
+  createNote,
   getBookmarksInFolder,
   updateBookmark,
+  updateNote,
   deleteBookmark,
   copyBookmark,
   updateFolder,
@@ -35,6 +37,7 @@ import { UIModule } from "./modules/UIModule.js"
 import { DragDropModule } from "./modules/DragDropModule.js"
 import { ContextMenuModule } from "./modules/ContextMenuModule.js"
 import { ContextMenu } from "./components/ContextMenu.js"
+import { NoteModal } from "./components/NoteModal.js"
 
 // Глобальные переменные
 let mainContent
@@ -374,14 +377,24 @@ async function handleContextMenu(e) {
 
   // Получаем данные о элементе
   const isFolder = bookmarkElement.classList.contains("folder")
+  const isNote = bookmarkElement.classList.contains("note")
   const id = bookmarkElement.dataset.id
   const title = bookmarkElement.querySelector(".bookmark-title").textContent
   const url = bookmarkElement.dataset.url
+  const content = bookmarkElement.dataset.content
+  const createdAt = bookmarkElement.dataset.createdAt
+    ? parseInt(bookmarkElement.dataset.createdAt)
+    : null
 
   // Определяем набор пунктов меню в зависимости от типа элемента
-  const items = isFolder
-    ? CONTEXT_MENU_CONFIG.FOLDER
-    : CONTEXT_MENU_CONFIG.BOOKMARK
+  let items
+  if (isFolder) {
+    items = CONTEXT_MENU_CONFIG.FOLDER
+  } else if (isNote) {
+    items = CONTEXT_MENU_CONFIG.NOTE
+  } else {
+    items = CONTEXT_MENU_CONFIG.BOOKMARK
+  }
 
   // Создаем объект контекстного меню
   const contextMenu = new ContextMenu()
@@ -395,6 +408,13 @@ async function handleContextMenu(e) {
           showFolderEditDialog({
             id: id,
             title: title,
+          })
+        } else if (isNote) {
+          showNoteEditDialog({
+            id: id,
+            title: title,
+            content: content,
+            createdAt: createdAt,
           })
         } else {
           const modal = new Modal()
@@ -438,9 +458,15 @@ async function handleContextMenu(e) {
             // Создаем объект для сохранения в корзину
             let itemToTrash = {
               id,
-              type: isFolder ? "folder" : "bookmark",
+              type: isFolder ? "folder" : isNote ? "note" : "bookmark",
               title,
               url,
+              content,
+            }
+
+            // Если это заметка, сохраняем дату создания
+            if (isNote && createdAt) {
+              itemToTrash.createdAt = createdAt
             }
 
             // Если это папка, получаем её содержимое рекурсивно
@@ -459,7 +485,7 @@ async function handleContextMenu(e) {
             const deleted = await ErrorHandler.wrapAsync(
               deleteBookmark(id),
               ErrorType.DELETE,
-              isFolder ? "folder" : "bookmark"
+              isFolder ? "folder" : isNote ? "note" : "bookmark"
             )
 
             if (deleted) {
@@ -473,7 +499,7 @@ async function handleContextMenu(e) {
             ErrorHandler.handle(
               error,
               ErrorType.DELETE,
-              isFolder ? "folder" : "bookmark"
+              isFolder ? "folder" : isNote ? "note" : "bookmark"
             )
           }
         }
@@ -487,11 +513,11 @@ async function handleContextMenu(e) {
           // Получаем ID текущей папки
           const currentFolderId = navigationModule.getCurrentParentId()
 
-          // Копируем закладку
+          // Копируем элемент
           const result = await ErrorHandler.wrapAsync(
             copyBookmark(id, currentFolderId),
             ErrorType.COPY,
-            isFolder ? "folder" : "bookmark"
+            isFolder ? "folder" : isNote ? "note" : "bookmark"
           )
 
           if (result) {
@@ -774,6 +800,8 @@ function showAddDialog(parentId) {
         showCreateFolderDialog(parentId)
       } else if (item.action === "addBookmark") {
         showCreateBookmarkDialog(parentId)
+      } else if (item.action === "addNote") {
+        showCreateNoteDialog(parentId)
       }
     })
 
@@ -941,4 +969,246 @@ function showCreateBookmarkDialog(parentId) {
       }
     }
   )
+}
+
+/**
+ * Показывает диалог создания новой заметки
+ * @param {string} parentId - ID родительской папки
+ */
+function showCreateNoteDialog(parentId) {
+  log("Показываем диалог создания заметки в", parentId)
+
+  // Обязательно перепроверяем ID родительской папки перед созданием
+  let currentParentId = parentId
+  if (navigationModule) {
+    currentParentId = navigationModule.getCurrentParentId()
+    if (currentParentId !== parentId) {
+      log(`Обновлен ID родительской папки с ${parentId} на ${currentParentId}`)
+    }
+  }
+
+  // Сохраняем финальный ID папки в переменной, чтобы использовать в замыкании
+  const finalParentId = currentParentId
+  log(`Финальный ID родительской папки для создания: ${finalParentId}`)
+
+  // Создаем модальное окно для заметки
+  const modal = new NoteModal()
+  modal.show(
+    i18n.t("MODALS.CREATE_NOTE"),
+    { title: "", content: "" },
+    async (data) => {
+      try {
+        log("Данные формы для создания заметки:", data)
+
+        // Валидация данных
+        if (!data || !data.title || data.title.trim() === "") {
+          alert(i18n.t("VALIDATIONS.EMPTY_NOTE_TITLE"))
+          return false
+        }
+
+        // Нормализуем данные
+        const noteData = {
+          title: data.title.trim(),
+          content: data.content || "",
+        }
+
+        // Логируем детальную информацию для дебаггинга
+        log(
+          `Отправка запроса на создание заметки: ${noteData.title} в родительской папке: ${finalParentId}`
+        )
+
+        // Создание заметки с расширенной обработкой ошибок
+        const result = await ErrorHandler.wrapAsync(
+          createNote(finalParentId, noteData.title, noteData.content),
+          ErrorType.CREATE,
+          "note"
+        )
+
+        if (result) {
+          log("Заметка успешно создана:", result)
+          modal.close()
+
+          // Полностью очищаем кеш для обеспечения свежих данных
+          window._folderContentsCache = {}
+          window._cachedBookmarks = null
+
+          // Добавляем задержку перед обновлением интерфейса
+          setTimeout(() => {
+            refreshCurrentView(true)
+          }, 100)
+          return true
+        } else {
+          logError("Не удалось создать заметку: результат пустой или null")
+          return false
+        }
+      } catch (error) {
+        logError("Ошибка при создании заметки:", error)
+        return false
+      }
+    }
+  )
+}
+
+/**
+ * Показывает диалог редактирования заметки
+ * @param {Object} note - Объект заметки для редактирования
+ */
+function showNoteEditDialog(note) {
+  log("Показываем диалог редактирования заметки:", note)
+
+  try {
+    // Создаем модальное окно для редактирования заметки
+    const modal = new NoteModal()
+    modal.show(
+      i18n.t("MODALS.EDIT_NOTE"),
+      {
+        id: note.id,
+        title: note.title,
+        content: note.content || "",
+        createdAt: note.createdAt,
+      },
+      async (data) => {
+        try {
+          log("Данные формы для обновления заметки:", data)
+
+          // Валидация данных
+          if (!data || !data.title || data.title.trim() === "") {
+            alert(i18n.t("VALIDATIONS.EMPTY_NOTE_TITLE"))
+            return false
+          }
+
+          // Обновляем заметку
+          const result = await ErrorHandler.wrapAsync(
+            updateNote(note.id, data),
+            ErrorType.UPDATE,
+            "note"
+          )
+
+          if (result) {
+            log("Заметка успешно обновлена")
+            modal.close()
+
+            // Обновляем интерфейс
+            refreshCurrentView(true)
+            return true
+          } else {
+            logError("Не удалось обновить заметку:", result)
+            return false
+          }
+        } catch (error) {
+          logError("Ошибка при обновлении заметки:", error)
+          return false
+        }
+      }
+    )
+  } catch (error) {
+    logError("Ошибка при создании диалога редактирования заметки:", error)
+  }
+}
+
+/**
+ * Обрабатывает клик по элементу
+ * @param {Event} e - Событие клика
+ */
+async function handleBookmarkItemClick(e) {
+  const bookmarkElement = e.target.closest(".bookmark-item")
+  if (!bookmarkElement) return
+
+  const isFolder = bookmarkElement.classList.contains("folder")
+  const isNote = bookmarkElement.classList.contains("note")
+  const id = bookmarkElement.dataset.id
+
+  if (isFolder) {
+    // Если это папка, переходим в неё
+    if (navigationModule) {
+      await navigationModule.handleFolderClick(bookmarkElement)
+    }
+  } else if (isNote) {
+    // Если это заметка, открываем её для просмотра/редактирования
+    const title = bookmarkElement.querySelector(".bookmark-title").textContent
+    const content = bookmarkElement.dataset.content || ""
+    const createdAt = bookmarkElement.dataset.createdAt
+      ? parseInt(bookmarkElement.dataset.createdAt)
+      : null
+
+    showNoteEditDialog({
+      id,
+      title,
+      content,
+      createdAt,
+    })
+  } else {
+    // Если это закладка, открываем URL
+    const url = bookmarkElement.dataset.url
+    if (url) {
+      chrome.tabs.create({ url })
+    }
+  }
+}
+
+/**
+ * Создает элемент закладки или папки для отображения
+ * @param {Object} item - Данные закладки или папки
+ * @param {Object} cachedIcons - Кеш иконок
+ * @returns {HTMLElement} - DOM элемент
+ */
+function createBookmarkElement(item, cachedIcons = {}) {
+  const bookmarkElement = document.createElement("div")
+  bookmarkElement.className = `bookmark-item ${
+    item.type === "folder" ? "folder" : item.type === "note" ? "note" : ""
+  }`
+  bookmarkElement.dataset.id = item.id
+  bookmarkElement.dataset.type = item.type
+
+  // Добавляем дополнительные данные в зависимости от типа
+  if (item.type === "bookmark" && item.url) {
+    bookmarkElement.dataset.url = item.url
+  } else if (item.type === "note") {
+    bookmarkElement.dataset.content = item.content || ""
+    if (item.createdAt) {
+      bookmarkElement.dataset.createdAt = item.createdAt
+    }
+  }
+
+  // Делаем элемент перетаскиваемым
+  bookmarkElement.setAttribute("draggable", "true")
+
+  // Создаем иконку
+  const icon = document.createElement("img")
+  icon.className = "bookmark-icon"
+  icon.alt = item.type
+
+  if (item.type === "folder") {
+    // Для папки используем иконку из кеша или дефолтную
+    const cachedIcon = cachedIcons[item.id]
+    if (cachedIcon) {
+      icon.src = cachedIcon
+    } else {
+      icon.src = document.body.classList.contains("dark-theme")
+        ? ICONS.FOLDER.DARK
+        : ICONS.FOLDER.LIGHT
+    }
+  } else if (item.type === "note") {
+    // Для заметки используем иконку заметки
+    icon.src = document.body.classList.contains("dark-theme")
+      ? ICONS.NOTE.DARK
+      : ICONS.NOTE.LIGHT
+  } else {
+    // Для закладки используем стандартную иконку
+    icon.src = ICONS.LINK
+  }
+
+  // Создаем заголовок
+  const title = document.createElement("span")
+  title.className = "bookmark-title"
+  title.textContent = item.title
+
+  // Добавляем элементы в закладку
+  bookmarkElement.appendChild(icon)
+  bookmarkElement.appendChild(title)
+
+  // Добавляем обработчик клика
+  bookmarkElement.addEventListener("click", handleBookmarkItemClick)
+
+  return bookmarkElement
 }

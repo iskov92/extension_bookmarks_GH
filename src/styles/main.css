@@ -23,6 +23,9 @@
   --hover-color: rgba(180, 180, 180, 0.2);
   --highlight-color: rgba(100, 149, 237, 0.3);
   --highlight-color-shadow: rgba(100, 149, 237, 0.5);
+
+  /* Новые переменные для заметок */
+  --accent-color-rgb: 255, 138, 36; /* Light theme - соответствует #ff8a24 */
 }
 
 * {
@@ -171,6 +174,20 @@ body {
 
 .bookmark-item:hover {
   background-color: var(--hover-color);
+}
+
+/* Стили для заметок */
+.bookmark-item.note {
+  background-color: rgba(var(--accent-color-rgb), 0.05);
+  border-left: 3px solid var(--accent-color);
+}
+
+.bookmark-item.note .bookmark-title {
+  font-style: italic;
+}
+
+.bookmark-item.note:hover {
+  background-color: rgba(var(--accent-color-rgb), 0.1);
 }
 
 .bookmark-item.dragging {
@@ -901,6 +918,7 @@ body[data-theme="dark"] .dark-theme-icon {
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   --input-background: #ffffff;
   --accent-color: var(--light-accent);
+  --accent-color-rgb: 255, 138, 36; /* Light theme - соответствует #ff8a24 */
 }
 
 /* Стили для темной темы */
@@ -914,6 +932,7 @@ body[data-theme="dark"] .dark-theme-icon {
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   --input-background: #2d2d2d;
   --accent-color: var(--dark-accent);
+  --accent-color-rgb: 36, 255, 208; /* Dark theme - соответствует #24ffd0 */
 }
 
 /* Специфичные стили для светлой темы */
@@ -1384,4 +1403,60 @@ body.dragging * {
   background-color: var(--dark-accent);
   color: #ffffff;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* Стили для модального окна редактора заметок */
+.note-editor-modal {
+  width: 600px;
+  max-width: 90vw;
+  height: 400px;
+  max-height: 80vh;
+}
+
+.note-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 10px;
+}
+
+.note-editor-title {
+  margin-bottom: 10px;
+}
+
+.note-editor-content {
+  flex: 1;
+  min-height: 200px;
+  resize: none;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.note-editor-content:focus {
+  outline: 1px solid var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.note-modal {
+  width: 600px;
+  max-width: 95vw;
+  height: 400px;
+  max-height: 80vh;
+}
+
+.note-modal .modal-content {
+  height: calc(100% - 120px); /* Вычитаем высоту заголовка и кнопок */
+  display: flex;
+  flex-direction: column;
+}
+
+.note-created-at {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  font-style: italic;
 }

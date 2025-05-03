@@ -1,5 +1,6 @@
 import { storage } from "../utils/storage.js"
 import { iconStorage } from "../services/IconStorage.js"
+import { ICONS } from "../config/constants.js"
 
 export class NestedMenu {
   constructor(container, bookmarks) {
@@ -21,6 +22,13 @@ export class NestedMenu {
     // Проверяем текущую тему по атрибуту data-theme на body
     const theme = document.body.getAttribute("data-theme") || "light"
     return `/assets/icons/folder_${theme === "dark" ? "black" : "white"}.svg`
+  }
+
+  // Получить иконку заметки в зависимости от темы
+  async getNoteIcon() {
+    // Проверяем текущую тему по атрибуту data-theme на body
+    const theme = document.body.getAttribute("data-theme") || "light"
+    return theme === "dark" ? ICONS.NOTE.DARK : ICONS.NOTE.LIGHT
   }
 
   async getFolderIcon(folderId) {
@@ -65,7 +73,11 @@ export class NestedMenu {
 
       const item = document.createElement("div")
       item.className = `bookmark-item ${
-        bookmark.type === "folder" ? "folder" : "link"
+        bookmark.type === "folder"
+          ? "folder"
+          : bookmark.type === "note"
+          ? "note"
+          : "link"
       }`
       item.dataset.id = bookmark.id
       item.dataset.type = bookmark.type
@@ -77,16 +89,29 @@ export class NestedMenu {
         item.dataset.url = bookmark.url
       }
 
+      // Для заметок сохраняем содержимое и дату создания
+      if (bookmark.type === "note") {
+        item.dataset.content = bookmark.content || ""
+        if (bookmark.createdAt) {
+          item.dataset.createdAt = bookmark.createdAt
+        }
+      }
+
       const icon = document.createElement("img")
       icon.className = "bookmark-icon"
+      icon.alt = bookmark.type
 
       if (bookmark.type === "folder") {
         icon.src = await this.getFolderIcon(bookmark.id)
         icon.onerror = async () => {
           icon.src = await this.getDefaultFolderIcon()
         }
+      } else if (bookmark.type === "note") {
+        // Для заметок используем иконку заметки
+        icon.src = await this.getNoteIcon()
       } else {
-        icon.src = "/assets/icons/link.svg"
+        // Для закладок используем иконку ссылки
+        icon.src = ICONS.LINK
       }
 
       const title = document.createElement("span")
