@@ -640,23 +640,30 @@ if (typeof window !== "undefined") {
 export async function updateAllFavicons(progressCallback) {
   try {
     const bookmarks = await getStoredBookmarks()
-    let total = 0
+    const allBookmarksList = []
     let processed = 0
     let successfullyUpdated = 0
 
-    // Сначала подсчитаем общее количество закладок
-    function countBookmarks(items) {
+    // Собираем все закладки в плоский список для параллельной обработки
+    function collectBookmarks(items, parentPath = []) {
       for (const item of items) {
-        if (item.type === "bookmark") {
-          total++
+        const currentPath = [...parentPath, item.id]
+
+        if (item.type === "bookmark" && item.url) {
+          allBookmarksList.push({
+            item,
+            path: currentPath,
+          })
         }
+
         if (item.type === "folder" && item.children) {
-          countBookmarks(item.children)
+          collectBookmarks(item.children, currentPath)
         }
       }
     }
 
-    countBookmarks(bookmarks)
+    collectBookmarks(bookmarks)
+    const total = allBookmarksList.length
 
     // Если нет закладок, сразу возвращаем результат
     if (total === 0) {
@@ -667,61 +674,69 @@ export async function updateAllFavicons(progressCallback) {
       }
     }
 
-    // Быстрое обновление фавиконов с новой функцией
-    async function updateFavicons(items) {
-      const updatedItems = [...items]
+    // Обновляем все фавиконы параллельно с ограничением количества одновременных запросов
+    const BATCH_SIZE = 20 // Максимальное количество одновременных запросов
+    const updatedBookmarks = [...bookmarks] // Копируем структуру для обновления
 
-      for (let i = 0; i < updatedItems.length; i++) {
-        const item = updatedItems[i]
+    // Функция для обновления одной закладки
+    async function updateSingleFavicon(bookmarkInfo) {
+      try {
+        const { item, path } = bookmarkInfo
 
-        if (item.type === "bookmark" && item.url) {
-          try {
-            // Используем быструю функцию для получения фавикона
-            const faviconUrl = await getFaviconFast(item.url)
+        // Используем быструю функцию для получения фавикона
+        const faviconUrl = await getFaviconFast(item.url)
 
-            // Если получили фавикон и он отличается от существующего или его не было
-            if (faviconUrl && (!item.favicon || faviconUrl !== item.favicon)) {
-              updatedItems[i] = {
-                ...item,
-                favicon: faviconUrl,
-              }
+        // Если получили фавикон и он отличается от существующего или его не было
+        if (faviconUrl && (!item.favicon || faviconUrl !== item.favicon)) {
+          // Обновляем фавикон в нашей копии структуры
+          let current = updatedBookmarks
 
-              successfullyUpdated++
-              console.log(`Обновлен фавикон для ${item.url}: ${faviconUrl}`)
+          // Проходим по пути до нужной закладки, кроме последнего элемента
+          for (let i = 0; i < path.length - 1; i++) {
+            const pathSegment = path[i]
+            const index = current.findIndex((el) => el.id === pathSegment)
+            if (index !== -1) {
+              current = current[index].children
+            } else {
+              throw new Error(`Путь к закладке не найден: ${path.join("/")}`)
             }
+          }
 
-            processed++
-            if (progressCallback) {
-              progressCallback(processed, total, successfullyUpdated)
-            }
-          } catch (error) {
-            console.warn(
-              `Ошибка при обновлении фавикона для ${item.url}:`,
-              error
-            )
-            processed++
-            if (progressCallback) {
-              progressCallback(processed, total, successfullyUpdated)
-            }
+          // Находим и обновляем саму закладку
+          const bookmarkIndex = current.findIndex(
+            (el) => el.id === path[path.length - 1]
+          )
+          if (bookmarkIndex !== -1) {
+            current[bookmarkIndex].favicon = faviconUrl
+            successfullyUpdated++
           }
         }
 
-        if (item.type === "folder" && item.children) {
-          updatedItems[i] = {
-            ...item,
-            children: await updateFavicons(item.children),
-          }
+        return true
+      } catch (error) {
+        console.warn(
+          `Ошибка при обновлении фавикона для ${bookmarkInfo.item.url}:`,
+          error
+        )
+        return false
+      } finally {
+        processed++
+        if (progressCallback) {
+          progressCallback(processed, total, successfullyUpdated)
         }
       }
-
-      return updatedItems
     }
 
-    // Запускаем обновление
-    const updatedBookmarks = await updateFavicons(bookmarks)
+    // Обрабатываем закладки порциями для контроля над нагрузкой
+    for (let i = 0; i < allBookmarksList.length; i += BATCH_SIZE) {
+      const batch = allBookmarksList.slice(i, i + BATCH_SIZE)
+      await Promise.all(batch.map(updateSingleFavicon))
+    }
 
-    // Сохраняем результат
-    await saveBookmarks(updatedBookmarks)
+    // Сохраняем результат только если были обновления
+    if (successfullyUpdated > 0) {
+      await saveBookmarks(updatedBookmarks)
+    }
 
     return {
       success: true,
@@ -809,67 +824,85 @@ export async function updateBookmarkFavicon(bookmarkId) {
   try {
     // Получаем все закладки
     const bookmarks = await getStoredBookmarks()
-    let updated = false
-    let bookmarkUrl = null
-    let bookmarkTitle = null
 
-    // Функция для поиска и обновления фавикона закладки по ID
-    async function updateFavicon(items) {
-      const updatedItems = [...items]
+    // Функция для плоского поиска закладки по ID
+    function findBookmarkById(items, path = []) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        const currentPath = [...path, i]
 
-      for (let i = 0; i < updatedItems.length; i++) {
-        const item = updatedItems[i]
-
-        if (item.id === bookmarkId && item.type === "bookmark" && item.url) {
-          // Запоминаем URL и заголовок для логирования
-          bookmarkUrl = item.url
-          bookmarkTitle = item.title
-          console.log(
-            `Обновляем фавикон для закладки: ${item.title} (${item.url})`
-          )
-
-          // Форсированное обновление: используем новую быструю функцию
-          const faviconUrl = await getFaviconFast(item.url)
-
-          // Используем полученный фавикон напрямую без дополнительных проверок
-          if (faviconUrl && (!item.favicon || faviconUrl !== item.favicon)) {
-            updatedItems[i] = {
-              ...item,
-              favicon: faviconUrl,
-            }
-            updated = true
-            console.log(`Фавикон обновлен на: ${faviconUrl}`)
-          } else if (!faviconUrl) {
-            console.warn(`Не удалось получить новый фавикон для: ${item.url}`)
-          } else {
-            console.log(`Фавикон не изменился: ${faviconUrl}`)
-          }
+        if (item.id === bookmarkId) {
+          return { item, path: currentPath }
         }
 
-        if (item.type === "folder" && item.children) {
-          updatedItems[i] = {
-            ...item,
-            children: await updateFavicon(item.children),
-          }
+        if (item.type === "folder" && Array.isArray(item.children)) {
+          const found = findBookmarkById(item.children, [
+            ...path,
+            i,
+            "children",
+          ])
+          if (found) return found
         }
       }
-
-      return updatedItems
+      return null
     }
 
-    // Обновляем фавикон в дереве закладок
-    const updatedBookmarks = await updateFavicon(bookmarks)
+    // Ищем закладку в дереве
+    const found = findBookmarkById(bookmarks)
 
-    // Сохраняем изменения только если фавикон был обновлен
-    if (updated) {
-      await saveBookmarks(updatedBookmarks)
+    if (!found || found.item.type !== "bookmark" || !found.item.url) {
+      return {
+        success: false,
+        error: "Закладка не найдена или не имеет URL",
+      }
     }
+
+    // Быстрое получение фавикона
+    const faviconUrl = await getFaviconFast(found.item.url)
+
+    // Если фавикон не изменился или не получен, возвращаем результат без сохранения
+    if (!faviconUrl || faviconUrl === found.item.favicon) {
+      return {
+        success: true,
+        updated: false,
+        url: found.item.url,
+        title: found.item.title,
+      }
+    }
+
+    // Прямое обновление закладки по найденному пути
+    let current = bookmarks
+    const pathSegments = found.path
+
+    for (let i = 0; i < pathSegments.length - 1; i++) {
+      const segment = pathSegments[i]
+
+      if (segment === "children") {
+        continue // Пропускаем сегмент 'children', так как мы уже перешли к массиву children
+      }
+
+      current = current[segment]
+
+      // Если следующий сегмент - 'children', переходим к массиву children
+      if (pathSegments[i + 1] === "children") {
+        current = current.children
+        i++ // Пропускаем следующий шаг
+      }
+    }
+
+    // Обновляем фавикон в найденной закладке
+    const lastIndex = pathSegments[pathSegments.length - 1]
+    current[lastIndex].favicon = faviconUrl
+
+    // Сохраняем изменения
+    await saveBookmarks(bookmarks)
 
     return {
       success: true,
-      updated,
-      url: bookmarkUrl,
-      title: bookmarkTitle,
+      updated: true,
+      url: found.item.url,
+      title: found.item.title,
+      favicon: faviconUrl,
     }
   } catch (error) {
     console.error("Ошибка при обновлении фавикона закладки:", error)
@@ -918,60 +951,47 @@ export async function getFaviconFast(url) {
       window.faviconDirectCache = {}
     }
 
-    // Создаем уникальный ключ для сервисов Google (учитывая второй уровень пути)
-    let cacheKey = domain
-
-    // Специально обрабатываем сервисы Google, добавляя к ключу первую часть пути
-    if (domain.includes("google.com") || domain.includes("docs.google.com")) {
+    // Специальные проверки для Google Docs
+    if (domain === "docs.google.com") {
+      // Распознаем тип документа Google Docs по URL пути
       const pathParts = fullPath.split("/").filter((part) => part)
       if (pathParts.length > 0) {
-        // Пытаемся добавить первый значимый сегмент пути
-        cacheKey = `${domain}/${pathParts[0]}`
+        const docType = pathParts[0]
+
+        // Распознаем различные типы документов Google
+        const googleDocsIcons = {
+          document:
+            "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png",
+          spreadsheets:
+            "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico",
+          presentation:
+            "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico",
+          forms:
+            "https://ssl.gstatic.com/docs/forms/device_home/android_192.png",
+          drawings:
+            "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png",
+          // Добавляем новый кейс для обработки просто "https://docs.google.com/"
+          "": "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png",
+        }
+
+        if (googleDocsIcons[docType]) {
+          return googleDocsIcons[docType]
+        }
       }
+
+      // Если не определили точный тип, возвращаем иконку Google Docs по умолчанию
+      return "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png"
     }
 
-    // Проверяем кэш по уточненному ключу
+    // Создаем уникальный ключ для кэша
+    let cacheKey = domain
+
+    // Проверяем кэш
     if (window.faviconDirectCache[cacheKey]) {
       return window.faviconDirectCache[cacheKey]
     }
 
-    // Специальные фавиконы для разных сервисов Google
-    const googleServiceIcons = {
-      "docs.google.com/document":
-        "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png",
-      "docs.google.com/spreadsheets":
-        "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico",
-      "docs.google.com/presentation":
-        "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico",
-      "docs.google.com/forms":
-        "https://ssl.gstatic.com/docs/forms/device_home/android_192.png",
-      "docs.google.com/drawings":
-        "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png",
-      "drive.google.com":
-        "https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png",
-      "mail.google.com":
-        "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico",
-      "calendar.google.com":
-        "https://ssl.gstatic.com/calendar/images/favicon.ico",
-      "meet.google.com":
-        "https://www.gstatic.com/meet/google_meet_icon_192.png",
-      "photos.google.com":
-        "https://ssl.gstatic.com/photos/favicon/favicon_beamshape_medium.ico",
-      "keep.google.com": "https://ssl.gstatic.com/keep/icon_2020q4v2_128.png",
-      "classroom.google.com": "https://ssl.gstatic.com/classroom/favicon.png",
-      "translate.google.com": "https://ssl.gstatic.com/translate/favicon.ico",
-    }
-
-    // Проверяем соответствие сервисам Google по доменам и путям
-    for (const googleService in googleServiceIcons) {
-      if (url.includes(googleService)) {
-        const googleIcon = googleServiceIcons[googleService]
-        window.faviconDirectCache[cacheKey] = googleIcon
-        return googleIcon
-      }
-    }
-
-    // Список специальных путей для популярных сайтов
+    // Список специальных случаев для популярных сайтов (оставляем как есть)
     const specialCases = {
       // Популярные социальные сети
       "youtube.com":
@@ -1054,104 +1074,19 @@ export async function getFaviconFast(url) {
       return specialUrl
     }
 
-    // Максимальное количество автоматических повторных попыток
-    const MAX_AUTO_RETRIES = 3
+    // Быстрый выбор фавикона без дополнительных проверок качества
+    // Просто выбираем первый доступный источник
 
-    // Список приоритетных прямых путей к высококачественным фавиконам
-    const getPriorityPaths = (domain) => [
-      // 1. Самые высококачественные источники (192px+)
-      `https://${domain}/apple-touch-icon.png`,
-      `https://${domain}/apple-touch-icon-precomposed.png`,
-      `https://${domain}/touch-icon-192x192.png`,
-      `https://${domain}/icon-192x192.png`,
-      `https://${domain}/favicon-192x192.png`,
-
-      // 2. DuckDuckGo (обычно даёт лучшие иконки чем Google)
+    // Стратегия 1: Используем DuckDuckGo или Google (всегда работают)
+    const quickSources = [
       `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-
-      // 3. Iconify - новый сервис иконок с хорошим качеством
-      `https://icon.horse/icon/${domain}`,
-
-      // 4. Всегда работающий Google (резервный вариант)
       `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
     ]
 
-    // Функция для проверки размера изображения
-    const checkImageSize = (url) => {
-      return new Promise((resolve, reject) => {
-        const img = new Image()
-        img.onload = () =>
-          resolve({
-            url,
-            width: img.width,
-            height: img.height,
-            quality:
-              img.width >= 64 ? "high" : img.width >= 32 ? "medium" : "low",
-          })
-        img.onerror = () => reject(new Error(`Failed to load ${url}`))
-        img.src = url
-        setTimeout(() => reject(new Error(`Timeout for ${url}`)), 1500)
-      })
-    }
-
-    // Функция для проверки одного источника с учетом качества
-    const trySource = async (src, retryCount = 0) => {
-      try {
-        const imgData = await checkImageSize(src)
-
-        // Если качество низкое и у нас еще есть попытки, пробуем следующий источник
-        if (imgData.quality === "low" && retryCount < MAX_AUTO_RETRIES) {
-          console.log(
-            `Фавикон низкого качества (${imgData.width}x${
-              imgData.height
-            }), поиск лучшего варианта. Попытка ${
-              retryCount + 1
-            }/${MAX_AUTO_RETRIES}`
-          )
-          return null // Сигнал продолжить поиск
-        }
-
-        return imgData.url
-      } catch (e) {
-        return null // Ошибка загрузки, пробуем следующий
-      }
-    }
-
-    // Проверяем источники последовательно, но с учетом качества
-    let bestFavicon = null
-    let currentRetry = 0
-
-    while (currentRetry < MAX_AUTO_RETRIES && !bestFavicon) {
-      const paths = getPriorityPaths(domain)
-
-      for (let i = 0; i < paths.length; i++) {
-        const result = await trySource(paths[i], currentRetry)
-        if (result) {
-          bestFavicon = result
-          break
-        }
-      }
-
-      currentRetry++
-
-      // Если после всех путей не нашли ничего хорошего, но у нас еще остались попытки
-      if (!bestFavicon && currentRetry < MAX_AUTO_RETRIES) {
-        console.log(
-          `Не найден качественный фавикон после попытки ${currentRetry}/${MAX_AUTO_RETRIES}. Пробуем еще раз...`
-        )
-      }
-    }
-
-    // Если после всех попыток не нашли ничего, используем Google
-    if (!bestFavicon) {
-      bestFavicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-      console.log(
-        `Используем запасной вариант Google после ${MAX_AUTO_RETRIES} попыток`
-      )
-    }
-
-    // Сохраняем в кэш и возвращаем
+    // Выбираем первый источник и сразу кэшируем
+    const bestFavicon = quickSources[0]
     window.faviconDirectCache[cacheKey] = bestFavicon
+
     return bestFavicon
   } catch (error) {
     console.error("Ошибка в getFaviconFast:", error)
