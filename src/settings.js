@@ -1,5 +1,5 @@
 import { initTheme } from "./utils/theme.js"
-import { importFromBrowser } from "./utils/bookmarks.js"
+import { importFromBrowser, exportBookmarksToHTML } from "./utils/bookmarks.js"
 import { getStoredBookmarks, saveBookmarks } from "./utils/storage.js"
 import { i18n } from "./utils/i18n.js"
 
@@ -103,15 +103,13 @@ async function importBookmarksFromBrowser() {
 // Функция экспорта закладок в файл
 async function exportBookmarksToFile() {
   try {
-    const bookmarks = await getStoredBookmarks()
+    // Используем встроенную функцию экспорта из bookmarks.js
+    const html = await exportBookmarksToHTML()
 
-    if (!bookmarks || bookmarks.length === 0) {
+    if (!html) {
       alert("Нет сохраненных закладок для экспорта")
       return
     }
-
-    // Создаем HTML файл с закладками
-    const html = generateSettingsBookmarksHTML(bookmarks)
 
     // Создаем Blob и скачиваем файл
     const blob = new Blob([html], { type: "text/html" })
@@ -130,40 +128,6 @@ async function exportBookmarksToFile() {
     console.error("Ошибка при экспорте закладок:", error)
     alert("Произошла ошибка при экспорте закладок")
   }
-}
-
-// Функция генерации HTML файла с закладками
-function generateSettingsBookmarksHTML(bookmarks) {
-  const header = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
-<!-- This is an automatically generated file.
-     It will be read and overwritten.
-     DO NOT EDIT! -->
-<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Bookmarks</TITLE>
-<H1>Bookmarks</H1>
-<DL><p>`
-
-  const footer = "</DL><p>"
-
-  function generateBookmarkItem(item, indent = "") {
-    if (item.type === "folder") {
-      let html = `${indent}<DT><H3>${item.title}</H3>\n${indent}<DL><p>\n`
-      item.children.forEach((child) => {
-        html += generateBookmarkItem(child, indent + "    ")
-      })
-      html += `${indent}</DL><p>\n`
-      return html
-    } else {
-      return `${indent}<DT><A HREF="${item.url}">${item.title}</A>\n`
-    }
-  }
-
-  let content = ""
-  bookmarks.forEach((item) => {
-    content += generateBookmarkItem(item, "    ")
-  })
-
-  return header + content + footer
 }
 
 // Функция импорта закладок из HTML файла
@@ -203,6 +167,7 @@ function parseBookmarksHTML(html) {
     dtElements.forEach((dt) => {
       const link = dt.querySelector(":scope > A")
       const h3 = dt.querySelector(":scope > H3")
+      const noteElement = dt.querySelector(":scope > EXT-NOTE")
 
       if (link) {
         // Это закладка
@@ -211,6 +176,22 @@ function parseBookmarksHTML(html) {
           title: link.textContent,
           url: link.href,
           type: "bookmark",
+        })
+      } else if (noteElement) {
+        // Это заметка
+        const title = noteElement.getAttribute("TITLE") || "Заметка"
+        const createdAt = parseInt(
+          noteElement.getAttribute("CREATED_AT") || Date.now()
+        )
+        // Получаем содержимое заметки (весь текст внутри EXT-NOTE)
+        const content = noteElement.textContent.trim()
+
+        items.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+          title: title,
+          content: content,
+          createdAt: createdAt,
+          type: "note",
         })
       } else if (h3) {
         const folderTitle = h3.textContent

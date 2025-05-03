@@ -416,19 +416,30 @@ async function processBookmarkTreeWithNotes(bookmarks) {
         children: await processBookmarkTreeWithNotes(item.children),
       }
       result.push(folder)
-    } else if (item.title && item.html) {
+    } else if (item.html && item.html.includes("<EXT-NOTE")) {
       // Проверяем, это заметка?
       const html = item.html
-      if (html.includes("<EXT-NOTE")) {
-        const noteData = extractNoteContent(html)
-        result.push({
-          id: generateUniqueId(),
-          title: noteData.title,
-          type: "note",
-          content: noteData.content,
-          createdAt: noteData.createdAt,
-        })
-      }
+      const noteData = extractNoteContent(html)
+      result.push({
+        id: generateUniqueId(),
+        title: noteData.title,
+        type: "note",
+        content: noteData.content,
+        createdAt: noteData.createdAt,
+      })
+    } else if (item.tagName === "EXT-NOTE") {
+      // Это заметка из нашего парсера
+      const title = item.getAttribute("TITLE") || "Заметка"
+      const createdAt = parseInt(item.getAttribute("CREATED_AT") || Date.now())
+      const content = item.textContent.trim()
+
+      result.push({
+        id: generateUniqueId(),
+        title: title,
+        content: content,
+        createdAt: createdAt,
+        type: "note",
+      })
     }
   }
 
