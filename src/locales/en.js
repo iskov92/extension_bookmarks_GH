@@ -36,6 +36,7 @@ export default {
   },
   VALIDATIONS: {
     EMPTY_FOLDER_NAME: "Folder name cannot be empty",
+    EMPTY_BOOKMARK_NAME: "Bookmark name cannot be empty",
     INVALID_IMAGE: "Please select an image",
   },
   MESSAGES: {

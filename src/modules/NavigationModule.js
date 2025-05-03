@@ -19,7 +19,8 @@ export class NavigationModule {
     this.container = container
     this.updateUI = updateUI
     this.navigation = new Navigation()
-    this.currentParentId = "0" // Начальный ID корневой папки
+    // Вместо задания parentId напрямую, используем метод getCurrentParentId
+    this.currentParentId = this.navigation.getCurrentParentId()
 
     // Инициализируем DOM-элементы
     this.backButton = document.getElementById(DOM_IDS.BACK_BUTTON)
@@ -125,9 +126,7 @@ export class NavigationModule {
       } else {
         // В случае ошибки откатываем состояние
         this.navigation.pop()
-        this.currentParentId = this.navigation.isRoot
-          ? "0"
-          : this.navigation.currentFolder.id
+        this.currentParentId = this.navigation.getCurrentParentId()
       }
     } catch (error) {
       logError("Ошибка при переходе в папку:", error)
@@ -187,7 +186,7 @@ export class NavigationModule {
               "Не удалось получить содержимое папки, возвращаемся в корень"
             )
             this.navigation.clear()
-            this.currentParentId = "0"
+            this.currentParentId = this.navigation.getCurrentParentId()
             this.updateFolderTitle("Закладки")
             this.toggleBackButton(false)
 
@@ -196,7 +195,7 @@ export class NavigationModule {
           }
         } else {
           // Вернулись в корневую папку
-          this.currentParentId = "0"
+          this.currentParentId = this.navigation.getCurrentParentId()
           this.updateFolderTitle("Закладки")
           this.toggleBackButton(false)
 
@@ -281,6 +280,9 @@ export class NavigationModule {
     // Проверяем, не пуст ли стек навигации
     if (stack && stack.length > 0) {
       this.currentParentId = this.navigation.currentFolder.id
+    } else {
+      // Если стек пуст, используем корневой ID
+      this.currentParentId = "0"
     }
   }
 
@@ -294,9 +296,18 @@ export class NavigationModule {
 
   /**
    * Возвращает текущий ID родительской папки
-   * @returns {string} - ID родительской папки
+   * @returns {string} ID текущей родительской папки
    */
   getCurrentParentId() {
-    return this.currentParentId
+    // Проверяем, что навигация инициализирована и текущая папка существует
+    if (!this.navigation) {
+      console.error(
+        "Навигация не инициализирована в NavigationModule.getCurrentParentId()"
+      )
+      return "0" // возвращаем корневую папку по умолчанию
+    }
+
+    // Используем встроенный метод Navigation для получения ID
+    return this.navigation.getCurrentParentId()
   }
 }

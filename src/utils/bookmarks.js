@@ -55,16 +55,78 @@ export async function getAllBookmarks(forceUpdate = false) {
 
 // Создать новую закладку
 export async function createBookmark(parentId, title, url = "") {
-  return await createStoredBookmark(parentId, title, url)
+  console.log(
+    `createBookmark: создание закладки '${title}' в папке ${parentId}`
+  )
+
+  // Проверяем parentId на валидность
+  if (!parentId || typeof parentId !== "string") {
+    console.error(`Ошибка в createBookmark: недопустимый parentId: ${parentId}`)
+    return null
+  }
+
+  // Проверяем title на валидность
+  if (!title || typeof title !== "string" || title.trim() === "") {
+    console.error(`Ошибка в createBookmark: недопустимый title: ${title}`)
+    return null
+  }
+
+  try {
+    // Создаем закладку в хранилище
+    const bookmark = await createStoredBookmark(parentId, title, url)
+
+    // Очищаем кэш для принудительного обновления данных
+    if (window._folderContentsCache) {
+      delete window._folderContentsCache[parentId]
+      console.log(`Кэш для папки ${parentId} очищен после создания закладки`)
+    }
+
+    return bookmark
+  } catch (error) {
+    console.error(`Ошибка в createBookmark:`, error)
+    return null
+  }
 }
 
 // Создать новую папку
 export async function createFolder(parentId, title) {
-  return await createStoredBookmark(parentId, title)
+  console.log(`createFolder: создание папки '${title}' в папке ${parentId}`)
+
+  // Проверяем parentId на валидность
+  if (!parentId || typeof parentId !== "string") {
+    console.error(`Ошибка в createFolder: недопустимый parentId: ${parentId}`)
+    return null
+  }
+
+  // Проверяем title на валидность
+  if (!title || typeof title !== "string" || title.trim() === "") {
+    console.error(`Ошибка в createFolder: недопустимый title: ${title}`)
+    return null
+  }
+
+  try {
+    // Создаем папку в хранилище (передаем пустой URL для создания папки)
+    const folder = await createStoredBookmark(parentId, title)
+
+    // Очищаем кэш для принудительного обновления данных
+    if (window._folderContentsCache) {
+      delete window._folderContentsCache[parentId]
+      console.log(`Кэш для папки ${parentId} очищен после создания подпапки`)
+    }
+
+    return folder
+  } catch (error) {
+    console.error(`Ошибка в createFolder:`, error)
+    return null
+  }
 }
 
 // Получить закладки из папки
 export async function getBookmarksInFolder(folderId, forceUpdate = false) {
+  console.log(
+    `getBookmarksInFolder: запрос содержимого папки ${folderId}, forceUpdate = ${forceUpdate}`
+  )
+
   // При принудительном обновлении сразу обходим кэш
   if (forceUpdate) {
     console.log(
@@ -76,11 +138,22 @@ export async function getBookmarksInFolder(folderId, forceUpdate = false) {
 
     if (folderId === "0") {
       folderContents = bookmarks
+      console.log(
+        `Получено ${folderContents.length} элементов из корневой папки`
+      )
     } else {
       function findFolder(items) {
         for (const item of items) {
           if (item.id === folderId) {
-            return item.children || []
+            console.log(`Найдена папка ${item.id} (${item.title})`)
+            // Убедимся, что у папки есть свойство children
+            if (!item.children) {
+              item.children = []
+              console.log(
+                `Инициализировано свойство children для папки ${item.title} (ID: ${item.id})`
+              )
+            }
+            return item.children
           }
           if (item.type === "folder" && item.children) {
             const found = findFolder(item.children)
@@ -89,7 +162,16 @@ export async function getBookmarksInFolder(folderId, forceUpdate = false) {
         }
         return null
       }
+
       folderContents = findFolder(bookmarks) || []
+      console.log(
+        `Получено ${folderContents.length} элементов из папки ${folderId}`
+      )
+
+      if (folderContents === null) {
+        console.warn(`Папка ${folderId} не найдена!`)
+        folderContents = []
+      }
     }
 
     // Обновляем кэш
@@ -107,28 +189,51 @@ export async function getBookmarksInFolder(folderId, forceUpdate = false) {
   // Проверка кэша и времени его актуальности
   if (window._folderContentsCache && window._folderContentsCache[folderId]) {
     const cache = window._folderContentsCache[folderId]
-    // Кэш действителен не более 30 секунд
-    if (Date.now() - cache.timestamp < 30000) {
-      console.log(`Использую кэш для папки ${folderId}`)
+    // Кэш действителен не более 5 секунд при работе во вложенных папках
+    // Для корневой папки можно использовать более долгий срок
+    // Это помогает избежать проблем при создании новых элементов
+    const cacheLifetime = folderId === "0" ? 30000 : 3000
+
+    if (Date.now() - cache.timestamp < cacheLifetime) {
+      console.log(
+        `Использую кэш для папки ${folderId} (${
+          cache.contents.length
+        } элементов, возраст ${(Date.now() - cache.timestamp) / 1000} сек)`
+      )
       return cache.contents
     }
+
+    console.log(
+      `Кэш для папки ${folderId} устарел (${
+        (Date.now() - cache.timestamp) / 1000
+      } сек > ${cacheLifetime / 1000} сек)`
+    )
+  } else {
+    console.log(`Кэш для папки ${folderId} отсутствует`)
   }
 
   // Кэш устарел или его нет - получаем свежие данные
-  console.log(
-    `Кэш устарел или отсутствует: получаем содержимое папки ${folderId} из хранилища`
-  )
+  console.log(`Получаем содержимое папки ${folderId} из хранилища`)
 
   const bookmarks = await getStoredBookmarks()
   let folderContents
 
   if (folderId === "0") {
     folderContents = bookmarks
+    console.log(`Получено ${folderContents.length} элементов из корневой папки`)
   } else {
     function findFolder(items) {
       for (const item of items) {
         if (item.id === folderId) {
-          return item.children || []
+          console.log(`Найдена папка ${item.id} (${item.title})`)
+          // Убедимся, что у папки есть children
+          if (!item.children) {
+            item.children = []
+            console.log(
+              `Инициализировано свойство children для папки ${item.title} (ID: ${item.id})`
+            )
+          }
+          return item.children
         }
         if (item.type === "folder" && item.children) {
           const found = findFolder(item.children)
@@ -137,10 +242,16 @@ export async function getBookmarksInFolder(folderId, forceUpdate = false) {
       }
       return null
     }
-    folderContents = findFolder(bookmarks) || []
+
+    folderContents = findFolder(bookmarks)
+
+    if (folderContents === null) {
+      console.warn(`Папка ${folderId} не найдена!`)
+      folderContents = []
+    }
   }
 
-  // Сохраняем в кэш
+  // Обновляем кэш
   if (!window._folderContentsCache) {
     window._folderContentsCache = {}
   }

@@ -36,6 +36,7 @@ export default {
   },
   VALIDATIONS: {
     EMPTY_FOLDER_NAME: "Название папки не может быть пустым",
+    EMPTY_BOOKMARK_NAME: "Название закладки не может быть пустым",
     INVALID_IMAGE: "Пожалуйста, выберите изображение",
   },
   MESSAGES: {

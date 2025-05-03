@@ -260,6 +260,14 @@ function initEventListeners() {
   const addButton = document.getElementById("addButton")
   if (addButton) {
     addButton.addEventListener("click", () => {
+      // Проверяем доступность navigationModule и получаем актуальный ID родительской папки
+      if (navigationModule) {
+        currentParentId = navigationModule.getCurrentParentId()
+        log(
+          `Обновлен ID родительской папки перед открытием диалога: ${currentParentId}`
+        )
+      }
+
       showAddDialog(currentParentId)
     })
   }
@@ -721,7 +729,20 @@ async function optimizeImage(file) {
  * @param {string} parentId - ID родительской папки
  */
 function showAddDialog(parentId) {
-  log("Показываем диалог добавления, родительская папка:", parentId)
+  // Получаем актуальный ID родительской папки из NavigationModule
+  if (navigationModule) {
+    const currentParentId = navigationModule.getCurrentParentId()
+    log(
+      `Показываем диалог добавления, родительская папка: ${currentParentId} (переданный parentId: ${parentId})`
+    )
+
+    // Используем актуальное значение вместо переданного
+    parentId = currentParentId
+  } else {
+    log(
+      `Показываем диалог добавления, родительская папка: ${parentId} (NavigationModule не доступен)`
+    )
+  }
 
   // Создаем модальное окно выбора типа
   const modal = new Modal()
@@ -770,6 +791,21 @@ function showAddDialog(parentId) {
 function showCreateFolderDialog(parentId) {
   log("Показываем диалог создания папки в", parentId)
 
+  // Обязательно перепроверяем ID родительской папки перед созданием
+  // Это нужно делать до отображения модального окна, чтобы убедиться,
+  // что используется текущий ID навигации
+  let currentParentId = parentId
+  if (navigationModule) {
+    currentParentId = navigationModule.getCurrentParentId()
+    if (currentParentId !== parentId) {
+      log(`Обновлен ID родительской папки с ${parentId} на ${currentParentId}`)
+    }
+  }
+
+  // Сохраняем финальный ID папки в переменной, чтобы использовать в замыкании
+  const finalParentId = currentParentId
+  log(`Финальный ID родительской папки для создания: ${finalParentId}`)
+
   const modal = new Modal()
   modal.show(
     i18n.t("MODALS.CREATE_FOLDER"),
@@ -777,20 +813,46 @@ function showCreateFolderDialog(parentId) {
     { title: "" },
     async (data) => {
       try {
-        // Создаем новую папку
+        log("Данные формы для создания папки:", data)
+
+        // Валидация данных
+        if (!data || !data.title || data.title.trim() === "") {
+          alert(i18n.t("VALIDATIONS.EMPTY_FOLDER_NAME"))
+          return false
+        }
+
+        // Нормализуем данные
+        const folderData = {
+          title: data.title.trim(),
+        }
+
+        // Логируем детальную информацию для дебаггинга
+        log(
+          `Отправка запроса на создание папки: ${folderData.title} в родительской папке: ${finalParentId}`
+        )
+
+        // Создание папки с расширенной обработкой ошибок
         const result = await ErrorHandler.wrapAsync(
-          createFolder(parentId, data.title),
+          createFolder(finalParentId, folderData.title),
           ErrorType.CREATE,
           "folder"
         )
 
         if (result) {
+          log("Папка успешно создана:", result)
           modal.close()
-          // Обновляем интерфейс
-          refreshCurrentView(true)
+
+          // Полностью очищаем кеш для обеспечения свежих данных
+          window._folderContentsCache = {}
+          window._cachedBookmarks = null
+
+          // Добавляем задержку перед обновлением интерфейса
+          setTimeout(() => {
+            refreshCurrentView(true)
+          }, 100)
           return true
         } else {
-          logError("Не удалось создать папку")
+          logError("Не удалось создать папку: результат пустой или null")
           return false
         }
       } catch (error) {
@@ -808,6 +870,21 @@ function showCreateFolderDialog(parentId) {
 function showCreateBookmarkDialog(parentId) {
   log("Показываем диалог создания закладки в", parentId)
 
+  // Обязательно перепроверяем ID родительской папки перед созданием
+  // Это нужно делать до отображения модального окна, чтобы убедиться,
+  // что используется текущий ID навигации
+  let currentParentId = parentId
+  if (navigationModule) {
+    currentParentId = navigationModule.getCurrentParentId()
+    if (currentParentId !== parentId) {
+      log(`Обновлен ID родительской папки с ${parentId} на ${currentParentId}`)
+    }
+  }
+
+  // Сохраняем финальный ID папки в переменной, чтобы использовать в замыкании
+  const finalParentId = currentParentId
+  log(`Финальный ID родительской папки для создания: ${finalParentId}`)
+
   const modal = new Modal()
   modal.show(
     i18n.t("MODALS.CREATE_BOOKMARK"),
@@ -815,20 +892,47 @@ function showCreateBookmarkDialog(parentId) {
     { title: "", url: "https://" },
     async (data) => {
       try {
-        // Создаем новую закладку
+        log("Данные формы для создания закладки:", data)
+
+        // Валидация данных
+        if (!data || !data.title || data.title.trim() === "") {
+          alert(i18n.t("VALIDATIONS.EMPTY_BOOKMARK_NAME"))
+          return false
+        }
+
+        // Нормализуем данные
+        const bookmarkData = {
+          title: data.title.trim(),
+          url: data.url || "https://",
+        }
+
+        // Логируем детальную информацию для дебаггинга
+        log(
+          `Отправка запроса на создание закладки: ${bookmarkData.title} (${bookmarkData.url}) в родительской папке: ${finalParentId}`
+        )
+
+        // Создание закладки с расширенной обработкой ошибок
         const result = await ErrorHandler.wrapAsync(
-          createBookmark(parentId, data.title, data.url),
+          createBookmark(finalParentId, bookmarkData.title, bookmarkData.url),
           ErrorType.CREATE,
           "bookmark"
         )
 
         if (result) {
+          log("Закладка успешно создана:", result)
           modal.close()
-          // Обновляем интерфейс
-          refreshCurrentView(true)
+
+          // Полностью очищаем кеш для обеспечения свежих данных
+          window._folderContentsCache = {}
+          window._cachedBookmarks = null
+
+          // Добавляем задержку перед обновлением интерфейса
+          setTimeout(() => {
+            refreshCurrentView(true)
+          }, 100)
           return true
         } else {
-          logError("Не удалось создать закладку")
+          logError("Не удалось создать закладку: результат пустой или null")
           return false
         }
       } catch (error) {

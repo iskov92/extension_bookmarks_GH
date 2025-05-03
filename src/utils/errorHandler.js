@@ -53,14 +53,14 @@ const errorMessages = {
 }
 
 export class ErrorHandler {
-  static handle(error, type, subtype = null) {
+  static handle(error, type, subtype = null, customMessage = null) {
     // Логируем ошибку с полным контекстом
     console.error(`Error [${type}${subtype ? ":" + subtype : ""}]:`, error)
 
     // Получаем сообщение об ошибке
-    const message = subtype
-      ? errorMessages[type]?.[subtype]
-      : errorMessages[type]
+    const message =
+      customMessage ||
+      (subtype ? errorMessages[type]?.[subtype] : errorMessages[type])
 
     // Показываем пользователю
     alert(message || "Произошла неизвестная ошибка")
@@ -69,11 +69,54 @@ export class ErrorHandler {
     return false
   }
 
-  static async wrapAsync(promise, type, subtype = null) {
+  static async wrapAsync(
+    promise,
+    type,
+    subtype = null,
+    customMessage = null,
+    showLoading = false
+  ) {
     try {
-      return await promise
+      console.log(`Выполнение операции: ${type}${subtype ? ":" + subtype : ""}`)
+
+      // Отображаем индикатор загрузки, если нужно
+      if (showLoading && window.showLoadingIndicator) {
+        window.showLoadingIndicator(customMessage)
+      }
+
+      // Выполняем операцию
+      const result = await promise
+
+      // Проверяем результат на null/undefined
+      if (result === null || result === undefined) {
+        console.warn(
+          `Операция ${type}${subtype ? ":" + subtype : ""} вернула ${result}`
+        )
+
+        // Не генерируем ошибку, если это не критично
+        if (type === ErrorType.LOAD || type === ErrorType.CREATE) {
+          return this.handle(
+            new Error("Operation returned null or undefined"),
+            type,
+            subtype,
+            customMessage
+          )
+        }
+      }
+
+      // Скрываем индикатор загрузки
+      if (showLoading && window.hideLoadingIndicator) {
+        window.hideLoadingIndicator()
+      }
+
+      return result
     } catch (error) {
-      return this.handle(error, type, subtype)
+      // Скрываем индикатор загрузки в случае ошибки
+      if (showLoading && window.hideLoadingIndicator) {
+        window.hideLoadingIndicator()
+      }
+
+      return this.handle(error, type, subtype, customMessage)
     }
   }
 }
