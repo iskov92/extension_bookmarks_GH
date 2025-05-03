@@ -84,8 +84,19 @@ export class ErrorHandler {
         window.showLoadingIndicator(customMessage)
       }
 
+      // Проверка входных данных перед выполнением операции
+      if (!promise || typeof promise.then !== "function") {
+        console.error("wrapAsync получил не Promise:", promise)
+        throw new Error("Неверный формат Promise")
+      }
+
       // Выполняем операцию
       const result = await promise
+
+      // Скрываем индикатор загрузки
+      if (showLoading && window.hideLoadingIndicator) {
+        window.hideLoadingIndicator()
+      }
 
       // Проверяем результат на null/undefined
       if (result === null || result === undefined) {
@@ -93,20 +104,23 @@ export class ErrorHandler {
           `Операция ${type}${subtype ? ":" + subtype : ""} вернула ${result}`
         )
 
-        // Не генерируем ошибку, если это не критично
-        if (type === ErrorType.LOAD || type === ErrorType.CREATE) {
+        if (type === ErrorType.CREATE) {
+          // В случае создания элементов показываем ошибку пользователю
+          const error = new Error("Операция вернула пустой результат")
           return this.handle(
-            new Error("Operation returned null or undefined"),
+            error,
             type,
             subtype,
-            customMessage
+            customMessage ||
+              (subtype === "folder"
+                ? "Не удалось создать папку. Возможно, проблема с правами доступа или папка с таким именем уже существует."
+                : "Не удалось создать закладку. Проверьте корректность URL и попробуйте снова.")
           )
         }
-      }
 
-      // Скрываем индикатор загрузки
-      if (showLoading && window.hideLoadingIndicator) {
-        window.hideLoadingIndicator()
+        // Для других типов операций не считаем null результат критичной ошибкой
+        console.log(`Некритичный пустой результат для операции ${type}`)
+        return result
       }
 
       return result
@@ -116,7 +130,25 @@ export class ErrorHandler {
         window.hideLoadingIndicator()
       }
 
-      return this.handle(error, type, subtype, customMessage)
+      console.error(
+        `Ошибка при выполнении операции ${type}:${subtype || ""}:`,
+        error
+      )
+
+      // Добавляем дополнительную информацию об ошибке, если это возможно
+      let enhancedMessage = customMessage
+      if (!enhancedMessage) {
+        if (error.message) {
+          enhancedMessage = `${
+            errorMessages[type]?.[subtype] || "Ошибка операции"
+          }: ${error.message}`
+        } else {
+          enhancedMessage =
+            errorMessages[type]?.[subtype] || "Произошла неизвестная ошибка"
+        }
+      }
+
+      return this.handle(error, type, subtype, enhancedMessage)
     }
   }
 }
