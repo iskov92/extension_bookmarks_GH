@@ -16,7 +16,7 @@ import { initTheme } from "./utils/theme.js"
 import { MainInterface } from "./components/MainInterface.js"
 import { NestedMenu } from "./components/NestedMenu.js"
 import { Modal } from "./components/Modal.js"
-import { storage } from "./utils/storage.js"
+import { storage, updateBookmarkFavicon } from "./utils/storage.js"
 import { Navigation } from "./utils/navigation.js"
 import { ErrorHandler, ErrorType } from "./utils/errorHandler.js"
 import { i18n } from "./utils/i18n.js"
@@ -545,6 +545,37 @@ async function handleContextMenu(e) {
             }
           } catch (error) {
             logError("Ошибка при копировании элемента:", error)
+          }
+          break
+
+        case "update_favicon":
+          try {
+            // Закрываем контекстное меню
+            globalContextMenu.close()
+
+            // Показываем уведомление о начале обновления
+            uiModule.showLoadingIndicator()
+            uiModule.showNotification("Обновление фавикона...")
+
+            // Обновляем фавикон
+            const result = await updateBookmarkFavicon(id)
+
+            if (result.success) {
+              uiModule.showNotification("Фавикон успешно обновлен")
+
+              // Обновляем интерфейс
+              refreshCurrentView(true)
+            } else {
+              uiModule.showErrorMessage(
+                `Ошибка: ${result.error || "не удалось обновить фавикон"}`
+              )
+            }
+          } catch (error) {
+            logError("Ошибка при обновлении фавикона:", error)
+            uiModule.showErrorMessage("Не удалось обновить фавикон")
+          } finally {
+            // Скрываем индикатор загрузки в любом случае
+            uiModule.hideLoadingIndicator()
           }
           break
 
