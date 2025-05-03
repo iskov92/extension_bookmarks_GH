@@ -1205,7 +1205,7 @@ async function handleBookmarkItemClick(e) {
  * @param {Object} cachedIcons - Кеш иконок
  * @returns {HTMLElement} - DOM элемент
  */
-function createBookmarkElement(item, cachedIcons = {}) {
+async function createBookmarkElement(item, cachedIcons = {}) {
   const bookmarkElement = document.createElement("div")
   bookmarkElement.className = `bookmark-item ${
     item.type === "folder" ? "folder" : item.type === "note" ? "note" : ""
@@ -1231,24 +1231,25 @@ function createBookmarkElement(item, cachedIcons = {}) {
   icon.className = "bookmark-icon"
   icon.alt = item.type
 
+  // Устанавливаем правильный favicon в зависимости от типа
+  const faviconsEnabled = await shouldShowFavicons()
+
   if (item.type === "folder") {
-    // Для папки используем иконку из кеша или дефолтную
-    const cachedIcon = cachedIcons[item.id]
-    if (cachedIcon) {
-      icon.src = cachedIcon
-    } else {
-      icon.src = document.body.classList.contains("dark-theme")
-        ? ICONS.FOLDER.DARK
-        : ICONS.FOLDER.LIGHT
-    }
+    icon.src = "/assets/icons/folder.svg"
   } else if (item.type === "note") {
-    // Для заметки используем иконку заметки
-    icon.src = document.body.classList.contains("dark-theme")
-      ? ICONS.NOTE.DARK
-      : ICONS.NOTE.LIGHT
+    icon.src = "/assets/icons/note.svg"
   } else {
-    // Для закладки используем стандартную иконку
-    icon.src = ICONS.LINK
+    // Обработка закладок с учетом настройки отображения фавиконов
+    if (faviconsEnabled && item.favicon) {
+      icon.src = item.favicon
+      // Добавляем обработчик ошибки для резервного отображения
+      icon.onerror = () => {
+        icon.src = "/assets/icons/link.svg"
+      }
+    } else {
+      // Используем стандартную иконку, если фавиконы отключены или недоступны
+      icon.src = "/assets/icons/link.svg"
+    }
   }
 
   // Создаем заголовок
@@ -1264,4 +1265,27 @@ function createBookmarkElement(item, cachedIcons = {}) {
   bookmarkElement.addEventListener("click", handleBookmarkItemClick)
 
   return bookmarkElement
+}
+
+// Получение настройки отображения фавиконов
+async function shouldShowFavicons() {
+  try {
+    // Импортируем функцию динамически, чтобы избежать циклической зависимости
+    const { getFaviconsEnabled } = await import("./utils/storage.js")
+    const enabled = await getFaviconsEnabled()
+    console.log("popup.js: Получено состояние отображения фавиконов:", enabled)
+    return enabled
+  } catch (error) {
+    console.error("Ошибка при получении настройки фавиконов:", error)
+    return false
+  }
+}
+
+async function renderBookmarks(folderContentElement, items) {
+  folderContentElement.innerHTML = ""
+
+  for (const item of items) {
+    const itemElement = await createBookmarkElement(item)
+    folderContentElement.appendChild(itemElement)
+  }
 }

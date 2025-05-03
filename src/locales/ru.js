@@ -65,6 +65,11 @@ export default {
     EXPORT: "Экспортировать закладки в файл",
     CONTACTS: "Контакты",
     AUTHOR: "Автор расширения",
+    DISPLAY_OPTIONS: "Настройки отображения",
+    FAVICONS: "Отображение фавиконов",
+    FAVICONS_ENABLED: "Включено",
+    FAVICONS_DISABLED: "Выключено",
+    FAVICONS_LOADING: "Установка фавиконов...",
   },
   TRASH: {
     TITLE: "Корзина",

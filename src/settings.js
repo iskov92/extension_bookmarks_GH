@@ -1,6 +1,13 @@
 import { initTheme } from "./utils/theme.js"
 import { importFromBrowser, exportBookmarksToHTML } from "./utils/bookmarks.js"
-import { getStoredBookmarks, saveBookmarks } from "./utils/storage.js"
+import {
+  getStoredBookmarks,
+  saveBookmarks,
+  getFaviconsEnabled,
+  setFaviconsEnabled,
+  updateAllFavicons,
+  clearAllFavicons,
+} from "./utils/storage.js"
 import { i18n } from "./utils/i18n.js"
 
 // Инициализация UI
@@ -64,6 +71,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     input.click()
   })
+
+  // Инициализация переключателя фавиконов и его обработчика
+  initFaviconToggle()
 })
 
 // Обновление состояния переключателя языка
@@ -227,4 +237,83 @@ function parseBookmarksHTML(html) {
 
   const rootDL = doc.querySelector("DL")
   return rootDL ? processNode(rootDL) : []
+}
+
+// Инициализация переключателя фавиконов
+async function initFaviconToggle() {
+  const faviconToggle = document.getElementById("faviconToggle")
+  const loadingIndicator = document.querySelector(".favicon-loading-indicator")
+  const toggleStatus = document.querySelector(".toggle-status")
+
+  try {
+    // Получаем текущее состояние из хранилища
+    const isEnabled = await getFaviconsEnabled()
+    console.log("Текущее состояние фавиконов:", isEnabled)
+
+    // Устанавливаем состояние переключателя
+    faviconToggle.checked = isEnabled
+
+    // Обновляем текст статуса
+    if (toggleStatus) {
+      toggleStatus.textContent = isEnabled
+        ? i18n.t("SETTINGS.FAVICONS_ENABLED") || "Включено"
+        : i18n.t("SETTINGS.FAVICONS_DISABLED") || "Выключено"
+    }
+
+    // Добавляем обработчик события
+    faviconToggle.addEventListener("change", async () => {
+      const enabled = faviconToggle.checked
+
+      // Обновляем текст статуса
+      if (toggleStatus) {
+        toggleStatus.textContent = enabled
+          ? i18n.t("SETTINGS.FAVICONS_ENABLED") || "Включено"
+          : i18n.t("SETTINGS.FAVICONS_DISABLED") || "Выключено"
+      }
+
+      // Сохраняем состояние в хранилище
+      console.log("Сохраняем состояние фавиконов:", enabled)
+      await setFaviconsEnabled(enabled)
+
+      if (enabled) {
+        // Включаем индикатор загрузки
+        loadingIndicator.classList.add("active")
+
+        // Запускаем процесс обновления фавиконов
+        updateAllFavicons((processed, total) => {
+          // Обновляем прогресс
+          const percentComplete = Math.round((processed / total) * 100)
+          const loadingText = document.querySelector(
+            "[data-translate='SETTINGS.FAVICONS_LOADING']"
+          )
+          loadingText.textContent = `Установка фавиконов... ${percentComplete}% (${processed}/${total})`
+        }).then((result) => {
+          loadingIndicator.classList.remove("active")
+          if (result.success) {
+            alert(`Успешно обновлено ${result.updated} фавиконов!`)
+            // Повторно сохраняем состояние для уверенности
+            setFaviconsEnabled(true)
+          } else {
+            alert(`Ошибка при обновлении фавиконов: ${result.error}`)
+          }
+        })
+      } else {
+        // При отключении очищаем все фавиконы
+        loadingIndicator.classList.add("active")
+
+        clearAllFavicons().then((result) => {
+          loadingIndicator.classList.remove("active")
+          if (result.success) {
+            alert("Все фавиконы удалены!")
+            // Повторно сохраняем состояние для уверенности
+            setFaviconsEnabled(false)
+          } else {
+            alert(`Ошибка при удалении фавиконов: ${result.error}`)
+          }
+        })
+      }
+    })
+  } catch (error) {
+    console.error("Ошибка при инициализации переключателя фавиконов:", error)
+  }
 }

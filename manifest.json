@@ -5,6 +5,7 @@
   "version": "1.0",
   "description": "Автономный менеджер закладок с собственным хранилищем, независимым от браузера. Удобное управление и организация закладок.",
   "permissions": ["storage", "bookmarks", "unlimitedStorage"],
+  "host_permissions": ["*://*/*", "chrome://favicon/*"],
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": {
@@ -19,7 +20,7 @@
     "128": "assets/logo/icon128.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: chrome://favicon/"
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: chrome://favicon/ https://* http://*"
   },
   "web_accessible_resources": [
     {
