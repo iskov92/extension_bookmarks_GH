@@ -1047,12 +1047,19 @@ export class DragDropModule {
     e.preventDefault()
     e.stopPropagation()
 
+    // Получаем сам элемент кнопки (а не просто e.target, который может быть дочерним элементом)
+    const backButton = document.getElementById("backButton")
+
     // Только если мы не в корне и идет перетаскивание
     if (
       !this.navigationModule.getNavigation().isRoot &&
-      this.draggedElementId
+      this.draggedElementId &&
+      backButton
     ) {
-      e.target.classList.add("drag-over")
+      // Добавляем класс для неоновой подсветки ко всей кнопке
+      backButton.classList.add("drag-over")
+
+      // Устанавливаем эффект перемещения
       e.dataTransfer.dropEffect = "move"
     }
   }
@@ -1062,7 +1069,26 @@ export class DragDropModule {
    * @param {DragEvent} e - Событие выхода
    */
   handleBackButtonDragLeave(e) {
-    e.target.classList.remove("drag-over")
+    // Используем setTimeout с нулевой задержкой, чтобы проверить, действительно ли курсор
+    // покинул кнопку или просто перешел на дочерний элемент
+    setTimeout(() => {
+      // Получаем текущие координаты курсора
+      const x = e.clientX
+      const y = e.clientY
+
+      // Получаем элемент под курсором
+      const elementAtPoint = document.elementFromPoint(x, y)
+      const backButton = document.getElementById("backButton")
+
+      // Проверяем, находится ли курсор над кнопкой или её дочерними элементами
+      if (
+        !backButton ||
+        (!backButton.contains(elementAtPoint) && elementAtPoint !== backButton)
+      ) {
+        // Только если курсор действительно покинул кнопку, удаляем подсветку
+        backButton.classList.remove("drag-over")
+      }
+    }, 0)
   }
 
   /**
@@ -1072,7 +1098,12 @@ export class DragDropModule {
   async handleBackButtonDrop(e) {
     e.preventDefault()
     e.stopPropagation()
-    e.target.classList.remove("drag-over")
+
+    // Получаем сам элемент кнопки "назад"
+    const backButton = document.getElementById("backButton")
+    if (backButton) {
+      backButton.classList.remove("drag-over")
+    }
 
     // Проверяем, что есть ID перетаскиваемого элемента и мы не в корне
     if (
@@ -1169,8 +1200,16 @@ export class DragDropModule {
    * @param {string} text - Текст подсказки
    */
   showDraggingTooltip(text) {
-    // Отключаем отображение всплывающих подсказок
-    return
+    // Проверяем, есть ли уже элемент подсказки
+    if (!this.tooltipElement) {
+      this.tooltipElement = document.createElement("div")
+      this.tooltipElement.className = "dragging-tooltip"
+      document.body.appendChild(this.tooltipElement)
+    }
+
+    // Обновляем текст и показываем подсказку
+    this.tooltipElement.textContent = text
+    this.tooltipElement.classList.add("visible")
   }
 
   /**

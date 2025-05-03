@@ -85,5 +85,6 @@ export default {
     BEFORE_TIP: "Moving before item",
     AFTER_TIP: "Moving after item",
     INTO_TIP: "Moving into folder (release to complete)",
+    MOVE_TO_PARENT: "Moving up one level",
   },
 }
