@@ -1106,30 +1106,57 @@ function showNoteEditDialog(note) {
   }
 }
 
+// Делаем функцию глобально доступной для компонентов
+window.showNoteEditDialog = showNoteEditDialog
+
 /**
  * Обрабатывает клик по элементу
  * @param {Event} e - Событие клика
  */
 async function handleBookmarkItemClick(e) {
+  console.log("handleBookmarkItemClick вызван", e)
+
   const bookmarkElement = e.target.closest(".bookmark-item")
-  if (!bookmarkElement) return
+  if (!bookmarkElement) {
+    console.log("Элемент .bookmark-item не найден")
+    return
+  }
+
+  console.log("bookmarkElement:", bookmarkElement)
 
   const isFolder = bookmarkElement.classList.contains("folder")
   const isNote = bookmarkElement.classList.contains("note")
   const id = bookmarkElement.dataset.id
 
+  console.log("Тип элемента:", {
+    id,
+    isFolder,
+    isNote,
+    classes: bookmarkElement.className,
+    type: bookmarkElement.dataset.type,
+  })
+
   if (isFolder) {
+    console.log("Обработка клика по папке")
     // Если это папка, переходим в неё
     if (navigationModule) {
       await navigationModule.handleFolderClick(bookmarkElement)
     }
   } else if (isNote) {
+    console.log("Обработка клика по заметке")
     // Если это заметка, открываем её для просмотра/редактирования
     const title = bookmarkElement.querySelector(".bookmark-title").textContent
     const content = bookmarkElement.dataset.content || ""
     const createdAt = bookmarkElement.dataset.createdAt
       ? parseInt(bookmarkElement.dataset.createdAt)
       : null
+
+    console.log("Данные заметки для редактирования:", {
+      id,
+      title,
+      content,
+      createdAt,
+    })
 
     showNoteEditDialog({
       id,
@@ -1138,6 +1165,7 @@ async function handleBookmarkItemClick(e) {
       createdAt,
     })
   } else {
+    console.log("Обработка клика по закладке")
     // Если это закладка, открываем URL
     const url = bookmarkElement.dataset.url
     if (url) {
