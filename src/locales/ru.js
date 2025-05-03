@@ -24,6 +24,7 @@ export default {
     SETTINGS: "Настройки",
     CREATE_NOTE: "Создать заметку",
     ADDNOTE: "Создать заметку",
+    UPDATE_FAVICON: "Обновить фавикон",
   },
   LABELS: {
     FOLDER_NAME: "Название папки",

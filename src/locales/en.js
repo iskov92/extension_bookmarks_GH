@@ -24,6 +24,7 @@ export default {
     SETTINGS: "Settings",
     CREATE_NOTE: "Create note",
     ADDNOTE: "Create note",
+    UPDATE_FAVICON: "Update favicon",
   },
   LABELS: {
     FOLDER_NAME: "Folder name",
