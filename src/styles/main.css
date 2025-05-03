@@ -1406,57 +1406,175 @@ body.dragging * {
 }
 
 /* Стили для модального окна редактора заметок */
-.note-editor-modal {
+.note-modal {
   width: 600px;
-  max-width: 90vw;
-  height: 400px;
-  max-height: 80vh;
-}
-
-.note-editor-wrapper {
+  max-width: 95vw;
+  height: 500px;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
+}
+
+.note-modal .modal-header {
+  padding: 0;
+  height: 20px;
+  min-height: 20px;
+  max-height: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.note-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   height: 100%;
-  gap: 10px;
+  width: 100%;
+}
+
+.note-editor-label {
+  font-size: 12px;
+  padding-right: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.note-editor-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 2px;
 }
 
 .note-editor-title {
-  margin-bottom: 10px;
+  font-size: 14px;
+  padding: 0 10px;
+  border: none;
+  background-color: transparent;
+  color: var(--text-primary);
+  font-weight: bold;
+  height: 18px;
+  flex: 1;
+}
+
+.note-editor-title:focus {
+  outline: none;
 }
 
 .note-editor-content {
   flex: 1;
-  min-height: 200px;
   resize: none;
   padding: 10px;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  background-color: var(--bg-primary);
+  border-radius: 3px;
+  background-color: var(--bg-secondary);
   color: var(--text-primary);
   font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 2px;
+  overflow-y: auto;
 }
 
 .note-editor-content:focus {
-  outline: 1px solid var(--accent-color);
+  outline: none;
   border-color: var(--accent-color);
 }
 
-.note-modal {
-  width: 600px;
-  max-width: 95vw;
-  height: 400px;
-  max-height: 80vh;
+/* Стиль для скроллбара в редакторе, как в основном интерфейсе */
+.note-editor-content::-webkit-scrollbar {
+  width: var(--scrollbar-width);
 }
 
-.note-modal .modal-content {
-  height: calc(100% - 120px); /* Вычитаем высоту заголовка и кнопок */
+.note-editor-content::-webkit-scrollbar-track {
+  background: var(--light-accent);
+  border-radius: calc(var(--scrollbar-width) / 2);
+}
+
+.note-editor-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: calc(var(--scrollbar-width) / 2);
+}
+
+[data-theme="dark"] .note-editor-content::-webkit-scrollbar-track {
+  background: var(--dark-accent);
+}
+
+.note-modal-footer {
+  padding: 5px 10px;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
 }
 
 .note-created-at {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
-  margin-bottom: 10px;
-  font-style: italic;
+  white-space: nowrap;
+}
+
+.note-buttons-container {
+  display: flex;
+  gap: 6px;
+}
+
+.note-modal .cancel-button,
+.note-modal .save-button {
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-weight: normal;
+  cursor: pointer;
+  border: none;
+  font-size: 12px;
+  height: 20px;
+  line-height: 1;
+  min-width: 60px;
+  transition: all 0.2s ease;
+}
+
+.note-modal .cancel-button {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.note-modal .cancel-button:hover {
+  background-color: var(--bg-secondary);
+}
+
+.note-modal .save-button {
+  background-color: var(--accent-color);
+  color: black;
+}
+
+.note-modal .save-button:hover {
+  filter: brightness(110%);
+}
+
+/* Темная тема для модального окна заметок */
+[data-theme="dark"] .note-modal .save-button {
+  background-color: var(--dark-accent);
+}
+
+[data-theme="dark"] .note-editor-title,
+[data-theme="dark"] .note-editor-content {
+  background-color: var(--dark-bg-primary);
+  color: var(--dark-text-primary);
+}
+
+[data-theme="dark"] .note-created-at {
+  color: var(--dark-text-secondary);
+}
+
+[data-theme="dark"] .note-modal .cancel-button {
+  color: var(--dark-text-primary);
+  border-color: var(--dark-border-color);
+}
+
+[data-theme="dark"] .note-modal .cancel-button:hover {
+  background-color: var(--dark-bg-secondary);
 }

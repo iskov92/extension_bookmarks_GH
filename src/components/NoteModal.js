@@ -38,85 +38,68 @@ export class NoteModal extends Modal {
     this.modal = document.createElement("div")
     this.modal.className = "modal note-modal"
 
-    // Заголовок
+    // Заголовок модального окна (компактная шапка)
     const header = document.createElement("div")
-    header.className = "modal-header"
-    header.textContent = title
+    header.className = "modal-header note-modal-header"
 
-    // Содержимое
-    const content = document.createElement("div")
-    content.className = "modal-content"
-
-    // Обертка для редактора
-    const editorWrapper = document.createElement("div")
-    editorWrapper.className = "note-editor-wrapper"
+    // Контейнер для заголовка
+    const headerContainer = document.createElement("div")
+    headerContainer.className = "note-header-container"
 
     // Поле для заголовка заметки
-    const titleGroup = document.createElement("div")
-    titleGroup.className = "modal-input-group"
-
-    const titleLabel = document.createElement("label")
-    titleLabel.htmlFor = "note-title"
-    titleLabel.textContent = i18n.t("LABELS.NOTE_TITLE")
-
     this.editorTitle = document.createElement("input")
-    this.editorTitle.id = "note-title"
     this.editorTitle.type = "text"
     this.editorTitle.className = "note-editor-title"
     this.editorTitle.value = initialData.title || ""
+    this.editorTitle.placeholder =
+      i18n.t("PLACEHOLDERS.NOTE_TITLE") || "Введите название заметки..."
 
-    titleGroup.appendChild(titleLabel)
-    titleGroup.appendChild(this.editorTitle)
+    // Метка редактора заметки
+    const editorLabel = document.createElement("div")
+    editorLabel.className = "note-editor-label"
+    editorLabel.textContent = i18n.t("LABELS.NOTE_EDITOR") || "Редактор заметки"
 
-    // Если есть дата создания, показываем ее
-    if (initialData.createdAt) {
-      const createdAt = document.createElement("div")
-      createdAt.className = "note-created-at"
+    // Добавляем элементы в шапку
+    headerContainer.appendChild(this.editorTitle)
+    headerContainer.appendChild(editorLabel)
+    header.appendChild(headerContainer)
 
-      const date = new Date(initialData.createdAt)
-      createdAt.textContent = `${i18n.t(
-        "LABELS.CREATED_AT"
-      )}: ${date.toLocaleString()}`
+    // Содержимое
+    const content = document.createElement("div")
+    content.className = "modal-content note-editor-container"
 
-      titleGroup.appendChild(createdAt)
-    }
+    // Поле для содержимого заметки
+    this.editorContent = document.createElement("textarea")
+    this.editorContent.className = "note-editor-content"
+    this.editorContent.value = initialData.content || ""
+    this.editorContent.placeholder =
+      i18n.t("PLACEHOLDERS.NOTE_CONTENT") || "Введите текст заметки..."
 
-    // Добавляем поле содержимого только если это режим редактирования
-    if (this.isEditMode) {
-      // Поле для содержимого заметки
-      const contentGroup = document.createElement("div")
-      contentGroup.className = "modal-input-group"
-      contentGroup.style.flex = "1"
+    // Добавляем поле в содержимое
+    content.appendChild(this.editorContent)
 
-      const contentLabel = document.createElement("label")
-      contentLabel.htmlFor = "note-content"
-      contentLabel.textContent = i18n.t("LABELS.NOTE_CONTENT")
-
-      this.editorContent = document.createElement("textarea")
-      this.editorContent.id = "note-content"
-      this.editorContent.className = "note-editor-content"
-      this.editorContent.value = initialData.content || ""
-      this.editorContent.placeholder =
-        i18n.t("PLACEHOLDERS.NOTE_CONTENT") || "Введите текст заметки..."
-
-      contentGroup.appendChild(contentLabel)
-      contentGroup.appendChild(this.editorContent)
-
-      // Добавляем группу содержимого в обертку
-      editorWrapper.appendChild(contentGroup)
-    }
-
-    // Добавляем элементы в обертку
-    editorWrapper.appendChild(titleGroup)
-    content.appendChild(editorWrapper)
-
-    // Кнопки
+    // Кнопки и информация о создании
     const buttons = document.createElement("div")
-    buttons.className = "modal-footer"
+    buttons.className = "modal-footer note-modal-footer"
+
+    // Информация о создании
+    let createdAtInfo = ""
+    if (initialData.createdAt) {
+      const date = new Date(initialData.createdAt)
+      createdAtInfo = `${i18n.t("LABELS.CREATED_AT")}: ${date.toLocaleString()}`
+    }
+
+    const createdAt = document.createElement("div")
+    createdAt.className = "note-created-at"
+    createdAt.textContent = createdAtInfo
+
+    // Контейнер для кнопок
+    const buttonsContainer = document.createElement("div")
+    buttonsContainer.className = "note-buttons-container"
 
     const cancelButton = document.createElement("button")
     cancelButton.textContent = i18n.t("BUTTONS.CANCEL")
-    cancelButton.className = "cancel"
+    cancelButton.className = "cancel-button"
     cancelButton.onclick = () => this.close()
 
     const saveButton = document.createElement("button")
@@ -124,8 +107,11 @@ export class NoteModal extends Modal {
     saveButton.className = "save-button"
     saveButton.onclick = () => this.handleSave()
 
-    buttons.appendChild(cancelButton)
-    buttons.appendChild(saveButton)
+    buttonsContainer.appendChild(cancelButton)
+    buttonsContainer.appendChild(saveButton)
+
+    buttons.appendChild(createdAt)
+    buttons.appendChild(buttonsContainer)
 
     // Собираем модальное окно
     this.modal.appendChild(header)
@@ -176,12 +162,7 @@ export class NoteModal extends Modal {
         return
       }
 
-      // В режиме создания заметки, пустое содержимое
-      // В режиме редактирования, берем содержимое из редактора
-      const content =
-        this.isEditMode && this.editorContent
-          ? this.editorContent.value || ""
-          : ""
+      const content = this.editorContent.value || ""
 
       const noteData = {
         title,
