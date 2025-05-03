@@ -38,6 +38,13 @@
         <main class="settings-content">
             <div class="settings-section">
                 <h2 data-translate="SETTINGS.BOOKMARKS_MANAGEMENT">Управление закладками</h2>
+                <div class="language-switch-wrapper">
+                    <input type="checkbox" id="languageToggle">
+                    <label for="languageToggle" class="language-toggle-label">
+                        <span class="ru" data-translate="SETTINGS.LANGUAGE_RU">Русский</span>
+                        <span class="en" data-translate="SETTINGS.LANGUAGE_EN">English</span>
+                    </label>
+                </div>
                 <div class="settings-buttons">
                     <button id="importBookmarks" class="settings-button">
                         <img src="../assets/icons/import.svg" alt="Import" class="settings-icon light-theme-icon">
@@ -75,22 +82,11 @@
                 </div>
             </div>
 
-            <div class="settings-section author-section">
+            <div class="author-section">
                 <h2 data-translate="SETTINGS.CONTACTS">Контакты</h2>
                 <div class="author-info">
                     <p><span data-translate="SETTINGS.AUTHOR">Автор расширения</span>: <a href="https://t.me/iskov92"
                             target="_blank">@iskov92</a></p>
-                </div>
-            </div>
-
-            <div class="settings-group">
-                <label data-translate="LABELS.LANGUAGE">Язык</label>
-                <div class="language-switch-wrapper">
-                    <input type="checkbox" id="languageToggle">
-                    <label for="languageToggle" class="language-toggle-label">
-                        <span class="ru" data-translate="SETTINGS.LANGUAGE_RU">Русский</span>
-                        <span class="en" data-translate="SETTINGS.LANGUAGE_EN">English</span>
-                    </label>
                 </div>
             </div>
         </main>

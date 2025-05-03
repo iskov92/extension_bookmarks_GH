@@ -115,12 +115,20 @@
   padding: 1rem;
   background: var(--bg-secondary);
   border-radius: 8px;
+  position: relative;
 }
 
 .settings-section h2 {
   margin-bottom: 1rem;
   color: var(--text-primary);
   font-size: 18px;
+}
+
+/* Стили для заголовка с переключателем языка */
+.settings-section h2 + .language-switch-wrapper {
+  position: absolute;
+  top: 0.7rem;
+  right: 1rem;
 }
 
 .settings-buttons {
@@ -166,6 +174,9 @@
   margin-top: auto;
   text-align: center;
   margin-bottom: 20px;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
 }
 
 .author-info {
@@ -338,6 +349,11 @@
 /* Цвет для светлой темы */
 [data-theme="light"] .toggle-status.active-status {
   color: var(--light-accent);
+}
+
+/* Цвет для темной темы */
+[data-theme="dark"] .toggle-status.active-status {
+  color: #24ffd0;
 }
 
 /* Индикатор процесса установки фавиконов */
