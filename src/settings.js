@@ -199,8 +199,8 @@ function parseBookmarksHTML(html) {
         const createdAt = parseInt(
           noteElement.getAttribute("CREATED_AT") || Date.now()
         )
-        // Получаем содержимое заметки (весь текст внутри EXT-NOTE)
-        const content = noteElement.textContent.trim()
+        // Получаем содержимое заметки СО ВСЕМ форматированием HTML
+        const content = noteElement.innerHTML.trim()
 
         items.push({
           id: Date.now().toString(36) + Math.random().toString(36).substr(2),

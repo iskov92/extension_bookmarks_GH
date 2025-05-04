@@ -431,7 +431,7 @@ async function processBookmarkTreeWithNotes(bookmarks) {
       // Это заметка из нашего парсера
       const title = item.getAttribute("TITLE") || "Заметка"
       const createdAt = parseInt(item.getAttribute("CREATED_AT") || Date.now())
-      const content = item.textContent.trim()
+      const content = item.innerHTML.trim()
 
       result.push({
         id: generateUniqueId(),
