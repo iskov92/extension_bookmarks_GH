@@ -630,7 +630,7 @@ export class NoteModal extends Modal {
     // Функция создания выпадающего меню для кнопок выравнивания
     const createAlignmentDropdownButton = {
       name: "alignmentMenu",
-      icon: '<span style="display:inline-block;text-align:left;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/><polygon points="12,4 14,2 14,6" fill="currentColor"/></svg></span>',
+      icon: '<img src="/assets/icons/text_align_center.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_center_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
       title: i18n.t("LABELS.ALIGN_TEXT") || "Выравнивание текста",
       result: function () {
         // Получаем текущее выделение
@@ -659,22 +659,22 @@ export class NoteModal extends Modal {
           {
             name: "justifyLeft",
             title: i18n.t("LABELS.ALIGN_LEFT") || "По левому краю",
-            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+            icon: '<img src="/assets/icons/text_align_left.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_left_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
           },
           {
             name: "justifyCenter",
             title: i18n.t("LABELS.ALIGN_CENTER") || "По центру",
-            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="2" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+            icon: '<img src="/assets/icons/text_align_center.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_center_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
           },
           {
             name: "justifyRight",
             title: i18n.t("LABELS.ALIGN_RIGHT") || "По правому краю",
-            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="4" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+            icon: '<img src="/assets/icons/text_align_right.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_right_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
           },
           {
             name: "justifyFull",
             title: i18n.t("LABELS.ALIGN_JUSTIFY") || "По ширине",
-            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="14" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+            icon: '<img src="/assets/icons/text_align_justify.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_justify_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
           },
         ]
 

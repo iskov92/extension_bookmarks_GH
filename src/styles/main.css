@@ -1460,7 +1460,7 @@ body.dragging * {
 }
 
 .note-editor-title {
-  font-size: 12px;
+  font-size: 14px;
   padding: 0 10px;
   border: none;
   background-color: var(--bg-primary, #1e1e1e);
@@ -1606,10 +1606,10 @@ body.dragging * {
   box-sizing: border-box;
 }
 
-.note-editor-content:focus {
+/*.note-editor-content:focus { подсветка при фокусе на поле текста заметки
   outline: none;
   border-color: var(--accent-color);
-}
+}*/
 
 /* Стиль для скроллбара в редакторе, как в основном интерфейсе */
 .note-editor-content::-webkit-scrollbar {
@@ -1722,6 +1722,10 @@ body.dragging * {
   color: var(--text-primary);
   line-height: 1.5;
   background-color: transparent;
+  overflow-x: auto; /* отключает горизонтальный скролл */
+  word-wrap: break-word; /* переносит длинные слова */
+  overflow-wrap: break-word; /* более современно, то же самое */
+  white-space: normal;
 }
 
 .note-edit-button {
@@ -1773,7 +1777,7 @@ body.dragging * {
   background-color: #ff8a24; /* светлая тема */
   max-width: 8px !important;
   border-radius: 16px;
-  margin: 1px 0;
+  margin: 2px 0;
 }
 
 .note-content-view::-webkit-scrollbar-thumb {
@@ -1787,3 +1791,52 @@ body.dragging * {
 [data-theme="dark"] .note-content-view::-webkit-scrollbar-track {
   background-color: #24ffd0;
 }
+
+.pell-button .light-theme-icon,
+.pell-button .dark-theme-icon {
+  display: none;
+}
+
+.pell-button .light-theme-icon {
+  display: block;
+}
+
+.pell-button .dark-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .pell-button .light-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .pell-button .dark-theme-icon {
+  display: block;
+}
+
+.pell-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid #ccc;
+}
+
+.alignment-option .light-theme-icon,
+.alignment-option .dark-theme-icon {
+  display: none;
+}
+
+.alignment-option .light-theme-icon {
+  display: block;
+}
+
+.alignment-option .dark-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .alignment-option .light-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .alignment-option .dark-theme-icon {
+  display: block;
+}
+
+/* Стили для выпадающего меню выравнивания */
