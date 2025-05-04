@@ -773,9 +773,12 @@ export class NoteModal extends Modal {
         "heading2",
         {
           name: "olist",
-          icon: "1.",
+          icon: '<img src="/assets/icons/list_ordered.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/list_ordered_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
         },
-        "ulist",
+        {
+          name: "ulist",
+          icon: '<img src="/assets/icons/list_unordered.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/list_unordered_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+        },
         "line",
         // Заменяем четыре кнопки выравнивания одной выпадающей кнопкой
         createAlignmentDropdownButton,
