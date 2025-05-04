@@ -154,15 +154,23 @@
   background: var(--bg-hover);
 }
 
+/* Базовые стили для иконок в кнопках настроек */
 .settings-buttons .settings-button img {
   width: 24px;
   height: 24px;
   transition: transform 0.2s ease;
 }
 
+/* Анимация только для конкретных кнопок */
 #importFromFile:hover img,
 #exportBookmarks:hover img {
   transform: scale(1.2);
+}
+
+/* По умолчанию иконки не анимируются при наведении на контейнер */
+.settings-button:hover img,
+.storage-setting:hover img {
+  transform: none;
 }
 
 .settings-buttons .settings-button span {
@@ -400,4 +408,124 @@
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* Стили для блока управления хранилищем */
+.storage-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  width: 100%;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.storage-setting:hover {
+  background: var(--bg-hover);
+}
+
+/* Явно отключаем анимацию иконок при наведении на storage-setting */
+.storage-setting:hover > .storage-header img,
+.storage-setting:hover .storage-actions img,
+.storage-setting:hover .storage-header .settings-icon,
+.settings-button.storage-setting:hover img {
+  transform: none !important;
+}
+
+.storage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.storage-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.storage-action-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.storage-action-button:hover {
+  background-color: var(--hover-color);
+}
+
+.storage-action-button img {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+/* Анимация для иконок только при наведении конкретно на кнопку */
+#storageInfoButton:hover .light-theme-icon,
+#storageInfoButton:hover .dark-theme-icon,
+#storageClearButton:hover .light-theme-icon,
+#storageClearButton:hover .dark-theme-icon {
+  transform: scale(1.2) !important;
+}
+
+/* Отключаем анимацию внутри блока хранилища при наведении на контейнер */
+.storage-setting:hover .light-theme-icon,
+.storage-setting:hover .dark-theme-icon {
+  transform: none !important;
+}
+
+/* При наведении на кнопку переопределяем анимацию для вложенных элементов */
+#storageInfoButton:hover img,
+#storageClearButton:hover img {
+  transform: scale(1.2) !important;
+}
+
+/* Явно отключаем стандартную анимацию для кнопок внутри storage-setting */
+.storage-setting .settings-icon,
+.storage-setting img.settings-icon {
+  transform: none;
+}
+
+.storage-info-container {
+  display: none;
+  margin-top: 12px;
+  padding: 10px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.storage-info-container .spinner {
+  display: block;
+  width: 24px;
+  height: 24px;
+  margin: 10px auto;
+  border: 3px solid var(--text-secondary);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+.storage-info-container.active {
+  display: block;
+}
+
+.storage-info-line {
+  padding: 4px 0;
+  line-height: 1.3;
+  color: var(--text-secondary);
 }

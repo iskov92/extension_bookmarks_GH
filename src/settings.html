@@ -79,6 +79,31 @@
                             <span data-translate="SETTINGS.FAVICONS_LOADING">Установка фавиконов...</span>
                         </div>
                     </div>
+
+                    <div class="settings-button storage-setting">
+                        <div class="storage-header">
+                            <span data-translate="SETTINGS.STORAGE_MANAGEMENT">Хранилище расширения</span>
+                            <div class="storage-actions">
+                                <button id="storageInfoButton" class="storage-action-button">
+                                    <img src="../assets/icons/info_dark.svg" alt="Info"
+                                        class="settings-icon light-theme-icon">
+                                    <img src="../assets/icons/info.svg" alt="Info"
+                                        class="settings-icon dark-theme-icon">
+                                    <span data-translate="BUTTONS.STORAGE_INFO">Информация</span>
+                                </button>
+                                <button id="storageClearButton" class="storage-action-button">
+                                    <img src="../assets/icons/Trash_Empty_white.svg" alt="Clear"
+                                        class="settings-icon light-theme-icon">
+                                    <img src="../assets/icons/Trash_Empty_black.svg" alt="Clear"
+                                        class="settings-icon dark-theme-icon">
+                                    <span data-translate="BUTTONS.STORAGE_CLEAR">Очистить</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="storageInfo" class="storage-info-container">
+                            <!-- Здесь будет отображаться информация о хранилище -->
+                        </div>
+                    </div>
                 </div>
             </div>
 

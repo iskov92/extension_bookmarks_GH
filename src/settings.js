@@ -7,8 +7,11 @@ import {
   setFaviconsEnabled,
   updateAllFavicons,
   clearAllFavicons,
+  storage,
 } from "./utils/storage.js"
 import { i18n } from "./utils/i18n.js"
+import { iconStorage } from "./services/IconStorage.js"
+import { trashStorage } from "./services/TrashStorage.js"
 
 // Инициализация UI
 document.addEventListener("DOMContentLoaded", async () => {
@@ -74,6 +77,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Инициализация переключателя фавиконов и его обработчика
   initFaviconToggle()
+
+  // Инициализация функций управления хранилищем
+  initStorageManagement()
 })
 
 // Обновление состояния переключателя языка
@@ -330,4 +336,360 @@ async function initFaviconToggle() {
   } catch (error) {
     console.error("Ошибка при инициализации переключателя фавиконов:", error)
   }
+}
+
+// Функция инициализации управления хранилищем
+async function initStorageManagement() {
+  const storageInfoButton = document.getElementById("storageInfoButton")
+  const storageClearButton = document.getElementById("storageClearButton")
+  const storageInfoContainer = document.getElementById("storageInfo")
+
+  // Обработчик кнопки "Информация"
+  storageInfoButton.addEventListener("click", async () => {
+    const isActive = storageInfoContainer.classList.contains("active")
+
+    if (isActive) {
+      // Если контейнер уже активен, скрываем его
+      storageInfoContainer.classList.remove("active")
+      storageInfoContainer.innerHTML = ""
+    } else {
+      // Если контейнер не активен, показываем информацию
+      try {
+        storageInfoContainer.innerHTML = '<div class="spinner"></div>'
+        storageInfoContainer.classList.add("active")
+
+        const storageInfo = await getStorageInfo()
+        renderStorageInfo(storageInfo, storageInfoContainer)
+      } catch (error) {
+        console.error("Ошибка при получении информации о хранилище:", error)
+        storageInfoContainer.innerHTML = `<div class="storage-error">Ошибка при получении информации о хранилище</div>`
+      }
+    }
+  })
+
+  // Обработчик кнопки "Очистить"
+  storageClearButton.addEventListener("click", async () => {
+    const confirmMessage = i18n.t("SETTINGS.STORAGE_CLEAR_CONFIRM")
+    if (confirm(confirmMessage)) {
+      try {
+        await clearAllStorage()
+        alert(i18n.t("SETTINGS.STORAGE_CLEARED"))
+
+        // Обновляем информацию, если она отображается
+        if (storageInfoContainer.classList.contains("active")) {
+          const storageInfo = await getStorageInfo()
+          renderStorageInfo(storageInfo, storageInfoContainer)
+        }
+      } catch (error) {
+        console.error("Ошибка при очистке хранилища:", error)
+        alert("Произошла ошибка при очистке хранилища")
+      }
+    }
+  })
+}
+
+// Функция для получения информации о хранилище
+async function getStorageInfo() {
+  // Получаем информацию о закладках
+  const bookmarks = await getStoredBookmarks()
+  let bookmarksCount = 0
+
+  // Рекурсивно считаем количество элементов
+  function countItems(items) {
+    for (const item of items) {
+      bookmarksCount++
+      if (item.children && item.children.length > 0) {
+        countItems(item.children)
+      }
+    }
+  }
+  countItems(bookmarks)
+
+  // Получаем информацию о размере данных Chrome Storage
+  const storageData = await getStorageSize()
+  const storageDataSize = storageData.usedSize
+  const storagePercentage = storageData.percentage || 0
+
+  // Получаем информацию о размере данных IndexedDB
+  const indexedDBData = await getIndexedDBSize()
+  const indexedDBSize = indexedDBData.size
+  const indexedDBPercentage = indexedDBData.percentage || 0
+
+  // Получаем информацию о количестве иконок папок
+  let folderIconsCount = 0
+  try {
+    await iconStorage.init()
+    const transaction = iconStorage.db.transaction(
+      [iconStorage.ICONS_STORE],
+      "readonly"
+    )
+    const store = transaction.objectStore(iconStorage.ICONS_STORE)
+    const count = await new Promise((resolve) => {
+      const countRequest = store.count()
+      countRequest.onsuccess = () => resolve(countRequest.result)
+      countRequest.onerror = () => resolve(0)
+    })
+    folderIconsCount = count
+  } catch (error) {
+    console.error("Ошибка при получении информации об иконках:", error)
+  }
+
+  // Получаем информацию о элементах в корзине
+  let trashItemsCount = 0
+  try {
+    const trashItems = await trashStorage.getTrashItems()
+    trashItemsCount = trashItems.length
+  } catch (error) {
+    console.error("Ошибка при получении информации о корзине:", error)
+  }
+
+  return {
+    bookmarksCount,
+    storageSize: formatBytes(storageDataSize),
+    storagePercentage,
+    indexedDBSize,
+    indexedDBPercentage,
+    folderIconsCount,
+    trashItemsCount,
+  }
+}
+
+// Функция для рендеринга информации о хранилище
+function renderStorageInfo(info, container) {
+  container.innerHTML = `
+    <div class="storage-info-line">
+      ${i18n.t("SETTINGS.STORAGE_BOOKMARKS", { count: info.bookmarksCount })}
+    </div>
+    <div class="storage-info-line">
+      ${i18n.t("SETTINGS.STORAGE_ICONS", { count: info.folderIconsCount })}
+    </div>
+    <div class="storage-info-line">
+      ${i18n.t("SETTINGS.STORAGE_TRASH", { count: info.trashItemsCount })}
+    </div>
+    <div class="storage-info-line">
+      ${i18n.t("SETTINGS.STORAGE_SIZE_USED", {
+        size: info.storageSize,
+        percent: info.storagePercentage,
+      })}
+    </div>
+    <div class="storage-info-line">
+      ${i18n.t("SETTINGS.STORAGE_INDEXEDDB_SIZE", {
+        size: info.indexedDBSize,
+        percent: info.indexedDBPercentage,
+      })}
+    </div>
+  `
+}
+
+// Функция для очистки хранилища
+async function clearAllStorage() {
+  // Очищаем Chrome Storage
+  await new Promise((resolve, reject) => {
+    chrome.storage.local.clear(() => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError)
+      } else {
+        resolve()
+      }
+    })
+  })
+
+  // Очищаем IndexedDB для иконок папок
+  try {
+    await iconStorage.init()
+    const transaction = iconStorage.db.transaction(
+      [iconStorage.ICONS_STORE],
+      "readwrite"
+    )
+    const store = transaction.objectStore(iconStorage.ICONS_STORE)
+    await new Promise((resolve, reject) => {
+      const request = store.clear()
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(new Error("Failed to clear icon storage"))
+    })
+  } catch (error) {
+    console.error("Ошибка при очистке хранилища иконок:", error)
+  }
+
+  // Очищаем корзину
+  try {
+    await trashStorage.clearTrash()
+  } catch (error) {
+    console.error("Ошибка при очистке корзины:", error)
+  }
+
+  // Инициализируем хранилище с начальными значениями
+  await storage.initializeStorage()
+
+  // Устанавливаем тему и язык по умолчанию
+  chrome.storage.local.set({ isDarkTheme: true })
+  await i18n.setLocale("ru")
+  updateLanguageToggle()
+  translatePage()
+  document.body.setAttribute("data-theme", "dark")
+  const themeToggle = document.getElementById("themeToggle")
+  if (themeToggle) {
+    themeToggle.checked = true
+  }
+
+  // Сбрасываем состояние переключателя фавиконов
+  const faviconToggle = document.getElementById("faviconToggle")
+  if (faviconToggle) {
+    faviconToggle.checked = false
+  }
+  const toggleStatus = document.querySelector(".toggle-status")
+  if (toggleStatus) {
+    toggleStatus.textContent = i18n.t("SETTINGS.FAVICONS_DISABLED")
+    toggleStatus.classList.remove("active-status")
+  }
+}
+
+// Вспомогательная функция для получения размера хранилища Chrome
+async function getStorageSize() {
+  try {
+    const allData = await new Promise((resolve) => {
+      chrome.storage.local.get(null, (items) => {
+        resolve(items)
+      })
+    })
+
+    // Преобразуем объект в строку JSON и измеряем её размер
+    const jsonString = JSON.stringify(allData)
+    const usedSize = jsonString.length
+
+    // Стандартный лимит для chrome.storage.local составляет 5MB (5242880 байт)
+    const storageLimit = 5242880
+
+    // Вычисляем процент использования
+    const percentage = Math.round((usedSize / storageLimit) * 100)
+
+    return { usedSize, percentage: percentage + "%" }
+  } catch (error) {
+    console.error("Ошибка при получении размера хранилища:", error)
+    return { usedSize: 0, percentage: "0%" }
+  }
+}
+
+// Функция для получения размера IndexedDB
+async function getIndexedDBSize() {
+  try {
+    // Сначала попытаемся получить размер через оценку данных
+    let totalSize = 0
+    let estimatedPercent = "?"
+
+    // Получаем размер иконок папок
+    try {
+      await iconStorage.init()
+      const iconsSize = await estimateIconsSize()
+      totalSize += iconsSize
+    } catch (error) {
+      console.error("Ошибка при оценке размера иконок:", error)
+    }
+
+    // Получаем размер корзины
+    try {
+      const trashSize = await estimateTrashSize()
+      totalSize += trashSize
+    } catch (error) {
+      console.error("Ошибка при оценке размера корзины:", error)
+    }
+
+    // Лимит для IndexedDB обычно ограничен только общим дисковым пространством,
+    // но многие браузеры устанавливают мягкие ограничения от 50MB до безлимита.
+    // Примем 50MB как консервативную оценку для расчета процентов
+    if (totalSize > 0) {
+      const estimatedLimit = 50 * 1024 * 1024 // 50MB в байтах
+      estimatedPercent = Math.round((totalSize / estimatedLimit) * 100) + "%"
+    }
+
+    return {
+      size: formatBytes(totalSize),
+      percentage: estimatedPercent,
+    }
+  } catch (error) {
+    console.error("Ошибка при оценке размера IndexedDB:", error)
+    return {
+      size: "0 Bytes",
+      percentage: "0%",
+    }
+  }
+}
+
+// Функция для оценки размера иконок в IndexedDB
+async function estimateIconsSize() {
+  return new Promise(async (resolve) => {
+    try {
+      const transaction = iconStorage.db.transaction(
+        [iconStorage.ICONS_STORE],
+        "readonly"
+      )
+      const store = transaction.objectStore(iconStorage.ICONS_STORE)
+      const request = store.getAll()
+
+      request.onsuccess = (event) => {
+        const icons = event.target.result
+        let totalSize = 0
+
+        icons.forEach((icon) => {
+          if (icon.icon) {
+            // Если это Blob, используем его размер
+            if (icon.icon instanceof Blob) {
+              totalSize += icon.icon.size
+            }
+            // Если это строка base64, оцениваем размер
+            else if (
+              typeof icon.icon === "string" &&
+              icon.icon.includes("base64")
+            ) {
+              // Оценка размера base64 строки
+              const base64 = icon.icon.split(",")[1]
+              totalSize += Math.ceil(base64.length * 0.75) // Прибл. размер в байтах
+            }
+          }
+        })
+
+        resolve(totalSize)
+      }
+
+      request.onerror = () => {
+        resolve(0)
+      }
+    } catch (error) {
+      console.error("Ошибка при оценке размера иконок:", error)
+      resolve(0)
+    }
+  })
+}
+
+// Функция для оценки размера корзины в IndexedDB
+async function estimateTrashSize() {
+  return new Promise(async (resolve) => {
+    try {
+      const trashItems = await trashStorage.getTrashItems()
+      if (!trashItems || trashItems.length === 0) {
+        resolve(0)
+        return
+      }
+
+      // Преобразуем в JSON строку и оцениваем размер
+      const jsonString = JSON.stringify(trashItems)
+      resolve(jsonString.length)
+    } catch (error) {
+      console.error("Ошибка при оценке размера корзины:", error)
+      resolve(0)
+    }
+  })
+}
+
+// Вспомогательная функция для форматирования размера в байтах
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return "0 Bytes"
+
+  const k = 1024
+  const dm = decimals < 0 ? 0 : decimals
+  const sizes = ["Bytes", "KB", "MB", "GB"]
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]
 }
