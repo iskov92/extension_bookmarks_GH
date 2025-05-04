@@ -6,7 +6,7 @@
   --icon-size: 24px;
   --settings-icon-size: 20px;
   --header-icon-size: 20px;
-  --button-height: 40px;
+  --button-height: 44px;
   --button-width: 240px;
   --scrollbar-width: 8px;
   --grid-gap: 10px;
@@ -17,6 +17,9 @@
   --dark-accent-secondary: #1abebd;
   --light-accent: #ff8a24;
   --scrollbar-thumb: rgb(68, 71, 70);
+  --scrollbar-track: rgba(240, 240, 240, 0.8);
+  --scrollbar-track-dark: rgba(60, 60, 60, 0.8);
+  --scrollbar-thumb-hover: rgb(100, 100, 100);
 
   /* Анимации */
   --transition-speed: 0.3s;
@@ -160,9 +163,9 @@ body {
 /* Стили для закладок и папок */
 .bookmark-item {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
   border-radius: var(--border-radius);
   cursor: default;
   transition: background-color var(--transition-speed);
@@ -172,6 +175,7 @@ body {
   box-sizing: border-box;
   overflow: hidden;
   margin: 0;
+  position: relative;
 }
 
 .bookmark-item:hover {
@@ -216,11 +220,12 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 14px;
-  line-height: 1.2;
+  line-height: 1.3;
   word-break: break-word;
-  max-height: calc(1.2em * 2);
+  max-height: calc(1.3em * 2);
   margin: 0;
   padding: 0;
+  padding-bottom: 2px;
 }
 
 /* Анимированный переключатель темы */
@@ -721,7 +726,7 @@ input:checked + .slider:before {
 .modal-footer {
   margin-top: 20px;
   padding-top: 10px;
-  border-top: 1px solid var(--border-color);
+  border: none !important;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -731,7 +736,7 @@ input:checked + .slider:before {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
-  border: 1px solid var(--border-color);
+  border: none !important;
   background-color: transparent;
   color: var(--text-primary);
   transition: all var(--transition-speed);
@@ -1422,7 +1427,7 @@ body.dragging * {
   height: 20px;
   min-height: 20px;
   max-height: 20px;
-  border-bottom: 1px solid var(--border-color);
+  border: none;
   margin: 0;
   display: flex;
   align-items: center;
@@ -1441,6 +1446,7 @@ body.dragging * {
   padding-right: 10px;
   color: var(--text-secondary);
   white-space: nowrap;
+  display: none;
 }
 
 .note-editor-container {
@@ -1450,13 +1456,14 @@ body.dragging * {
   overflow: hidden;
   padding: 0;
   margin: 2px 0 0 0;
+  border-radius: 4px;
 }
 
 .note-editor-title {
-  font-size: 12px;
+  font-size: 14px;
   padding: 0 10px;
   border: none;
-  background-color: transparent;
+  background-color: var(--bg-primary, #1e1e1e);
   color: var(--text-primary);
   font-weight: bold;
   height: 18px;
@@ -1473,8 +1480,6 @@ body.dragging * {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
   margin-top: 2px;
   background-color: transparent;
 }
@@ -1489,18 +1494,20 @@ body.dragging * {
 
 .pell-actionbar {
   background-color: transparent !important;
-  border-bottom: 1px solid var(--border-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 4px;
   display: flex;
   flex-wrap: wrap;
   padding: 2px;
   height: 24px;
   min-height: 24px;
   overflow: hidden;
+  margin-bottom: 5px;
 }
 
 .pell-button {
   background-color: transparent;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   height: 20px !important;
   width: 24px !important;
@@ -1509,16 +1516,18 @@ body.dragging * {
   padding: 0;
   vertical-align: middle;
   color: var(--text-primary);
+  box-sizing: border-box;
+  border-radius: 2px;
 }
 
 .pell-button:hover {
-  background-color: var(--accent-color);
-  border-radius: 2px;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid #ccc;
 }
 
 .pell-button-selected {
   background-color: var(--accent-color) !important;
-  border-radius: 2px;
+  border: 1px solid transparent !important;
 }
 
 .pell-content {
@@ -1558,6 +1567,11 @@ body.dragging * {
   color: var(--text-primary);
 }
 
+[data-theme="dark"] .pell-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid #555;
+}
+
 [data-theme="dark"] .pell-button-selected {
   background-color: var(--dark-accent) !important;
 }
@@ -1580,7 +1594,7 @@ body.dragging * {
   resize: none;
   padding: 15px;
   border: 1px solid var(--border-color);
-  border-radius: 9px;
+  border-radius: 4px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: inherit;
@@ -1592,10 +1606,10 @@ body.dragging * {
   box-sizing: border-box;
 }
 
-.note-editor-content:focus {
+/*.note-editor-content:focus { подсветка при фокусе на поле текста заметки
   outline: none;
   border-color: var(--accent-color);
-}
+}*/
 
 /* Стиль для скроллбара в редакторе, как в основном интерфейсе */
 .note-editor-content::-webkit-scrollbar {
@@ -1605,6 +1619,7 @@ body.dragging * {
 .note-editor-content::-webkit-scrollbar-track {
   background: var(--light-accent);
   border-radius: calc(var(--scrollbar-width) / 2);
+  margin: 2px 0; /* сверху и снизу отступ по 1px */
 }
 
 .note-editor-content::-webkit-scrollbar-thumb {
@@ -1680,7 +1695,7 @@ body.dragging * {
 }
 
 [data-theme="dark"] .note-editor-title {
-  background-color: rgba(var(--bg-secondary-rgb), 0.2);
+  background-color: var(--bg-primary, #1e1e1e);
 }
 
 [data-theme="dark"] .note-editor-content {
@@ -1707,6 +1722,10 @@ body.dragging * {
   color: var(--text-primary);
   line-height: 1.5;
   background-color: transparent;
+  overflow-x: auto; /* отключает горизонтальный скролл */
+  word-wrap: break-word; /* переносит длинные слова */
+  overflow-wrap: break-word; /* более современно, то же самое */
+  white-space: normal;
 }
 
 .note-edit-button {
@@ -1747,3 +1766,77 @@ body.dragging * {
 [data-theme="dark"] .note-content-view a {
   color: var(--dark-accent);
 }
+
+/* Стили для скроллбара в режиме просмотра заметки */
+.note-content-view::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px; /* если есть горизонтальная прокрутка */
+}
+
+.note-content-view::-webkit-scrollbar-track {
+  background-color: #ff8a24; /* светлая тема */
+  max-width: 8px !important;
+  border-radius: 16px;
+  margin: 2px 0;
+}
+
+.note-content-view::-webkit-scrollbar-thumb {
+  background-color: rgb(68, 71, 70);
+  border-radius: 16px;
+  border: none;
+  max-width: 8px !important;
+}
+
+/* Тёмная тема */
+[data-theme="dark"] .note-content-view::-webkit-scrollbar-track {
+  background-color: #24ffd0;
+}
+
+.pell-button .light-theme-icon,
+.pell-button .dark-theme-icon {
+  display: none;
+}
+
+.pell-button .light-theme-icon {
+  display: block;
+}
+
+.pell-button .dark-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .pell-button .light-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .pell-button .dark-theme-icon {
+  display: block;
+}
+
+.pell-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid #ccc;
+}
+
+.alignment-option .light-theme-icon,
+.alignment-option .dark-theme-icon {
+  display: none;
+}
+
+.alignment-option .light-theme-icon {
+  display: block;
+}
+
+.alignment-option .dark-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .alignment-option .light-theme-icon {
+  display: none;
+}
+
+[data-theme="dark"] .alignment-option .dark-theme-icon {
+  display: block;
+}
+
+/* Стили для выпадающего меню выравнивания */

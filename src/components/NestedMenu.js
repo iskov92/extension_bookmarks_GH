@@ -156,8 +156,59 @@ export class NestedMenu {
         // Для заметок используем иконку заметки
         icon.src = await this.getNoteIcon()
       } else {
-        // Для закладок используем стандартную иконку
-        icon.src = ICONS.LINK
+        // Для закладок используем фавикон с учетом настройки отображения
+        try {
+          // Получаем настройку отображения фавиконов
+          const { getFaviconsEnabled } = await import("../utils/storage.js")
+          const showFavicons = await getFaviconsEnabled()
+
+          if (showFavicons && bookmark.favicon) {
+            // Если включены фавиконы и у закладки есть сохраненный фавикон, используем его
+            icon.src = bookmark.favicon
+
+            // Обработчик ошибки загрузки фавикона
+            icon.onerror = () => {
+              icon.src = ICONS.LINK
+            }
+          } else if (showFavicons && bookmark.url) {
+            // Если включены фавиконы, но у закладки нет сохраненного фавикона, пробуем загрузить его
+            const getFaviconFunc =
+              window.getFavicon ||
+              (typeof getFavicon === "function" ? getFavicon : null)
+
+            if (getFaviconFunc) {
+              const faviconUrl = await getFaviconFunc(bookmark.url)
+              if (faviconUrl && faviconUrl !== "/assets/icons/link.svg") {
+                icon.src = faviconUrl
+
+                // Обновляем закладку в хранилище, чтобы сохранить фавикон для будущего использования
+                if (typeof updateBookmark === "function") {
+                  updateBookmark(bookmark.id, {
+                    ...bookmark,
+                    favicon: faviconUrl,
+                  }).catch((err) =>
+                    console.error("Ошибка при обновлении фавикона:", err)
+                  )
+                }
+              } else {
+                icon.src = ICONS.LINK
+              }
+            } else {
+              icon.src = ICONS.LINK
+            }
+          } else {
+            // Если фавиконы отключены, используем стандартную иконку
+            icon.src = ICONS.LINK
+          }
+        } catch (error) {
+          console.error("Ошибка при определении настройки фавиконов:", error)
+          icon.src = ICONS.LINK
+        }
+
+        // Обработчик ошибки загрузки фавикона
+        icon.onerror = () => {
+          icon.src = ICONS.LINK
+        }
       }
 
       const title = document.createElement("span")

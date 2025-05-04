@@ -22,6 +22,10 @@ export const ICONS = {
     LIGHT: "/assets/icons/move_white.svg",
     DARK: "/assets/icons/move_black.svg",
   },
+  UPDATE_FAVICON: {
+    LIGHT: "/assets/icons/update_favicon_white.svg",
+    DARK: "/assets/icons/update_favicon_black.svg",
+  },
 }
 
 // Тексты интерфейса
@@ -44,6 +48,7 @@ export const UI_TEXTS = {
     COPY: "Копировать",
     CANCEL: "Отмена",
     SAVE: "Сохранить",
+    UPDATE_FAVICON: "Обновить фавикон",
   },
   LABELS: {
     FOLDER_NAME: "Название папки",
@@ -104,6 +109,12 @@ export const CONTEXT_MENU_CONFIG = {
       icon: ICONS.MOVE.LIGHT,
       iconDark: ICONS.MOVE.DARK,
       action: "copy",
+    },
+    {
+      text: UI_TEXTS.BUTTONS.UPDATE_FAVICON,
+      icon: ICONS.UPDATE_FAVICON.LIGHT,
+      iconDark: ICONS.UPDATE_FAVICON.DARK,
+      action: "update_favicon",
     },
   ],
   NOTE: [

@@ -333,6 +333,27 @@ export class NoteModal extends Modal {
           colorsContainer.appendChild(colorCell)
         })
 
+        // Кнопка сброса цвета текста
+        const resetButton = document.createElement("button")
+        resetButton.textContent = "Сбросить"
+        resetButton.style.margin = "5px 0"
+        resetButton.style.padding = "3px 8px"
+        resetButton.style.background = "var(--bg-secondary)"
+        resetButton.style.border = "1px solid var(--border-color)"
+        resetButton.style.borderRadius = "3px"
+        resetButton.style.cursor = "pointer"
+        resetButton.style.fontSize = "12px"
+        resetButton.style.width = "100%"
+        resetButton.title = "Вернуть цвет текста по умолчанию"
+
+        resetButton.addEventListener("click", () => {
+          // Восстанавливаем выделение и сбрасываем цвет к цвету, заданному в CSS
+          selection.removeAllRanges()
+          selection.addRange(selRange)
+          window.pell.exec("foreColor", "inherit")
+          document.body.removeChild(palette)
+        })
+
         // Создаем контейнер для поля ввода и кнопки
         const inputContainer = document.createElement("div")
         inputContainer.style.display = "flex"
@@ -376,6 +397,7 @@ export class NoteModal extends Modal {
         inputContainer.appendChild(okButton)
 
         palette.appendChild(colorsContainer)
+        palette.appendChild(resetButton)
         palette.appendChild(inputContainer)
 
         // Определяем позицию для палитры относительно курсора
@@ -497,6 +519,27 @@ export class NoteModal extends Modal {
           colorsContainer.appendChild(colorCell)
         })
 
+        // Кнопка сброса цвета фона
+        const resetButton = document.createElement("button")
+        resetButton.textContent = "Сбросить"
+        resetButton.style.margin = "5px 0"
+        resetButton.style.padding = "3px 8px"
+        resetButton.style.background = "var(--bg-secondary)"
+        resetButton.style.border = "1px solid var(--border-color)"
+        resetButton.style.borderRadius = "3px"
+        resetButton.style.cursor = "pointer"
+        resetButton.style.fontSize = "12px"
+        resetButton.style.width = "100%"
+        resetButton.title = "Вернуть цвет фона по умолчанию"
+
+        resetButton.addEventListener("click", () => {
+          // Восстанавливаем выделение и сбрасываем цвет фона к прозрачному
+          selection.removeAllRanges()
+          selection.addRange(selRange)
+          window.pell.exec("backColor", "transparent")
+          document.body.removeChild(palette)
+        })
+
         // Создаем контейнер для поля ввода и кнопки
         const inputContainer = document.createElement("div")
         inputContainer.style.display = "flex"
@@ -540,6 +583,7 @@ export class NoteModal extends Modal {
         inputContainer.appendChild(okButton)
 
         palette.appendChild(colorsContainer)
+        palette.appendChild(resetButton)
         palette.appendChild(inputContainer)
 
         // Определяем позицию для палитры относительно курсора
@@ -583,6 +627,135 @@ export class NoteModal extends Modal {
       },
     }
 
+    // Функция создания выпадающего меню для кнопок выравнивания
+    const createAlignmentDropdownButton = {
+      name: "alignmentMenu",
+      icon: '<img src="/assets/icons/text_align_center.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_center_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+      title: i18n.t("LABELS.ALIGN_TEXT") || "Выравнивание текста",
+      result: function () {
+        // Получаем текущее выделение
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        // Сохраняем выделение для последующего применения
+        const selRange = selection.getRangeAt(0)
+
+        // Создаем контейнер для выпадающего меню
+        const dropdown = document.createElement("div")
+        dropdown.className = "alignment-dropdown"
+        dropdown.style.position = "absolute"
+        dropdown.style.zIndex = "9999"
+        dropdown.style.background = "var(--bg-primary)"
+        dropdown.style.border = "1px solid var(--border-color)"
+        dropdown.style.borderRadius = "4px"
+        dropdown.style.boxShadow = "0 3px 8px rgba(0,0,0,0.3)"
+        dropdown.style.padding = "4px"
+        dropdown.style.display = "flex"
+        dropdown.style.flexDirection = "column"
+        dropdown.style.width = "180px"
+
+        // Определяем опции выравнивания
+        const alignmentOptions = [
+          {
+            name: "justifyLeft",
+            title: i18n.t("LABELS.ALIGN_LEFT") || "По левому краю",
+            icon: '<img src="/assets/icons/text_align_left.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_left_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+          },
+          {
+            name: "justifyCenter",
+            title: i18n.t("LABELS.ALIGN_CENTER") || "По центру",
+            icon: '<img src="/assets/icons/text_align_center.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_center_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+          },
+          {
+            name: "justifyRight",
+            title: i18n.t("LABELS.ALIGN_RIGHT") || "По правому краю",
+            icon: '<img src="/assets/icons/text_align_right.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_right_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+          },
+          {
+            name: "justifyFull",
+            title: i18n.t("LABELS.ALIGN_JUSTIFY") || "По ширине",
+            icon: '<img src="/assets/icons/text_align_justify.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/text_align_justify_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+          },
+        ]
+
+        // Создаем опции в выпадающем списке
+        alignmentOptions.forEach((option) => {
+          const optionElement = document.createElement("div")
+          optionElement.className = "alignment-option"
+          optionElement.style.display = "flex"
+          optionElement.style.alignItems = "center"
+          optionElement.style.padding = "6px 8px"
+          optionElement.style.cursor = "pointer"
+          optionElement.style.borderRadius = "3px"
+          optionElement.style.transition = "background 0.2s"
+          optionElement.title = option.title
+
+          // Добавляем эффект при наведении
+          optionElement.addEventListener("mouseover", () => {
+            optionElement.style.background = "var(--bg-hover)"
+          })
+          optionElement.addEventListener("mouseout", () => {
+            optionElement.style.background = "transparent"
+          })
+
+          // Создаем иконку опции
+          const iconSpan = document.createElement("span")
+          iconSpan.style.display = "inline-block"
+          iconSpan.style.width = "24px"
+          iconSpan.style.marginRight = "8px"
+          iconSpan.innerHTML = option.icon
+
+          // Создаем текст опции
+          const textSpan = document.createElement("span")
+          textSpan.textContent = option.title
+          textSpan.style.fontSize = "13px"
+
+          // Добавляем элементы в опцию
+          optionElement.appendChild(iconSpan)
+          optionElement.appendChild(textSpan)
+
+          // Обработчик клика по опции
+          optionElement.addEventListener("click", () => {
+            // Восстанавливаем выделение
+            selection.removeAllRanges()
+            selection.addRange(selRange)
+            // Применяем выравнивание
+            window.pell.exec(option.name)
+            // Закрываем выпадающее меню
+            document.body.removeChild(dropdown)
+          })
+
+          dropdown.appendChild(optionElement)
+        })
+
+        // Находим позицию для выпадающего меню относительно кнопки
+        // Используем кнопку, на которую нажали, как ориентир
+        const button = document.querySelector(
+          '.pell-button[title="' + this.title + '"]'
+        )
+        const buttonRect = button.getBoundingClientRect()
+        dropdown.style.top = `${buttonRect.bottom + 5}px`
+        dropdown.style.left = `${buttonRect.left}px`
+
+        // Добавляем выпадающее меню на страницу
+        document.body.appendChild(dropdown)
+
+        // Обработчик для закрытия выпадающего меню при клике вне его
+        const closeOnClickOutside = (e) => {
+          if (!dropdown.contains(e.target) && e.target !== button) {
+            document.body.removeChild(dropdown)
+            document.removeEventListener("mousedown", closeOnClickOutside)
+          }
+        }
+
+        // Регистрируем обработчик
+        setTimeout(() => {
+          document.addEventListener("mousedown", closeOnClickOutside)
+        }, 10)
+      },
+      state: () => false,
+    }
+
     // Инициализация редактора
     this.pellEditor = window.pell.init({
       element: document.getElementById(this.pellContainerId),
@@ -600,12 +773,18 @@ export class NoteModal extends Modal {
         "heading2",
         {
           name: "olist",
-          icon: "1.",
+          icon: '<img src="/assets/icons/list_ordered.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/list_ordered_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
         },
-        "ulist",
+        {
+          name: "ulist",
+          icon: '<img src="/assets/icons/list_unordered.svg" class="light-theme-icon" style="width: 16px; height: 16px; object-fit: contain;"><img src="/assets/icons/list_unordered_dark.svg" class="dark-theme-icon" style="width: 16px; height: 16px; object-fit: contain;">',
+        },
         "line",
+        // Заменяем четыре кнопки выравнивания одной выпадающей кнопкой
+        createAlignmentDropdownButton,
         {
           name: "link",
+          icon: '<img src="/assets/logo/icon128.png" style="width: 16px; height: 16px; object-fit: contain;">',
           result: () => {
             const url = window.prompt(
               i18n.t("PROMPTS.ENTER_LINK") || "Введите URL ссылки"

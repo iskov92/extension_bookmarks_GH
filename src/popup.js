@@ -16,7 +16,7 @@ import { initTheme } from "./utils/theme.js"
 import { MainInterface } from "./components/MainInterface.js"
 import { NestedMenu } from "./components/NestedMenu.js"
 import { Modal } from "./components/Modal.js"
-import { storage } from "./utils/storage.js"
+import { storage, updateBookmarkFavicon } from "./utils/storage.js"
 import { Navigation } from "./utils/navigation.js"
 import { ErrorHandler, ErrorType } from "./utils/errorHandler.js"
 import { i18n } from "./utils/i18n.js"
@@ -548,6 +548,37 @@ async function handleContextMenu(e) {
           }
           break
 
+        case "update_favicon":
+          try {
+            // Закрываем контекстное меню
+            globalContextMenu.close()
+
+            // Показываем уведомление о начале обновления
+            uiModule.showLoadingIndicator()
+            uiModule.showNotification("Обновление фавикона...")
+
+            // Обновляем фавикон
+            const result = await updateBookmarkFavicon(id)
+
+            if (result.success) {
+              uiModule.showNotification("Фавикон успешно обновлен")
+
+              // Обновляем интерфейс
+              refreshCurrentView(true)
+            } else {
+              uiModule.showErrorMessage(
+                `Ошибка: ${result.error || "не удалось обновить фавикон"}`
+              )
+            }
+          } catch (error) {
+            logError("Ошибка при обновлении фавикона:", error)
+            uiModule.showErrorMessage("Не удалось обновить фавикон")
+          } finally {
+            // Скрываем индикатор загрузки в любом случае
+            uiModule.hideLoadingIndicator()
+          }
+          break
+
         default:
           logError("Неизвестное действие контекстного меню:", action)
       }
@@ -612,9 +643,16 @@ async function showFolderEditDialog(folder) {
 
     const iconImg = document.createElement("img")
     iconImg.className = "folder-icon-preview"
-    iconImg.src = currentIconUrl || ICONS.FOLDER.LIGHT
+
+    // Определяем иконку в зависимости от текущей темы
+    const isDarkTheme =
+      document.body.classList.contains("dark-theme") ||
+      document.body.getAttribute("data-theme") === "dark"
+    iconImg.src =
+      currentIconUrl || (isDarkTheme ? ICONS.FOLDER.DARK : ICONS.FOLDER.LIGHT)
+
     iconImg.onerror = () => {
-      iconImg.src = ICONS.FOLDER.LIGHT
+      iconImg.src = isDarkTheme ? ICONS.FOLDER.DARK : ICONS.FOLDER.LIGHT
     }
 
     iconPreview.appendChild(iconImg)
@@ -1198,7 +1236,7 @@ async function handleBookmarkItemClick(e) {
  * @param {Object} cachedIcons - Кеш иконок
  * @returns {HTMLElement} - DOM элемент
  */
-function createBookmarkElement(item, cachedIcons = {}) {
+async function createBookmarkElement(item, cachedIcons = {}) {
   const bookmarkElement = document.createElement("div")
   bookmarkElement.className = `bookmark-item ${
     item.type === "folder" ? "folder" : item.type === "note" ? "note" : ""
@@ -1224,24 +1262,25 @@ function createBookmarkElement(item, cachedIcons = {}) {
   icon.className = "bookmark-icon"
   icon.alt = item.type
 
+  // Устанавливаем правильный favicon в зависимости от типа
+  const faviconsEnabled = await shouldShowFavicons()
+
   if (item.type === "folder") {
-    // Для папки используем иконку из кеша или дефолтную
-    const cachedIcon = cachedIcons[item.id]
-    if (cachedIcon) {
-      icon.src = cachedIcon
-    } else {
-      icon.src = document.body.classList.contains("dark-theme")
-        ? ICONS.FOLDER.DARK
-        : ICONS.FOLDER.LIGHT
-    }
+    icon.src = "/assets/icons/folder.svg"
   } else if (item.type === "note") {
-    // Для заметки используем иконку заметки
-    icon.src = document.body.classList.contains("dark-theme")
-      ? ICONS.NOTE.DARK
-      : ICONS.NOTE.LIGHT
+    icon.src = "/assets/icons/note.svg"
   } else {
-    // Для закладки используем стандартную иконку
-    icon.src = ICONS.LINK
+    // Обработка закладок с учетом настройки отображения фавиконов
+    if (faviconsEnabled && item.favicon) {
+      icon.src = item.favicon
+      // Добавляем обработчик ошибки для резервного отображения
+      icon.onerror = () => {
+        icon.src = "/assets/icons/link.svg"
+      }
+    } else {
+      // Используем стандартную иконку, если фавиконы отключены или недоступны
+      icon.src = "/assets/icons/link.svg"
+    }
   }
 
   // Создаем заголовок
@@ -1257,4 +1296,27 @@ function createBookmarkElement(item, cachedIcons = {}) {
   bookmarkElement.addEventListener("click", handleBookmarkItemClick)
 
   return bookmarkElement
+}
+
+// Получение настройки отображения фавиконов
+async function shouldShowFavicons() {
+  try {
+    // Импортируем функцию динамически, чтобы избежать циклической зависимости
+    const { getFaviconsEnabled } = await import("./utils/storage.js")
+    const enabled = await getFaviconsEnabled()
+    console.log("popup.js: Получено состояние отображения фавиконов:", enabled)
+    return enabled
+  } catch (error) {
+    console.error("Ошибка при получении настройки фавиконов:", error)
+    return false
+  }
+}
+
+async function renderBookmarks(folderContentElement, items) {
+  folderContentElement.innerHTML = ""
+
+  for (const item of items) {
+    const itemElement = await createBookmarkElement(item)
+    folderContentElement.appendChild(itemElement)
+  }
 }

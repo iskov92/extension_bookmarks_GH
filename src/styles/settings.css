@@ -115,12 +115,20 @@
   padding: 1rem;
   background: var(--bg-secondary);
   border-radius: 8px;
+  position: relative;
 }
 
 .settings-section h2 {
   margin-bottom: 1rem;
   color: var(--text-primary);
   font-size: 18px;
+}
+
+/* Стили для заголовка с переключателем языка */
+.settings-section h2 + .language-switch-wrapper {
+  position: absolute;
+  top: 0.7rem;
+  right: 1rem;
 }
 
 .settings-buttons {
@@ -146,15 +154,23 @@
   background: var(--bg-hover);
 }
 
+/* Базовые стили для иконок в кнопках настроек */
 .settings-buttons .settings-button img {
   width: 24px;
   height: 24px;
   transition: transform 0.2s ease;
 }
 
+/* Анимация только для конкретных кнопок */
 #importFromFile:hover img,
 #exportBookmarks:hover img {
   transform: scale(1.2);
+}
+
+/* По умолчанию иконки не анимируются при наведении на контейнер */
+.settings-button:hover img,
+.storage-setting:hover img {
+  transform: none;
 }
 
 .settings-buttons .settings-button span {
@@ -166,6 +182,9 @@
   margin-top: auto;
   text-align: center;
   margin-bottom: 20px;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
 }
 
 .author-info {
@@ -242,4 +261,271 @@
   font-size: 14px;
   min-width: 120px;
   color: var(--text-primary);
+}
+
+/* Стиль для блока с фавиконами */
+.favicon-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.favicon-setting:hover {
+  background: var(--bg-hover);
+}
+
+.favicon-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Стили для переключателя фавиконов */
+.toggle-control {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  margin: 0;
+}
+
+#faviconToggle {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-label {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgb(142, 145, 143);
+  transition: var(--transition-speed);
+  border-radius: 24px;
+}
+
+.toggle-label::after {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+  background-color: rgb(68, 71, 70);
+  border-radius: 50%;
+  transition: var(--transition-speed);
+}
+
+/* Активное состояние для темной темы */
+#faviconToggle:checked + .toggle-label {
+  background-color: var(--dark-accent);
+}
+
+/* Активное состояние для светлой темы */
+[data-theme="light"] #faviconToggle:checked + .toggle-label {
+  background-color: var(--light-accent);
+}
+
+#faviconToggle:checked + .toggle-label::after {
+  transform: translateX(12px);
+  background-color: rgb(68, 71, 70);
+}
+
+.toggle-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: auto;
+  transition: color var(--transition-speed);
+}
+
+/* Стили для активного статуса */
+.toggle-status.active-status {
+  color: var(--dark-accent);
+  font-weight: 500;
+}
+
+/* Цвет для светлой темы */
+[data-theme="light"] .toggle-status.active-status {
+  color: var(--light-accent);
+}
+
+/* Цвет для темной темы */
+[data-theme="dark"] .toggle-status.active-status {
+  color: #24ffd0;
+}
+
+/* Индикатор процесса установки фавиконов */
+.favicon-loading-indicator {
+  display: none;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  animation: pulse 1.5s infinite;
+  margin-top: 4px;
+}
+
+.favicon-loading-indicator.active {
+  display: flex;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.favicon-loading-indicator .spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Стили для блока управления хранилищем */
+.storage-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  width: 100%;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.storage-setting:hover {
+  background: var(--bg-hover);
+}
+
+/* Явно отключаем анимацию иконок при наведении на storage-setting */
+.storage-setting:hover > .storage-header img,
+.storage-setting:hover .storage-actions img,
+.storage-setting:hover .storage-header .settings-icon,
+.settings-button.storage-setting:hover img {
+  transform: none !important;
+}
+
+.storage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.storage-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.storage-action-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.storage-action-button:hover {
+  background-color: var(--hover-color);
+}
+
+.storage-action-button img {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+/* Анимация для иконок только при наведении конкретно на кнопку */
+#storageInfoButton:hover .light-theme-icon,
+#storageInfoButton:hover .dark-theme-icon,
+#storageClearButton:hover .light-theme-icon,
+#storageClearButton:hover .dark-theme-icon {
+  transform: scale(1.2) !important;
+}
+
+/* Отключаем анимацию внутри блока хранилища при наведении на контейнер */
+.storage-setting:hover .light-theme-icon,
+.storage-setting:hover .dark-theme-icon {
+  transform: none !important;
+}
+
+/* При наведении на кнопку переопределяем анимацию для вложенных элементов */
+#storageInfoButton:hover img,
+#storageClearButton:hover img {
+  transform: scale(1.2) !important;
+}
+
+/* Явно отключаем стандартную анимацию для кнопок внутри storage-setting */
+.storage-setting .settings-icon,
+.storage-setting img.settings-icon {
+  transform: none;
+}
+
+.storage-info-container {
+  display: none;
+  margin-top: 12px;
+  padding: 10px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.storage-info-container .spinner {
+  display: block;
+  width: 24px;
+  height: 24px;
+  margin: 10px auto;
+  border: 3px solid var(--text-secondary);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+.storage-info-container.active {
+  display: block;
+}
+
+.storage-info-line {
+  padding: 4px 0;
+  line-height: 1.3;
+  color: var(--text-secondary);
 }

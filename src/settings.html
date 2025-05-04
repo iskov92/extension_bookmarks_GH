@@ -38,6 +38,13 @@
         <main class="settings-content">
             <div class="settings-section">
                 <h2 data-translate="SETTINGS.BOOKMARKS_MANAGEMENT">Управление закладками</h2>
+                <div class="language-switch-wrapper">
+                    <input type="checkbox" id="languageToggle">
+                    <label for="languageToggle" class="language-toggle-label">
+                        <span class="ru" data-translate="SETTINGS.LANGUAGE_RU">Русский</span>
+                        <span class="en" data-translate="SETTINGS.LANGUAGE_EN">English</span>
+                    </label>
+                </div>
                 <div class="settings-buttons">
                     <button id="importBookmarks" class="settings-button">
                         <img src="../assets/icons/import.svg" alt="Import" class="settings-icon light-theme-icon">
@@ -57,25 +64,54 @@
                         <img src="../assets/icons/export_dark.svg" alt="Export" class="settings-icon dark-theme-icon">
                         <span data-translate="SETTINGS.EXPORT">Создать файл экспорта закладок из расширения</span>
                     </button>
+
+                    <div class="settings-button favicon-setting">
+                        <div class="favicon-toggle-container">
+                            <label class="toggle-control">
+                                <input type="checkbox" id="faviconToggle">
+                                <span class="toggle-label"></span>
+                            </label>
+                            <span data-translate="SETTINGS.FAVICONS">Отображение фавиконов</span>
+                            <span class="toggle-status" data-translate="SETTINGS.FAVICONS_DISABLED">Выключено</span>
+                        </div>
+                        <div class="favicon-loading-indicator">
+                            <span class="spinner"></span>
+                            <span data-translate="SETTINGS.FAVICONS_LOADING">Установка фавиконов...</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-button storage-setting">
+                        <div class="storage-header">
+                            <span data-translate="SETTINGS.STORAGE_MANAGEMENT">Хранилище расширения</span>
+                            <div class="storage-actions">
+                                <button id="storageInfoButton" class="storage-action-button">
+                                    <img src="../assets/icons/info_dark.svg" alt="Info"
+                                        class="settings-icon light-theme-icon">
+                                    <img src="../assets/icons/info.svg" alt="Info"
+                                        class="settings-icon dark-theme-icon">
+                                    <span data-translate="BUTTONS.STORAGE_INFO">Информация</span>
+                                </button>
+                                <button id="storageClearButton" class="storage-action-button">
+                                    <img src="../assets/icons/Trash_Empty_white.svg" alt="Clear"
+                                        class="settings-icon light-theme-icon">
+                                    <img src="../assets/icons/Trash_Empty_black.svg" alt="Clear"
+                                        class="settings-icon dark-theme-icon">
+                                    <span data-translate="BUTTONS.STORAGE_CLEAR">Очистить</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="storageInfo" class="storage-info-container">
+                            <!-- Здесь будет отображаться информация о хранилище -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="settings-section author-section">
+            <div class="author-section">
                 <h2 data-translate="SETTINGS.CONTACTS">Контакты</h2>
                 <div class="author-info">
                     <p><span data-translate="SETTINGS.AUTHOR">Автор расширения</span>: <a href="https://t.me/iskov92"
                             target="_blank">@iskov92</a></p>
-                </div>
-            </div>
-
-            <div class="settings-group">
-                <label data-translate="LABELS.LANGUAGE">Язык</label>
-                <div class="language-switch-wrapper">
-                    <input type="checkbox" id="languageToggle">
-                    <label for="languageToggle" class="language-toggle-label">
-                        <span class="ru" data-translate="SETTINGS.LANGUAGE_RU">Русский</span>
-                        <span class="en" data-translate="SETTINGS.LANGUAGE_EN">English</span>
-                    </label>
                 </div>
             </div>
         </main>
