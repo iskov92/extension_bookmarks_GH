@@ -207,6 +207,33 @@ export class NoteModal extends Modal {
         this.editorTitle.focus()
       }
     }, 100)
+
+    // Добавляем стилизацию для скролла в режиме просмотра заметки
+    this.viewContent.style.overflowY = "auto"
+    this.viewContent.style.maxHeight = "100%"
+    this.viewContent.style.scrollbarWidth = "thin"
+    this.viewContent.style.scrollbarColor =
+      "var(--scrollbar-thumb) var(--scrollbar-track)"
+
+    // Также добавляем стилизацию для WebKit браузеров
+    const styleElement = document.createElement("style")
+    styleElement.textContent = `
+      .note-content-view::-webkit-scrollbar {
+        width: 8px;
+      }
+      .note-content-view::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+        border-radius: 4px;
+      }
+      .note-content-view::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 4px;
+      }
+      .note-content-view::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover);
+      }
+    `
+    document.head.appendChild(styleElement)
   }
 
   /**
@@ -627,6 +654,135 @@ export class NoteModal extends Modal {
       },
     }
 
+    // Функция создания выпадающего меню для кнопок выравнивания
+    const createAlignmentDropdownButton = {
+      name: "alignmentMenu",
+      icon: '<span style="display:inline-block;text-align:left;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/><polygon points="12,4 14,2 14,6" fill="currentColor"/></svg></span>',
+      title: i18n.t("LABELS.ALIGN_TEXT") || "Выравнивание текста",
+      result: function () {
+        // Получаем текущее выделение
+        const selection = window.getSelection()
+        if (!selection.rangeCount) return
+
+        // Сохраняем выделение для последующего применения
+        const selRange = selection.getRangeAt(0)
+
+        // Создаем контейнер для выпадающего меню
+        const dropdown = document.createElement("div")
+        dropdown.className = "alignment-dropdown"
+        dropdown.style.position = "absolute"
+        dropdown.style.zIndex = "9999"
+        dropdown.style.background = "var(--bg-primary)"
+        dropdown.style.border = "1px solid var(--border-color)"
+        dropdown.style.borderRadius = "4px"
+        dropdown.style.boxShadow = "0 3px 8px rgba(0,0,0,0.3)"
+        dropdown.style.padding = "4px"
+        dropdown.style.display = "flex"
+        dropdown.style.flexDirection = "column"
+        dropdown.style.width = "180px"
+
+        // Определяем опции выравнивания
+        const alignmentOptions = [
+          {
+            name: "justifyLeft",
+            title: i18n.t("LABELS.ALIGN_LEFT") || "По левому краю",
+            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+          },
+          {
+            name: "justifyCenter",
+            title: i18n.t("LABELS.ALIGN_CENTER") || "По центру",
+            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="2" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+          },
+          {
+            name: "justifyRight",
+            title: i18n.t("LABELS.ALIGN_RIGHT") || "По правому краю",
+            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="4" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+          },
+          {
+            name: "justifyFull",
+            title: i18n.t("LABELS.ALIGN_JUSTIFY") || "По ширине",
+            icon: '<svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="14" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg>',
+          },
+        ]
+
+        // Создаем опции в выпадающем списке
+        alignmentOptions.forEach((option) => {
+          const optionElement = document.createElement("div")
+          optionElement.className = "alignment-option"
+          optionElement.style.display = "flex"
+          optionElement.style.alignItems = "center"
+          optionElement.style.padding = "6px 8px"
+          optionElement.style.cursor = "pointer"
+          optionElement.style.borderRadius = "3px"
+          optionElement.style.transition = "background 0.2s"
+          optionElement.title = option.title
+
+          // Добавляем эффект при наведении
+          optionElement.addEventListener("mouseover", () => {
+            optionElement.style.background = "var(--bg-hover)"
+          })
+          optionElement.addEventListener("mouseout", () => {
+            optionElement.style.background = "transparent"
+          })
+
+          // Создаем иконку опции
+          const iconSpan = document.createElement("span")
+          iconSpan.style.display = "inline-block"
+          iconSpan.style.width = "24px"
+          iconSpan.style.marginRight = "8px"
+          iconSpan.innerHTML = option.icon
+
+          // Создаем текст опции
+          const textSpan = document.createElement("span")
+          textSpan.textContent = option.title
+          textSpan.style.fontSize = "13px"
+
+          // Добавляем элементы в опцию
+          optionElement.appendChild(iconSpan)
+          optionElement.appendChild(textSpan)
+
+          // Обработчик клика по опции
+          optionElement.addEventListener("click", () => {
+            // Восстанавливаем выделение
+            selection.removeAllRanges()
+            selection.addRange(selRange)
+            // Применяем выравнивание
+            window.pell.exec(option.name)
+            // Закрываем выпадающее меню
+            document.body.removeChild(dropdown)
+          })
+
+          dropdown.appendChild(optionElement)
+        })
+
+        // Находим позицию для выпадающего меню относительно кнопки
+        // Используем кнопку, на которую нажали, как ориентир
+        const button = document.querySelector(
+          '.pell-button[title="' + this.title + '"]'
+        )
+        const buttonRect = button.getBoundingClientRect()
+        dropdown.style.top = `${buttonRect.bottom + 5}px`
+        dropdown.style.left = `${buttonRect.left}px`
+
+        // Добавляем выпадающее меню на страницу
+        document.body.appendChild(dropdown)
+
+        // Обработчик для закрытия выпадающего меню при клике вне его
+        const closeOnClickOutside = (e) => {
+          if (!dropdown.contains(e.target) && e.target !== button) {
+            document.body.removeChild(dropdown)
+            document.removeEventListener("mousedown", closeOnClickOutside)
+          }
+        }
+
+        // Регистрируем обработчик
+        setTimeout(() => {
+          document.addEventListener("mousedown", closeOnClickOutside)
+        }, 10)
+      },
+      state: () => false,
+    }
+
     // Инициализация редактора
     this.pellEditor = window.pell.init({
       element: document.getElementById(this.pellContainerId),
@@ -648,35 +804,8 @@ export class NoteModal extends Modal {
         },
         "ulist",
         "line",
-        // Добавляем кнопки выравнивания текста
-        {
-          name: "justifyLeft",
-          icon: '<span style="display:inline-block;text-align:left;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
-          title: i18n.t("LABELS.ALIGN_LEFT") || "По левому краю",
-          result: () => window.pell.exec("justifyLeft"),
-          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
-        },
-        {
-          name: "justifyCenter",
-          icon: '<span style="display:inline-block;text-align:center;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="2" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
-          title: i18n.t("LABELS.ALIGN_CENTER") || "По центру",
-          result: () => window.pell.exec("justifyCenter"),
-          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
-        },
-        {
-          name: "justifyRight",
-          icon: '<span style="display:inline-block;text-align:right;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="4" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
-          title: i18n.t("LABELS.ALIGN_RIGHT") || "По правому краю",
-          result: () => window.pell.exec("justifyRight"),
-          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
-        },
-        {
-          name: "justifyFull",
-          icon: '<span style="display:inline-block;text-align:justify;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="14" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
-          title: i18n.t("LABELS.ALIGN_JUSTIFY") || "По ширине",
-          result: () => window.pell.exec("justifyFull"),
-          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
-        },
+        // Заменяем четыре кнопки выравнивания одной выпадающей кнопкой
+        createAlignmentDropdownButton,
         {
           name: "link",
           icon: '<img src="/assets/logo/icon128.png" style="width: 16px; height: 16px; object-fit: contain;">',

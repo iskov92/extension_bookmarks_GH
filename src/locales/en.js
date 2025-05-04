@@ -48,6 +48,7 @@ export default {
     ALIGN_CENTER: "Align center",
     ALIGN_RIGHT: "Align right",
     ALIGN_JUSTIFY: "Justify",
+    ALIGN_TEXT: "Text alignment",
   },
   CONFIRMATIONS: {
     DELETE: "Are you sure you want to delete this item?",

@@ -48,6 +48,7 @@ export default {
     ALIGN_CENTER: "По центру",
     ALIGN_RIGHT: "По правому краю",
     ALIGN_JUSTIFY: "По ширине",
+    ALIGN_TEXT: "Выравнивание текста",
   },
   CONFIRMATIONS: {
     DELETE: "Вы уверены, что хотите удалить этот элемент?",
