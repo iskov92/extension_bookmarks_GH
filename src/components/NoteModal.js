@@ -651,31 +651,31 @@ export class NoteModal extends Modal {
         // Добавляем кнопки выравнивания текста
         {
           name: "justifyLeft",
-          icon: '<span style="text-align: left;">&#8676;</span>',
+          icon: '<span style="display:inline-block;text-align:left;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
           title: i18n.t("LABELS.ALIGN_LEFT") || "По левому краю",
           result: () => window.pell.exec("justifyLeft"),
-          state: () => document.queryCommandState("justifyLeft"),
+          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
         },
         {
           name: "justifyCenter",
-          icon: '<span style="text-align: center;">&#8633;</span>',
+          icon: '<span style="display:inline-block;text-align:center;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="2" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
           title: i18n.t("LABELS.ALIGN_CENTER") || "По центру",
           result: () => window.pell.exec("justifyCenter"),
-          state: () => document.queryCommandState("justifyCenter"),
+          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
         },
         {
           name: "justifyRight",
-          icon: '<span style="text-align: right;">&#8677;</span>',
+          icon: '<span style="display:inline-block;text-align:right;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="4" y="2" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
           title: i18n.t("LABELS.ALIGN_RIGHT") || "По правому краю",
           result: () => window.pell.exec("justifyRight"),
-          state: () => document.queryCommandState("justifyRight"),
+          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
         },
         {
           name: "justifyFull",
-          icon: '<span style="text-align: justify;">&#8696;</span>',
+          icon: '<span style="display:inline-block;text-align:justify;width:14px;"><svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="2" width="14" height="2" fill="currentColor"/><rect x="0" y="6" width="14" height="2" fill="currentColor"/></svg></span>',
           title: i18n.t("LABELS.ALIGN_JUSTIFY") || "По ширине",
           result: () => window.pell.exec("justifyFull"),
-          state: () => document.queryCommandState("justifyFull"),
+          state: () => false, // Возвращаем false, чтобы кнопка никогда не выделялась
         },
         {
           name: "link",
