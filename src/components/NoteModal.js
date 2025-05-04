@@ -207,33 +207,6 @@ export class NoteModal extends Modal {
         this.editorTitle.focus()
       }
     }, 100)
-
-    // Добавляем стилизацию для скролла в режиме просмотра заметки
-    this.viewContent.style.overflowY = "auto"
-    this.viewContent.style.maxHeight = "100%"
-    this.viewContent.style.scrollbarWidth = "thin"
-    this.viewContent.style.scrollbarColor =
-      "var(--scrollbar-thumb) var(--scrollbar-track)"
-
-    // Также добавляем стилизацию для WebKit браузеров
-    const styleElement = document.createElement("style")
-    styleElement.textContent = `
-      .note-content-view::-webkit-scrollbar {
-        width: 8px;
-      }
-      .note-content-view::-webkit-scrollbar-track {
-        background: var(--scrollbar-track);
-        border-radius: 4px;
-      }
-      .note-content-view::-webkit-scrollbar-thumb {
-        background: var(--scrollbar-thumb);
-        border-radius: 4px;
-      }
-      .note-content-view::-webkit-scrollbar-thumb:hover {
-        background: var(--scrollbar-thumb-hover);
-      }
-    `
-    document.head.appendChild(styleElement)
   }
 
   /**

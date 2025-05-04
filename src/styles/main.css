@@ -17,6 +17,9 @@
   --dark-accent-secondary: #1abebd;
   --light-accent: #ff8a24;
   --scrollbar-thumb: rgb(68, 71, 70);
+  --scrollbar-track: rgba(240, 240, 240, 0.8);
+  --scrollbar-track-dark: rgba(60, 60, 60, 0.8);
+  --scrollbar-thumb-hover: rgb(100, 100, 100);
 
   /* Анимации */
   --transition-speed: 0.3s;
@@ -723,7 +726,7 @@ input:checked + .slider:before {
 .modal-footer {
   margin-top: 20px;
   padding-top: 10px;
-  border-top: 1px solid var(--border-color);
+  border: none !important;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -733,7 +736,7 @@ input:checked + .slider:before {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
-  border: 1px solid var(--border-color);
+  border: none !important;
   background-color: transparent;
   color: var(--text-primary);
   transition: all var(--transition-speed);
@@ -1424,7 +1427,7 @@ body.dragging * {
   height: 20px;
   min-height: 20px;
   max-height: 20px;
-  border-bottom: 1px solid var(--border-color);
+  border: none;
   margin: 0;
   display: flex;
   align-items: center;
@@ -1443,6 +1446,7 @@ body.dragging * {
   padding-right: 10px;
   color: var(--text-secondary);
   white-space: nowrap;
+  display: none;
 }
 
 .note-editor-container {
@@ -1452,13 +1456,14 @@ body.dragging * {
   overflow: hidden;
   padding: 0;
   margin: 2px 0 0 0;
+  border-radius: 4px;
 }
 
 .note-editor-title {
   font-size: 12px;
   padding: 0 10px;
   border: none;
-  background-color: transparent;
+  background-color: var(--bg-primary, #1e1e1e);
   color: var(--text-primary);
   font-weight: bold;
   height: 18px;
@@ -1475,8 +1480,6 @@ body.dragging * {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
   margin-top: 2px;
   background-color: transparent;
 }
@@ -1491,13 +1494,15 @@ body.dragging * {
 
 .pell-actionbar {
   background-color: transparent !important;
-  border-bottom: 1px solid var(--border-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 4px;
   display: flex;
   flex-wrap: wrap;
   padding: 2px;
   height: 24px;
   min-height: 24px;
   overflow: hidden;
+  margin-bottom: 5px;
 }
 
 .pell-button {
@@ -1589,7 +1594,7 @@ body.dragging * {
   resize: none;
   padding: 15px;
   border: 1px solid var(--border-color);
-  border-radius: 9px;
+  border-radius: 4px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: inherit;
@@ -1614,6 +1619,7 @@ body.dragging * {
 .note-editor-content::-webkit-scrollbar-track {
   background: var(--light-accent);
   border-radius: calc(var(--scrollbar-width) / 2);
+  margin: 2px 0; /* сверху и снизу отступ по 1px */
 }
 
 .note-editor-content::-webkit-scrollbar-thumb {
@@ -1689,7 +1695,7 @@ body.dragging * {
 }
 
 [data-theme="dark"] .note-editor-title {
-  background-color: rgba(var(--bg-secondary-rgb), 0.2);
+  background-color: var(--bg-primary, #1e1e1e);
 }
 
 [data-theme="dark"] .note-editor-content {
@@ -1755,4 +1761,29 @@ body.dragging * {
 
 [data-theme="dark"] .note-content-view a {
   color: var(--dark-accent);
+}
+
+/* Стили для скроллбара в режиме просмотра заметки */
+.note-content-view::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px; /* если есть горизонтальная прокрутка */
+}
+
+.note-content-view::-webkit-scrollbar-track {
+  background-color: #ff8a24; /* светлая тема */
+  max-width: 8px !important;
+  border-radius: 16px;
+  margin: 1px 0;
+}
+
+.note-content-view::-webkit-scrollbar-thumb {
+  background-color: rgb(68, 71, 70);
+  border-radius: 16px;
+  border: none;
+  max-width: 8px !important;
+}
+
+/* Тёмная тема */
+[data-theme="dark"] .note-content-view::-webkit-scrollbar-track {
+  background-color: #24ffd0;
 }
