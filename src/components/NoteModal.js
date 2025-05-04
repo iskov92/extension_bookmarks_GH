@@ -648,6 +648,35 @@ export class NoteModal extends Modal {
         },
         "ulist",
         "line",
+        // Добавляем кнопки выравнивания текста
+        {
+          name: "justifyLeft",
+          icon: '<span style="text-align: left;">&#8676;</span>',
+          title: i18n.t("LABELS.ALIGN_LEFT") || "По левому краю",
+          result: () => window.pell.exec("justifyLeft"),
+          state: () => document.queryCommandState("justifyLeft"),
+        },
+        {
+          name: "justifyCenter",
+          icon: '<span style="text-align: center;">&#8633;</span>',
+          title: i18n.t("LABELS.ALIGN_CENTER") || "По центру",
+          result: () => window.pell.exec("justifyCenter"),
+          state: () => document.queryCommandState("justifyCenter"),
+        },
+        {
+          name: "justifyRight",
+          icon: '<span style="text-align: right;">&#8677;</span>',
+          title: i18n.t("LABELS.ALIGN_RIGHT") || "По правому краю",
+          result: () => window.pell.exec("justifyRight"),
+          state: () => document.queryCommandState("justifyRight"),
+        },
+        {
+          name: "justifyFull",
+          icon: '<span style="text-align: justify;">&#8696;</span>',
+          title: i18n.t("LABELS.ALIGN_JUSTIFY") || "По ширине",
+          result: () => window.pell.exec("justifyFull"),
+          state: () => document.queryCommandState("justifyFull"),
+        },
         {
           name: "link",
           icon: '<img src="/assets/logo/icon128.png" style="width: 16px; height: 16px; object-fit: contain;">',

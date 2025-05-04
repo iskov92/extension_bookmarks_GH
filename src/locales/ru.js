@@ -42,6 +42,12 @@ export default {
     NOTE_CONTENT: "Содержимое заметки",
     CREATED_AT: "Создано",
     NOTE_EDITOR: "Редактор заметки",
+    TEXT_COLOR: "Цвет текста",
+    BACKGROUND_COLOR: "Цвет фона",
+    ALIGN_LEFT: "По левому краю",
+    ALIGN_CENTER: "По центру",
+    ALIGN_RIGHT: "По правому краю",
+    ALIGN_JUSTIFY: "По ширине",
   },
   CONFIRMATIONS: {
     DELETE: "Вы уверены, что хотите удалить этот элемент?",

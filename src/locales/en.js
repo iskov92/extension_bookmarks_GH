@@ -42,6 +42,12 @@ export default {
     NOTE_CONTENT: "Note content",
     CREATED_AT: "Created",
     NOTE_EDITOR: "Note editor",
+    TEXT_COLOR: "Text color",
+    BACKGROUND_COLOR: "Background color",
+    ALIGN_LEFT: "Align left",
+    ALIGN_CENTER: "Align center",
+    ALIGN_RIGHT: "Align right",
+    ALIGN_JUSTIFY: "Justify",
   },
   CONFIRMATIONS: {
     DELETE: "Are you sure you want to delete this item?",
