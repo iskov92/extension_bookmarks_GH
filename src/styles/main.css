@@ -1920,7 +1920,7 @@ body.dragging * {
   position: absolute;
   top: 100%;
   left: 1px;
-  width: 280px;
+  width: 0;
   max-height: 0;
   overflow: hidden;
   background-color: transparent;
@@ -1930,6 +1930,10 @@ body.dragging * {
   z-index: 20;
   margin-top: 5px;
   border: 0;
+}
+
+.search-container.active .search-results {
+  width: 280px;
 }
 
 .search-results.has-results {
@@ -2011,20 +2015,39 @@ body.dragging * {
 /* Красивый скроллбар для результатов поиска */
 .search-results {
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 .search-results::-webkit-scrollbar {
-  width: 5px;
+  width: 8px;
+  height: 8px; /* для горизонтального скроллбара, если он понадобится */
 }
 
 .search-results::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
+  background: transparent;
+  width: 8px;
+  margin: 2px 0; /* отступ сверху и снизу */
 }
 
 .search-results::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
-  border-radius: 6px;
+  border-radius: 16px;
+  max-width: 8px;
+  border: none;
+}
+
+/* Скроллбар для темной темы */
+[data-theme="dark"] .search-results::-webkit-scrollbar-track {
+  background-color: #23ffd0 !important;
+  border-radius: 16px;
+  max-width: 8px;
+}
+
+/* Скроллбар для светлой темы */
+[data-theme="light"] .search-results::-webkit-scrollbar-track {
+  background-color: var(--light-accent);
+  border-radius: 16px;
+  max-width: 8px;
 }
 
 /* Стили для результатов поиска в зависимости от типа */
