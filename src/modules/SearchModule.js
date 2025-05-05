@@ -22,7 +22,44 @@ export class SearchModule {
     this.searchContainer = document.getElementById("searchContainer")
     this.isSearchActive = false
     this.currentResults = []
+    this.tooltipTimer = null
+    this.tooltip = null
+
+    // Сначала устанавливаем обработчики событий
     this.setupEventListeners()
+
+    // Затем создаем элемент всплывающего окна
+    this.createTooltip()
+
+    // Добавляем обработчик события для пересоздания элемента при изменении темы
+    document.addEventListener("theme-changed", () => {
+      this.createTooltip()
+    })
+  }
+
+  /**
+   * Создает элемент всплывающего окна с путем
+   */
+  createTooltip() {
+    // Удаляем существующий элемент, если он есть
+    if (this.tooltip) {
+      try {
+        document.body.removeChild(this.tooltip)
+      } catch (error) {
+        // Игнорируем ошибку, если элемент не был найден в DOM
+      }
+    }
+
+    // Создаем элемент всплывающего окна
+    this.tooltip = document.createElement("div")
+    this.tooltip.className = "path-tooltip"
+
+    // Добавляем элемент в DOM
+    try {
+      document.body.appendChild(this.tooltip)
+    } catch (error) {
+      console.error("Ошибка при добавлении всплывающего окна в DOM:", error)
+    }
   }
 
   /**
@@ -95,6 +132,7 @@ export class SearchModule {
     this.searchContainer.classList.remove("active")
     this.isSearchActive = false
     this.clearSearch()
+    this.hideTooltip()
   }
 
   /**
@@ -194,7 +232,7 @@ export class SearchModule {
     })
 
     // Ограничиваем количество результатов
-    return results.slice(0, 10)
+    return results.slice(0, 30)
   }
 
   /**
@@ -234,6 +272,23 @@ export class SearchModule {
       resultItem.className = `result-item ${result.type}`
       resultItem.addEventListener("click", () => this.selectResult(result))
 
+      // Добавляем обработчики для отображения всплывающего окна с путем
+      resultItem.addEventListener("mouseenter", (e) => {
+        // Скрываем предыдущее всплывающее окно, если оно было
+        this.hideTooltip()
+        // Показываем новое всплывающее окно
+        this.showPathTooltip(e, result)
+      })
+
+      resultItem.addEventListener("mouseleave", () => {
+        this.hideTooltip()
+      })
+
+      // Также добавляем обработчик на отмену всплывающего окна при клике
+      resultItem.addEventListener("click", () => {
+        this.hideTooltip()
+      })
+
       // Получаем иконку в зависимости от типа и темы
       const icon = document.createElement("img")
       icon.className = "result-icon"
@@ -268,12 +323,11 @@ export class SearchModule {
       const details = document.createElement("div")
       details.className = "result-details"
 
-      if (result.matchType === "url" && result.url) {
+      // В details показываем URL для закладок или информацию о совпадении для заметок
+      if (result.url) {
         details.textContent = result.url
       } else if (result.matchType === "content") {
         details.textContent = i18n.t("SEARCH.MATCH_IN_CONTENT")
-      } else if (result.path && result.path.length > 0) {
-        details.textContent = result.path.join(" > ")
       }
 
       textContainer.appendChild(title)
@@ -291,10 +345,97 @@ export class SearchModule {
   }
 
   /**
+   * Форматирует путь для отображения во всплывающем окне
+   * @param {Array} pathArray - Массив элементов пути
+   * @returns {string} Отформатированный путь
+   */
+  formatPathForTooltip(pathArray) {
+    if (!pathArray || !Array.isArray(pathArray) || pathArray.length === 0) {
+      return ""
+    }
+
+    // Если путь длинный, показываем ... в начале
+    if (pathArray.length > 5) {
+      return `... > ${pathArray.slice(-5).join(" > ")}`
+    }
+
+    return pathArray.join(" > ")
+  }
+
+  /**
+   * Отображает всплывающее окно с путем элемента
+   * @param {MouseEvent} event - Событие мыши
+   * @param {Object} result - Данные о результате поиска
+   */
+  showPathTooltip(event, result) {
+    // Сохраняем ссылку на элемент
+    const targetElement = event.currentTarget
+
+    // Отменяем предыдущий таймер, если он был установлен
+    if (this.tooltipTimer) {
+      clearTimeout(this.tooltipTimer)
+    }
+
+    // Устанавливаем таймер на 1.5 секунды
+    this.tooltipTimer = setTimeout(() => {
+      // Проверяем, что элемент все еще существует и есть путь
+      if (!targetElement || !targetElement.isConnected) {
+        this.hideTooltip()
+        return
+      }
+
+      if (result.path && result.path.length > 0) {
+        // Формируем текст для всплывающего окна
+        const pathText = this.formatPathForTooltip(result.path)
+
+        // Устанавливаем текст всплывающего окна
+        this.tooltip.textContent = pathText
+
+        try {
+          // Позиционируем всплывающее окно относительно элемента
+          const rect = targetElement.getBoundingClientRect()
+
+          // Позиционируем по центру элемента по вертикали
+          const top =
+            rect.top + rect.height / 2 - (this.tooltip.offsetHeight / 2 || 10)
+
+          // Располагаем всплывающее окно справа от элемента
+          this.tooltip.style.left = `${rect.right + 10}px`
+          this.tooltip.style.top = `${top}px`
+
+          // Показываем всплывающее окно
+          this.tooltip.classList.add("visible")
+        } catch (error) {
+          console.error("Ошибка при позиционировании всплывающего окна:", error)
+          this.hideTooltip()
+        }
+      }
+    }, 1500) // 1.5 секунды задержки
+  }
+
+  /**
+   * Скрывает всплывающее окно с путем
+   */
+  hideTooltip() {
+    // Отменяем таймер, если он был установлен
+    if (this.tooltipTimer) {
+      clearTimeout(this.tooltipTimer)
+      this.tooltipTimer = null
+    }
+
+    // Проверяем, что элемент tooltip существует
+    if (this.tooltip) {
+      // Скрываем всплывающее окно
+      this.tooltip.classList.remove("visible")
+    }
+  }
+
+  /**
    * Выбор результата поиска
    * @param {Object} result - Выбранный результат
    */
   selectResult(result) {
+    this.hideTooltip()
     this.onResultSelect(result)
     this.closeSearch()
   }

@@ -2033,7 +2033,6 @@ body.dragging * {
   background-color: var(--scrollbar-thumb);
   border-radius: 16px;
   max-width: 8px;
-  border: none;
 }
 
 /* Скроллбар для темной темы */
@@ -2095,4 +2094,51 @@ body.dragging * {
 [data-theme="light"] .search-results.has-results {
   background-color: #ffffff;
   border: 1px solid #e0e0e0;
+}
+
+/* Стили для всплывающего окна с путем (tooltip) */
+.path-tooltip {
+  position: fixed; /* Используем fixed вместо absolute для более надежного позиционирования */
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 8px 12px;
+  font-size: 12px;
+  max-width: 300px;
+  word-wrap: break-word;
+  box-shadow: var(--shadow);
+  z-index: 9999; /* Высокий z-index, чтобы быть поверх других элементов */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.path-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Дополнительные стили для темной темы */
+[data-theme="dark"] .path-tooltip {
+  background-color: #2a2a2a;
+  border-color: #404040;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Дополнительные стили для светлой темы */
+[data-theme="light"] .path-tooltip {
+  background-color: #ffffff;
+  border-color: #e0e0e0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.result-item {
+  position: relative;
 }
