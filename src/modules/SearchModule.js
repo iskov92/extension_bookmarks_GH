@@ -410,7 +410,7 @@ export class SearchModule {
           this.hideTooltip()
         }
       }
-    }, 1500) // 1.5 секунды задержки
+    }, 500) // 1.5 секунды задержки
   }
 
   /**
