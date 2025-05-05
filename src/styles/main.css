@@ -649,18 +649,21 @@ input:checked + .slider:before {
 }
 
 /* Стили для загрузки файла */
-.file-input-wrapper {
+.file-input-wrapper,
+.file-input-container {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-top: 5px;
 }
 
-.file-input-wrapper input[type="file"] {
+.file-input-wrapper input[type="file"],
+.file-input-container input[type="file"] {
   display: none;
 }
 
-.file-select-button {
+.file-select-button,
+.file-input-label {
   padding: 8px 16px;
   background-color: var(--accent-color);
   color: var(--text-primary);
@@ -668,9 +671,11 @@ input:checked + .slider:before {
   border-radius: var(--border-radius);
   cursor: pointer;
   transition: background-color var(--transition-speed);
+  display: inline-block;
 }
 
-.file-select-button:hover {
+.file-select-button:hover,
+.file-input-label:hover {
   background-color: var(--hover-color);
 }
 

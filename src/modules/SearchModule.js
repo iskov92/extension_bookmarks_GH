@@ -302,10 +302,15 @@ export class SearchModule {
         const theme = document.body.getAttribute("data-theme") || "light"
         icon.src = theme === "dark" ? ICONS.NOTE.DARK : ICONS.NOTE.LIGHT
       } else {
-        icon.src = result.url
-          ? `chrome://favicon/size/16@2x/${result.url}`
-          : ICONS.LINK
-        icon.onerror = () => {
+        // Для закладок используем URL напрямую в качестве фавикона
+        if (result.url) {
+          icon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+            new URL(result.url).hostname
+          )}&sz=32`
+          icon.onerror = () => {
+            icon.src = ICONS.LINK
+          }
+        } else {
           icon.src = ICONS.LINK
         }
       }
