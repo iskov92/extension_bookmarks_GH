@@ -128,6 +128,13 @@ export default {
     INTO_TIP: "Перемещение внутрь папки (отпустите для завершения)",
     MOVE_TO_PARENT: "Перемещение на уровень выше",
   },
+  SEARCH: {
+    PLACEHOLDER: "Поиск закладок...",
+    NO_RESULTS: "Ничего не найдено",
+    MATCH_IN_CONTENT: "Найдено в содержимом заметки",
+    TOOLTIP: "Поиск закладок, папок и заметок",
+    SEARCHING: "Поиск...",
+  },
   PLACEHOLDERS: {
     NOTE_CONTENT: "Введите текст заметки...",
   },

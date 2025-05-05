@@ -21,6 +21,21 @@
                     <img src="../assets/icons/return_black.svg" alt="Back" class="header-icon dark-theme-icon">
                     <img src="../assets/icons/return_white.svg" alt="Back" class="header-icon light-theme-icon">
                 </button>
+                <div id="searchContainer" class="search-container">
+                    <button id="searchButton" class="header-button search-button">
+                        <img src="../assets/icons/search_black.svg" alt="Search" class="header-icon dark-theme-icon">
+                        <img src="../assets/icons/search_white.svg" alt="Search" class="header-icon light-theme-icon">
+                    </button>
+                    <div class="search-input-container">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Поиск закладок..."
+                            data-translate="SEARCH.PLACEHOLDER">
+                        <button id="clearSearchButton" class="clear-search-button">
+                            <img src="../assets/icons/close_black.svg" alt="Clear" class="header-icon dark-theme-icon">
+                            <img src="../assets/icons/close_white.svg" alt="Clear" class="header-icon light-theme-icon">
+                        </button>
+                    </div>
+                    <div id="searchResults" class="search-results"></div>
+                </div>
             </div>
             <div class="header-center">
                 <span id="currentFolder" class="current-folder" style="display: none;">Панель закладок</span>

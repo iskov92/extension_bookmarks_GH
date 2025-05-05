@@ -127,6 +127,13 @@ export default {
     INTO_TIP: "Moving into folder (release to complete)",
     MOVE_TO_PARENT: "Moving up one level",
   },
+  SEARCH: {
+    PLACEHOLDER: "Search bookmarks...",
+    NO_RESULTS: "No results found",
+    MATCH_IN_CONTENT: "Found in note content",
+    TOOLTIP: "Search bookmarks, folders and notes",
+    SEARCHING: "Searching...",
+  },
   PLACEHOLDERS: {
     NOTE_CONTENT: "Enter note text...",
   },

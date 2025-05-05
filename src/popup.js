@@ -38,6 +38,7 @@ import { DragDropModule } from "./modules/DragDropModule.js"
 import { ContextMenuModule } from "./modules/ContextMenuModule.js"
 import { ContextMenu } from "./components/ContextMenu.js"
 import { NoteModal } from "./components/NoteModal.js"
+import { SearchModule } from "./modules/SearchModule.js"
 
 // Глобальные переменные
 let mainContent
@@ -48,6 +49,7 @@ let navigationModule
 let uiModule
 let dragDropModule
 let contextMenuModule
+let searchModule
 
 // Глобальная переменная для контекстного меню
 let globalContextMenu = null
@@ -77,12 +79,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 })
 
-// Функция перевода страницы
+/**
+ * Перевод всех элементов на странице
+ */
 function translatePage() {
   const elements = document.querySelectorAll("[data-translate]")
   elements.forEach((element) => {
     const key = element.dataset.translate
     element.textContent = i18n.t(key)
+
+    // Для элементов ввода с атрибутом placeholder
+    if (element.hasAttribute("placeholder")) {
+      element.placeholder = i18n.t(key)
+    }
   })
 }
 
@@ -107,12 +116,20 @@ function updateUI(bookmarks, folderId, folderTitle) {
   }
 }
 
-// Функция обработки клика по кнопке "Назад"
-async function handleBackButtonClick() {
+/**
+ * Обработчик кнопки "Назад"
+ */
+function handleBackButtonClick() {
   if (navigationModule) {
-    await navigationModule.handleBackButtonClick()
-  } else {
-    logError("Модуль NavigationModule не инициализирован")
+    navigationModule.handleBackButtonClick()
+
+    // Проверяем, находимся ли мы теперь в корне
+    const isRoot = navigationModule.getNavigation().getStack().length === 0
+
+    // Обновляем видимость поиска
+    if (searchModule) {
+      searchModule.toggleVisibility(isRoot)
+    }
   }
 }
 
@@ -156,66 +173,99 @@ function showErrorMessage(message) {
 }
 
 /**
- * Инициализирует пользовательский интерфейс и модули
+ * Инициализирует пользовательский интерфейс
  */
 async function initializeUI() {
   try {
-    // Инициализируем основной контейнер
-    mainContent = document.getElementById("mainContent")
-    if (!mainContent) {
-      throw new Error("Не удалось найти элемент mainContent")
-    }
+    const mainContent = document.getElementById("mainContent")
 
-    // Сначала инициализируем UI модуль
-    uiModule = new UIModule(mainContent, null)
-
-    // Затем инициализируем модуль навигации и передаем функцию обновления UI
+    // Инициализируем модули
+    uiModule = new UIModule(mainContent)
     navigationModule = new NavigationModule(mainContent, updateUI)
 
-    // Обновляем ссылку на navigationModule в uiModule
-    if (uiModule) {
-      uiModule.navigationModule = navigationModule
-    }
+    // Устанавливаем связь между модулями
+    uiModule.navigationModule = navigationModule
 
-    // Восстанавливаем предыдущее состояние навигации
-    const savedNavigation = await storage.get(STORAGE_KEYS.NAVIGATION)
+    // Инициализируем модуль поиска
+    searchModule = new SearchModule(mainContent, handleSearchResult)
 
-    // Загружаем закладки на основе навигации
-    if (
-      savedNavigation &&
-      Array.isArray(savedNavigation) &&
-      savedNavigation.length > 0
-    ) {
-      navigationModule.setStack(savedNavigation)
+    // Инициализируем параметры из URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const pathParam = urlParams.get("path")
 
-      // Обновляем UI на основе сохраненной навигации
-      const currentFolder = navigationModule.getNavigation().currentFolder
-      if (currentFolder) {
-        currentParentId = currentFolder.id
-        const nestedBookmarks = await getBookmarksInFolder(currentFolder.id)
-        updateUI(nestedBookmarks, currentFolder.id, currentFolder.title)
+    if (pathParam) {
+      try {
+        const path = JSON.parse(decodeURIComponent(pathParam))
+        navigationModule.setStack(path)
+      } catch (e) {
+        logError("Ошибка при разборе параметра path:", e)
       }
-    } else {
-      // Загружаем корневые закладки
-      const bookmarks = await getAllBookmarks()
-      updateUI(bookmarks, "0", "Закладки")
     }
 
-    // Инициализируем drag-and-drop модуль
+    // Инициализируем модуль drag-and-drop
     dragDropModule = new DragDropModule(mainContent, uiModule, navigationModule)
 
-    // Инициализируем обработчики событий
+    // Инициализируем модуль контекстного меню
+    contextMenuModule = new ContextMenuModule(uiModule, navigationModule)
+
+    // Инициализируем слушатели событий
     initEventListeners()
 
-    // Добавляем обработчик для контекстного меню напрямую
-    mainContent.addEventListener("contextmenu", handleContextMenu)
+    // Обновляем текущее представление
+    await refreshCurrentView()
 
-    // Скрываем индикатор загрузки после инициализации
-    hideLoadingIndicator()
+    return true
   } catch (error) {
-    logError("Ошибка при инициализации интерфейса:", error)
-    showErrorMessage(i18n.t("ERROR.INITIALIZATION_FAILED"))
+    logError("Ошибка инициализации интерфейса:", error)
+    return false
   }
+}
+
+/**
+ * Обработчик выбора результата поиска
+ * @param {Object} result - Выбранный результат поиска
+ */
+function handleSearchResult(result) {
+  try {
+    if (result.type === "folder") {
+      // Открытие папки
+      navigateToFolder(result.id, result.title)
+    } else if (result.type === "note") {
+      // Открытие заметки
+      showNoteEditDialog({
+        id: result.id,
+        title: result.title,
+        content: result.content || "",
+        createdAt: result.createdAt,
+      })
+    } else {
+      // Открытие закладки
+      if (result.url) {
+        chrome.tabs.create({ url: result.url })
+      }
+    }
+  } catch (error) {
+    logError("Ошибка при обработке результата поиска:", error)
+  }
+}
+
+/**
+ * Переход к указанной папке
+ * @param {string} folderId - ID папки
+ * @param {string} folderTitle - Название папки
+ */
+function navigateToFolder(folderId, folderTitle) {
+  // Создаем объект для навигации
+  const folderToNavigate = {
+    id: folderId,
+    title: folderTitle,
+  }
+
+  // Добавляем папку в стек навигации
+  navigationModule.getNavigation().push(folderToNavigate)
+
+  // Обновляем представление
+  refreshCurrentView(true)
 }
 
 /**
@@ -305,6 +355,11 @@ async function refreshCurrentView(forceUpdateCache = false) {
     // Обновляем содержимое текущей папки
     const currentStack = navigationModule.getNavigation().getStack()
     const isRoot = currentStack.length === 0
+
+    // Отображаем или скрываем поиск в зависимости от типа представления
+    if (searchModule) {
+      searchModule.toggleVisibility(isRoot)
+    }
 
     if (isRoot) {
       // Корневой уровень - получаем все закладки
