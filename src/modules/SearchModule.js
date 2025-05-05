@@ -163,7 +163,7 @@ export class SearchModule {
         bookmarks,
         query.trim().toLowerCase()
       )
-      this.displayResults(results)
+      await this.displayResults(results)
     } catch (error) {
       logError("Ошибка при поиске закладок:", error)
     }
@@ -250,7 +250,7 @@ export class SearchModule {
    * Отображение результатов поиска
    * @param {Array} results - Результаты поиска
    */
-  displayResults(results) {
+  async displayResults(results) {
     this.searchResults.innerHTML = ""
     this.currentResults = results
 
@@ -261,6 +261,19 @@ export class SearchModule {
       this.searchResults.appendChild(noResults)
       this.searchResults.classList.add("has-results")
       return
+    }
+
+    // Получаем настройку отображения фавиконов
+    let showFavicons = false
+    try {
+      const { getFaviconsEnabled } = await import("../utils/storage.js")
+      showFavicons = await getFaviconsEnabled()
+      log(
+        "SearchModule: Получено состояние отображения фавиконов:",
+        showFavicons
+      )
+    } catch (error) {
+      logError("SearchModule: Ошибка при получении настройки фавиконов:", error)
     }
 
     // Создаем элементы для каждого результата
@@ -302,8 +315,8 @@ export class SearchModule {
         const theme = document.body.getAttribute("data-theme") || "light"
         icon.src = theme === "dark" ? ICONS.NOTE.DARK : ICONS.NOTE.LIGHT
       } else {
-        // Для закладок используем URL напрямую в качестве фавикона
-        if (result.url) {
+        // Для закладок проверяем настройку отображения фавиконов
+        if (result.url && showFavicons) {
           icon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
             new URL(result.url).hostname
           )}&sz=32`
