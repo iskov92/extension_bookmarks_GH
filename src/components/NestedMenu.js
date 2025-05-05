@@ -49,15 +49,6 @@ export class NestedMenu {
     this.container.innerHTML = ""
     this.container.classList.add("nested-view")
 
-    // Проверяем, что у нас есть закладки для рендера
-    if (!this.bookmarks || this.bookmarks.length === 0) {
-      const empty = document.createElement("div")
-      empty.className = "empty-message"
-      empty.textContent = "Папка пуста"
-      this.container.appendChild(empty)
-      return
-    }
-
     // Создаем Set для отслеживания уже отрендеренных ID
     const renderedIds = new Set()
 
