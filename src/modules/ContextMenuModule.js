@@ -220,7 +220,7 @@ export class ContextMenuModule {
     modal.show(
       i18n.t("MODALS.EDIT_FOLDER"),
       "folder",
-      { title },
+      { title, id },
       async (data) => {
         try {
           log("Обработчик сохранения с данными:", data)
@@ -239,7 +239,7 @@ export class ContextMenuModule {
             window.dispatchEvent(
               new CustomEvent("refresh-view", { detail: { force: true } })
             )
-            return true
+            return { id }
           } else {
             logError("Не удалось обновить папку", result)
             return false

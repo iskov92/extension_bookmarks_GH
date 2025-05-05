@@ -648,13 +648,31 @@ input:checked + .slider:before {
   margin-bottom: 10px;
 }
 
+/* Стили для группы загрузки иконок */
+.icon-upload-group {
+  margin-top: 20px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.icon-section-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  align-self: flex-start;
+}
+
 /* Стили для загрузки файла */
 .file-input-wrapper,
 .file-input-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
-  margin-top: 5px;
+  margin-top: 12px;
 }
 
 .file-input-wrapper input[type="file"],
@@ -664,19 +682,35 @@ input:checked + .slider:before {
 
 .file-select-button,
 .file-input-label {
-  padding: 8px 16px;
-  background-color: var(--accent-color);
-  color: var(--text-primary);
+  padding: 6px 12px;
+  background-color: rgba(var(--accent-color-rgb), 0.8);
+  color: #000000;
   border: none;
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: background-color var(--transition-speed);
+  transition: all var(--transition-speed);
   display: inline-block;
+  font-size: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .file-select-button:hover,
 .file-input-label:hover {
-  background-color: var(--hover-color);
+  background-color: var(--accent-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Отдельные стили для светлой и темной темы */
+[data-theme="dark"] .file-select-button,
+[data-theme="dark"] .file-input-label {
+  color: #000000;
+}
+
+[data-theme="light"] .file-select-button,
+[data-theme="light"] .file-input-label {
+  color: #000000;
 }
 
 .file-status {
@@ -771,31 +805,21 @@ input:checked + .slider:before {
 }
 
 .icon-preview {
-  margin-top: 10px;
-  width: 100%;
+  margin: 10px auto;
   display: flex;
   justify-content: center;
   align-items: center;
+  padding-bottom: 15px;
 }
 
-.preview-content {
-  width: 64px;
-  height: 64px;
-  border: 1px solid var(--border-color);
+.folder-icon-preview {
+  width: 48px;
+  height: 48px;
   border-radius: 4px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.preview-content img {
-  width: 100%;
-  height: 100%;
   object-fit: contain;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border: 1px solid var(--border-color);
 }
 
 /* Стили для языкового селектора */

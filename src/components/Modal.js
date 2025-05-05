@@ -84,6 +84,111 @@ export class Modal {
       // Сохраняем ссылку на поле ввода
       this.inputs.name = nameGroup.querySelector("input")
 
+      // Добавляем группу для загрузки иконки, если initialData содержит folderId
+      if (initialData.id) {
+        const iconGroup = document.createElement("div")
+        iconGroup.className = "modal-input-group icon-upload-group"
+
+        const iconLabel = document.createElement("label")
+        iconLabel.className = "icon-section-label"
+        iconLabel.textContent = i18n.t("LABELS.UPLOAD_ICON")
+        iconGroup.appendChild(iconLabel)
+
+        // Элемент для предпросмотра иконки
+        const iconPreview = document.createElement("div")
+        iconPreview.className = "icon-preview"
+
+        const iconImg = document.createElement("img")
+        iconImg.className = "folder-icon-preview"
+
+        // Определяем иконку в зависимости от текущей темы
+        const isDarkTheme = document.body.getAttribute("data-theme") === "dark"
+
+        // Будем получать текущую иконку из iconStorage если она есть
+        import("../services/IconStorage.js").then(async ({ iconStorage }) => {
+          try {
+            // Получаем текущую иконку, если она есть
+            await iconStorage.init()
+            const iconBlob = await iconStorage.getIcon(initialData.id)
+            if (iconBlob) {
+              iconImg.src = URL.createObjectURL(iconBlob)
+            } else {
+              // Используем стандартную иконку
+              iconImg.src = isDarkTheme
+                ? "/assets/icons/folder_black.svg"
+                : "/assets/icons/folder_white.svg"
+            }
+          } catch (error) {
+            console.error("Ошибка при получении иконки папки:", error)
+            // Используем стандартную иконку при ошибке
+            iconImg.src = isDarkTheme
+              ? "/assets/icons/folder_black.svg"
+              : "/assets/icons/folder_white.svg"
+          }
+        })
+
+        iconImg.onerror = () => {
+          iconImg.src = isDarkTheme
+            ? "/assets/icons/folder_black.svg"
+            : "/assets/icons/folder_white.svg"
+        }
+
+        iconPreview.appendChild(iconImg)
+        iconGroup.appendChild(iconPreview)
+
+        // Контейнер для инпута загрузки файла
+        const fileInputContainer = document.createElement("div")
+        fileInputContainer.className = "file-input-container"
+
+        const fileInput = document.createElement("input")
+        fileInput.type = "file"
+        fileInput.id = "icon-upload"
+        fileInput.className = "icon-upload"
+        fileInput.accept = "image/*"
+
+        // Сохраняем ссылку на инпут файла для использования при сохранении
+        this.inputs.iconFile = fileInput
+
+        const fileLabel = document.createElement("label")
+        fileLabel.className = "file-input-label"
+        fileLabel.htmlFor = "icon-upload"
+        fileLabel.textContent = i18n.t("LABELS.CHOOSE_FILE")
+
+        // Обработчик события выбора файла
+        fileInput.addEventListener("change", async (e) => {
+          const file = e.target.files[0]
+          if (file) {
+            // Загружаем оптимизатор изображений при необходимости
+            import("../utils/imageUtils.js")
+              .then(async ({ optimizeImage }) => {
+                try {
+                  const optimizedImage = await optimizeImage(file)
+                  iconImg.src = URL.createObjectURL(optimizedImage)
+                  // Изменяем текст кнопки, чтобы показать, что файл выбран
+                  fileLabel.textContent =
+                    file.name.length > 15
+                      ? file.name.substring(0, 12) + "..."
+                      : file.name
+                } catch (error) {
+                  console.error("Ошибка при оптимизации изображения:", error)
+                  // В случае ошибки пробуем отобразить оригинал
+                  iconImg.src = URL.createObjectURL(file)
+                }
+              })
+              .catch(() => {
+                // Если модуль не найден, просто отображаем оригинал
+                iconImg.src = URL.createObjectURL(file)
+              })
+          }
+        })
+
+        fileInputContainer.appendChild(fileInput)
+        fileInputContainer.appendChild(fileLabel)
+        iconGroup.appendChild(fileInputContainer)
+
+        content.appendChild(iconGroup)
+      }
+
       // Добавляем обработчик нажатия Enter в поле ввода
       this.inputs.name.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -226,11 +331,54 @@ export class Modal {
         }
         return
       }
+
+      // Если есть выбранный файл иконки, добавляем его в данные
+      if (this.inputs.iconFile && this.inputs.iconFile.files.length > 0) {
+        const selectedIcon = this.inputs.iconFile.files[0]
+
+        // Используем оптимизацию иконки и сохраняем
+        if (selectedIcon) {
+          data._iconFile = selectedIcon // Временно храним файл в данных
+        }
+      }
     }
 
     if (this.onSave) {
-      // Создаем копию данных, чтобы избежать изменений оригинала
-      this.onSave({ ...data })
+      // Проверяем, есть ли выбранная иконка для сохранения
+      if (data._iconFile) {
+        // Используем async IIFE для сохранения иконки
+        ;(async () => {
+          try {
+            // Загружаем модули оптимизации и хранения
+            const { optimizeImage } = await import("../utils/imageUtils.js")
+            const { iconStorage } = await import("../services/IconStorage.js")
+
+            // Оптимизируем иконку
+            const optimizedIcon = await optimizeImage(data._iconFile)
+
+            // Вызываем колбэк на сохранение с данными
+            delete data._iconFile // Удаляем временный файл из данных
+
+            // Получаем результат сохранения данных от колбека
+            const result = await this.onSave({ ...data })
+
+            // Если сохранение прошло успешно и в данных был идентификатор папки,
+            // сохраняем иконку
+            if (result && result.id) {
+              await iconStorage.init()
+              await iconStorage.saveIcon(result.id, optimizedIcon)
+            }
+          } catch (error) {
+            console.error("Ошибка при сохранении иконки:", error)
+            // Вызываем колбэк на сохранение только с данными заголовка
+            delete data._iconFile
+            this.onSave({ ...data })
+          }
+        })()
+      } else {
+        // Если нет выбранной иконки, просто сохраняем данные
+        this.onSave({ ...data })
+      }
     }
   }
 
