@@ -189,6 +189,13 @@ async function initializeUI() {
     // Инициализируем модуль поиска
     searchModule = new SearchModule(mainContent, handleSearchResult)
 
+    // Делаем модуль поиска доступным глобально для других модулей
+    window.searchModule = searchModule
+
+    // Инициализируем видимость поиска в зависимости от текущего состояния навигации
+    const isRoot = !navigationModule.getNavigation().getStack().length
+    searchModule.toggleVisibility(isRoot)
+
     // Инициализируем параметры из URL
     const urlParams = new URLSearchParams(window.location.search)
     const pathParam = urlParams.get("path")
@@ -263,6 +270,11 @@ function navigateToFolder(folderId, folderTitle) {
 
   // Добавляем папку в стек навигации
   navigationModule.getNavigation().push(folderToNavigate)
+
+  // При переходе в папку мы уже не в корне, поэтому скрываем поиск
+  if (searchModule) {
+    searchModule.toggleVisibility(false)
+  }
 
   // Обновляем представление
   refreshCurrentView(true)

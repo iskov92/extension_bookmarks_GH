@@ -81,6 +81,12 @@ export class NavigationModule {
       this.navigation.push({ id, title: folderTitle })
       this.currentParentId = id
 
+      // Скрываем поиск при переходе в папку
+      const searchModule = window.searchModule
+      if (searchModule) {
+        searchModule.toggleVisibility(false)
+      }
+
       // Проверяем, был ли перемещен элемент в эту папку
       const hasRecentMove =
         window.lastMovedItem &&
@@ -189,6 +195,12 @@ export class NavigationModule {
             this.updateFolderTitle("Закладки")
             this.toggleBackButton(false)
 
+            // При возврате в корень отображаем поиск
+            const searchModule = window.searchModule
+            if (searchModule) {
+              searchModule.toggleVisibility(true)
+            }
+
             const rootBookmarks = await getAllBookmarks(true)
             this.updateUI(rootBookmarks, "0", "Закладки")
           }
@@ -197,6 +209,12 @@ export class NavigationModule {
           this.currentParentId = this.navigation.getCurrentParentId()
           this.updateFolderTitle("Закладки")
           this.toggleBackButton(false)
+
+          // При возврате в корень отображаем поиск
+          const searchModule = window.searchModule
+          if (searchModule) {
+            searchModule.toggleVisibility(true)
+          }
 
           log("Возвращаемся в корневую папку")
 

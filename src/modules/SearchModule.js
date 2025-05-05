@@ -306,9 +306,11 @@ export class SearchModule {
   toggleVisibility(isMainView) {
     if (isMainView) {
       this.searchContainer.style.display = "flex"
+      this.searchButton.style.display = "flex"
     } else {
       this.closeSearch()
       this.searchContainer.style.display = "none"
+      this.searchButton.style.display = "none"
     }
   }
 }
