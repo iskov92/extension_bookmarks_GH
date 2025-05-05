@@ -155,14 +155,14 @@ export class SearchModule {
       return
     }
 
+    // Нормализуем запрос
+    const trimmedQuery = query.trim().toLowerCase()
+
     try {
       // Получаем все закладки
       const bookmarks = await getAllBookmarks()
       // Выполняем поиск по запросу
-      const results = this.searchBookmarks(
-        bookmarks,
-        query.trim().toLowerCase()
-      )
+      const results = this.searchBookmarks(bookmarks, trimmedQuery)
       await this.displayResults(results)
     } catch (error) {
       logError("Ошибка при поиске закладок:", error)
@@ -251,9 +251,11 @@ export class SearchModule {
    * @param {Array} results - Результаты поиска
    */
   async displayResults(results) {
+    // Очищаем предыдущие результаты сразу
     this.searchResults.innerHTML = ""
     this.currentResults = results
 
+    // Проверяем наличие результатов
     if (results.length === 0) {
       const noResults = document.createElement("div")
       noResults.className = "no-results"
@@ -263,23 +265,33 @@ export class SearchModule {
       return
     }
 
-    // Получаем настройку отображения фавиконов
-    let showFavicons = false
-    try {
-      const { getFaviconsEnabled } = await import("../utils/storage.js")
-      showFavicons = await getFaviconsEnabled()
-      log(
-        "SearchModule: Получено состояние отображения фавиконов:",
-        showFavicons
-      )
-    } catch (error) {
-      logError("SearchModule: Ошибка при получении настройки фавиконов:", error)
-    }
+    // Запускаем получение настройки фавиконов отдельно, чтобы не блокировать отображение
+    let showFaviconsPromise = (async () => {
+      try {
+        const { getFaviconsEnabled } = await import("../utils/storage.js")
+        return await getFaviconsEnabled()
+      } catch (error) {
+        logError(
+          "SearchModule: Ошибка при получении настройки фавиконов:",
+          error
+        )
+        return false
+      }
+    })()
 
-    // Создаем элементы для каждого результата
+    // Создаем элементы для результатов
     const resultsList = document.createElement("ul")
     resultsList.className = "results-list"
 
+    // Получаем значение showFavicons
+    let showFavicons = false
+    try {
+      showFavicons = await showFaviconsPromise
+    } catch (error) {
+      logError("Не удалось получить настройку фавиконов:", error)
+    }
+
+    // Создаем элементы для каждого результата
     results.forEach((result) => {
       const resultItem = document.createElement("li")
       resultItem.className = `result-item ${result.type}`
@@ -317,9 +329,25 @@ export class SearchModule {
       } else {
         // Для закладок проверяем настройку отображения фавиконов
         if (result.url && showFavicons) {
-          icon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-            new URL(result.url).hostname
-          )}&sz=32`
+          try {
+            // Проверяем, что URL валидный перед созданием объекта URL
+            const isValidUrl = /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/i.test(
+              result.url.trim()
+            )
+            if (isValidUrl) {
+              const urlObj = new URL(result.url)
+              icon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+                urlObj.hostname
+              )}&sz=32`
+            } else {
+              // Если URL невалидный, используем стандартную иконку
+              icon.src = ICONS.LINK
+            }
+          } catch (error) {
+            // В случае ошибки при разборе URL используем стандартную иконку
+            console.warn("Ошибка при обработке URL:", error)
+            icon.src = ICONS.LINK
+          }
           icon.onerror = () => {
             icon.src = ICONS.LINK
           }

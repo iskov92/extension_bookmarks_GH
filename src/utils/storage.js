@@ -771,12 +771,10 @@ export async function setFaviconsEnabled(enabled) {
 export async function getFaviconsEnabled() {
   try {
     const result = await storage.get("favicons_enabled")
-    console.log(`getFaviconsEnabled: получено значение из хранилища:`, result)
     // По умолчанию выключено, чтобы не нагружать систему
-    const enabled =
+    return (
       result === true || result === "true" || result?.favicons_enabled === true
-    console.log(`getFaviconsEnabled: итоговое значение: ${enabled}`)
-    return enabled
+    )
   } catch (error) {
     console.error("Ошибка при получении настройки фавиконов:", error)
     return false

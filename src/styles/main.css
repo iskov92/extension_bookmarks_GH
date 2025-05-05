@@ -683,16 +683,15 @@ input:checked + .slider:before {
 .file-select-button,
 .file-input-label {
   padding: 6px 12px;
-  background-color: rgba(var(--accent-color-rgb), 0.8);
-  color: #000000;
-  border: none;
+  background-color: transparent;
+  color: #676767;
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   cursor: pointer;
   transition: all var(--transition-speed);
   display: inline-block;
   font-size: 14px;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .file-select-button:hover,
@@ -705,7 +704,7 @@ input:checked + .slider:before {
 /* Отдельные стили для светлой и темной темы */
 [data-theme="dark"] .file-select-button,
 [data-theme="dark"] .file-input-label {
-  color: #000000;
+  color: #979797;
 }
 
 [data-theme="light"] .file-select-button,
