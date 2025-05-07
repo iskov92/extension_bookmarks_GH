@@ -170,8 +170,8 @@ export class SearchModule {
   }
 
   /**
-   * Поиск по закладкам, папкам и заметкам
-   * @param {Array} bookmarks - Массив закладок
+   * Выполняет поиск по закладкам и папкам
+   * @param {Array} bookmarks - Массив закладок для поиска
    * @param {string} query - Поисковый запрос (в нижнем регистре)
    * @returns {Array} Результаты поиска
    */
@@ -201,6 +201,9 @@ export class SearchModule {
           type: item.type,
           path: currentPath.slice(0, -1), // Путь без текущего элемента
           matchType: urlMatch ? "url" : contentMatch ? "content" : "title",
+          // Обязательно добавляем содержимое и дату создания для заметок
+          content: item.type === "note" ? item.content : undefined,
+          createdAt: item.type === "note" ? item.createdAt : undefined,
         })
       }
 

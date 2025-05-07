@@ -238,7 +238,8 @@ function handleSearchResult(result) {
       // Открытие папки
       navigateToFolder(result.id, result.title)
     } else if (result.type === "note") {
-      // Открытие заметки
+      // Открытие заметки - обязательно передаем content
+      log("Открываем заметку из поиска:", result)
       showNoteEditDialog({
         id: result.id,
         title: result.title,
