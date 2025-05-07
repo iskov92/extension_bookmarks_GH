@@ -133,7 +133,11 @@ export class NoteModal extends Modal {
     const cancelButton = document.createElement("button")
     cancelButton.textContent = i18n.t("BUTTONS.CANCEL")
     cancelButton.className = "cancel-button"
-    cancelButton.onclick = () => this.close()
+    cancelButton.onclick = () => {
+      this.close()
+      // Логируем закрытие для отладки
+      log("Закрытие заметки по нажатию кнопки Отмена")
+    }
 
     // Создаем кнопку сохранения, но скрываем её в режиме просмотра
     this.saveButton = document.createElement("button")
@@ -164,6 +168,8 @@ export class NoteModal extends Modal {
     this.overlay.addEventListener("click", (e) => {
       if (e.target === this.overlay) {
         this.close()
+        // Логируем закрытие для отладки
+        log("Закрытие заметки по клику вне окна")
       }
     })
 
@@ -176,6 +182,8 @@ export class NoteModal extends Modal {
     const escHandler = (e) => {
       if (e.key === "Escape") {
         this.close()
+        // Логируем закрытие для отладки
+        log("Закрытие заметки по нажатию Escape")
         document.removeEventListener("keydown", escHandler)
       }
     }
@@ -240,6 +248,9 @@ export class NoteModal extends Modal {
     if (this.pellInitialized && this.pellEditor) {
       this.viewContent.innerHTML = this.pellEditor.content.innerHTML
     }
+
+    // Сбрасываем состояние перетаскивания при переключении режимов
+    this.resetDragState()
   }
 
   /**
@@ -967,12 +978,58 @@ export class NoteModal extends Modal {
   }
 
   /**
+   * Сброс всех состояний перетаскивания для решения проблемы с невозможностью перемещения заметки
+   */
+  resetDragState() {
+    // Полностью сбрасываем все флаги перетаскивания
+    window.isDragging = false
+    window.preventRefreshAfterDrop = false
+
+    // Удаляем классы перетаскивания с body
+    document.body.classList.remove("dragging")
+    document.body.classList.remove("dragging-active")
+
+    // Полностью очищаем все индикаторы перетаскивания в DOM
+    const dropTargets = document.querySelectorAll(
+      ".drop-target, .drop-target-above, .highlight"
+    )
+    dropTargets.forEach((item) => {
+      item.classList.remove("drop-target")
+      item.classList.remove("drop-target-above")
+      item.classList.remove("highlight")
+    })
+
+    // Очищаем активно перетаскиваемые элементы
+    const draggingItems = document.querySelectorAll(".bookmark-item.dragging")
+    draggingItems.forEach((item) => {
+      item.classList.remove("dragging")
+    })
+
+    // Жертвуем сохранностью перемещений ради возможности перетаскивать заметки
+    const shiftedItems = document.querySelectorAll("[data-shifted]")
+    shiftedItems.forEach((item) => {
+      item.removeAttribute("data-shifted")
+      item.style.transform = ""
+    })
+
+    log("Сброшено состояние перетаскивания для заметки")
+  }
+
+  /**
    * Очищает ресурсы перед закрытием модального окна
    */
   close() {
+    log("Вызван метод close() для NoteModal")
+
+    // Сбрасываем редактор и состояние редактирования
     this.pellEditor = null
     this.pellInitialized = false
     this.isEditing = false
+
+    // Полностью сбрасываем состояние перетаскивания
+    this.resetDragState()
+
+    // Вызываем метод закрытия родительского класса
     super.close()
   }
 

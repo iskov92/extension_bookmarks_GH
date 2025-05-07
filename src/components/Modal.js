@@ -384,12 +384,59 @@ export class Modal {
 
   close() {
     if (this.overlay) {
+      // Полностью сбрасываем все флаги перетаскивания
+      window.isDragging = false
+      window.preventRefreshAfterDrop = false
+
+      // Удаляем классы перетаскивания с body
+      document.body.classList.remove("dragging")
+      document.body.classList.remove("dragging-active")
+
+      // Полностью очищаем все индикаторы перетаскивания в DOM
+      const dropTargets = document.querySelectorAll(
+        ".drop-target, .drop-target-above, .highlight"
+      )
+      dropTargets.forEach((item) => {
+        item.classList.remove("drop-target")
+        item.classList.remove("drop-target-above")
+        item.classList.remove("highlight")
+      })
+
+      // Очищаем активно перетаскиваемые элементы
+      const draggingItems = document.querySelectorAll(".bookmark-item.dragging")
+      draggingItems.forEach((item) => {
+        item.classList.remove("dragging")
+      })
+
+      // Удаляем смещения и трансформации (жертвуем сохранностью перемещений)
+      const shiftedItems = document.querySelectorAll("[data-shifted]")
+      shiftedItems.forEach((item) => {
+        item.removeAttribute("data-shifted")
+        item.style.transform = ""
+      })
+
+      // Удаление модального окна из DOM
       document.body.removeChild(this.overlay)
+
+      // Очистка всех ссылок и состояний
       this.overlay = null
       this.modal = null
       this.inputs = {} // Очищаем кэш полей ввода
       this.onSave = null
       this.onClose = null
+
+      // Принудительно обновляем представление после очистки
+      setTimeout(() => {
+        try {
+          // Генерируем событие обновления интерфейса с force:true
+          const refreshEvent = new CustomEvent("refresh-view", {
+            detail: { force: true },
+          })
+          window.dispatchEvent(refreshEvent)
+        } catch (e) {
+          console.error("Ошибка при генерации события обновления:", e)
+        }
+      }, 50)
     }
   }
 
