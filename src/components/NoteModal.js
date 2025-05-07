@@ -449,7 +449,10 @@ export class NoteModal extends Modal {
         // Добавляем обработчик для закрытия палитры при клике вне неё
         const closeOnClickOutside = (e) => {
           if (!palette.contains(e.target)) {
-            document.body.removeChild(palette)
+            // Добавляем проверку существования элемента в DOM перед удалением
+            if (palette && palette.parentNode) {
+              document.body.removeChild(palette)
+            }
             document.removeEventListener("mousedown", closeOnClickOutside)
           }
         }
@@ -647,7 +650,10 @@ export class NoteModal extends Modal {
         // Добавляем обработчик для закрытия палитры при клике вне неё
         const closeOnClickOutside = (e) => {
           if (!palette.contains(e.target)) {
-            document.body.removeChild(palette)
+            // Добавляем проверку существования элемента в DOM перед удалением
+            if (palette && palette.parentNode) {
+              document.body.removeChild(palette)
+            }
             document.removeEventListener("mousedown", closeOnClickOutside)
           }
         }
@@ -795,7 +801,10 @@ export class NoteModal extends Modal {
         // Обработчик для закрытия выпадающего меню при клике вне его
         const closeOnClickOutside = (e) => {
           if (!dropdown.contains(e.target) && e.target !== button) {
-            document.body.removeChild(dropdown)
+            // Добавляем проверку существования элемента в DOM перед удалением
+            if (dropdown && dropdown.parentNode) {
+              document.body.removeChild(dropdown)
+            }
             document.removeEventListener("mousedown", closeOnClickOutside)
           }
         }
