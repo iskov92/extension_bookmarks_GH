@@ -112,6 +112,9 @@ export default {
     MOVE_FOLDER: "Не удалось переместить папку",
     MOVE_CYCLIC: "Нельзя переместить папку в её собственную подпапку",
     REORDER_FAILED: "Не удалось изменить порядок элементов",
+    FAVICON_UPDATE: "Ошибка при обновлении фавикона",
+    FAVICON_UPDATE_GENERIC: "Не удалось обновить фавикон",
+    UPDATE_FAILED: "Не удалось обновить данные",
   },
   DRAG_DROP: {
     MOVE_SUCCESS: "Элемент успешно перемещен",
@@ -138,4 +141,9 @@ export default {
   PLACEHOLDERS: {
     NOTE_CONTENT: "Введите текст заметки...",
   },
+  CONTEXT_MENU: {
+    COPY_SUCCESS: "Элемент успешно скопирован",
+  },
+  UPDATING_FAVICON: "Обновление фавикона...",
+  FAVICON_UPDATED: "Фавикон успешно обновлен",
 }

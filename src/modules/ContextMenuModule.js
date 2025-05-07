@@ -156,6 +156,10 @@ export class ContextMenuModule {
         await this._handleCopyAction(id, isFolder, isNote)
         break
 
+      case "update_favicon":
+        await this._handleUpdateFaviconAction(id, url)
+        break
+
       default:
         logError("Неизвестное действие контекстного меню:", action)
     }
@@ -421,6 +425,57 @@ export class ContextMenuModule {
       }
     } catch (error) {
       logError("Ошибка при копировании элемента:", error)
+    }
+  }
+
+  /**
+   * Обрабатывает действие обновления фавикона
+   * @param {string} id - ID закладки
+   * @param {string} url - URL закладки
+   */
+  async _handleUpdateFaviconAction(id, url) {
+    try {
+      // Закрываем контекстное меню
+      this.contextMenu.close()
+
+      // Показываем уведомление о начале обновления
+      this.uiModule.showLoadingIndicator()
+      this.uiModule.showNotification(
+        i18n.t("UPDATING_FAVICON") || "Обновление фавикона..."
+      )
+
+      // Импортируем функцию обновления фавикона
+      const { updateBookmarkFavicon } = await import("../utils/storage.js")
+
+      // Обновляем фавикон
+      const result = await updateBookmarkFavicon(id)
+
+      if (result.success) {
+        this.uiModule.showNotification(
+          i18n.t("FAVICON_UPDATED") || "Фавикон успешно обновлен"
+        )
+
+        // Обновляем интерфейс
+        window.dispatchEvent(
+          new CustomEvent("refresh-view", { detail: { force: true } })
+        )
+      } else {
+        this.uiModule.showErrorMessage(
+          `${i18n.t("ERROR.FAVICON_UPDATE") || "Ошибка"}: ${
+            result.error ||
+            i18n.t("ERROR.FAVICON_UPDATE_GENERIC") ||
+            "не удалось обновить фавикон"
+          }`
+        )
+      }
+    } catch (error) {
+      logError("Ошибка при обновлении фавикона:", error)
+      this.uiModule.showErrorMessage(
+        i18n.t("ERROR.FAVICON_UPDATE_GENERIC") || "Не удалось обновить фавикон"
+      )
+    } finally {
+      // Скрываем индикатор загрузки в любом случае
+      this.uiModule.hideLoadingIndicator()
     }
   }
 

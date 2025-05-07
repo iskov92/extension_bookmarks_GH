@@ -111,6 +111,9 @@ export default {
     MOVE_FOLDER: "Failed to move folder",
     MOVE_CYCLIC: "Cannot move a folder into its own subfolder",
     REORDER_FAILED: "Failed to reorder items",
+    FAVICON_UPDATE: "Error updating favicon",
+    FAVICON_UPDATE_GENERIC: "Failed to update favicon",
+    UPDATE_FAILED: "Failed to update data",
   },
   DRAG_DROP: {
     MOVE_SUCCESS: "Item successfully moved",
@@ -137,4 +140,9 @@ export default {
   PLACEHOLDERS: {
     NOTE_CONTENT: "Enter note text...",
   },
+  CONTEXT_MENU: {
+    COPY_SUCCESS: "Item successfully copied",
+  },
+  UPDATING_FAVICON: "Updating favicon...",
+  FAVICON_UPDATED: "Favicon successfully updated",
 }
