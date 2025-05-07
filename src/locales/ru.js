@@ -37,7 +37,7 @@ export default {
     BOOKMARK_URL: "URL закладки",
     FILE_NOT_SELECTED: "Файл не выбран",
     PREVIEW: "Предпросмотр",
-    CHOOSE_FILE: "Выбрать файл",
+    CHOOSE_FILE: "Выбрать",
     NOTE_TITLE: "Название заметки",
     NOTE_CONTENT: "Содержимое заметки",
     CREATED_AT: "Создано",

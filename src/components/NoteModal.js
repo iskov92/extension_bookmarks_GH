@@ -40,7 +40,7 @@ export class NoteModal extends Modal {
 
     // Создаем модальное окно
     this.modal = document.createElement("div")
-    this.modal.className = "modal note-modal"
+    this.modal.className = "modal note-modal note-modal-container"
 
     // Заголовок модального окна (компактная шапка)
     const header = document.createElement("div")
@@ -259,7 +259,7 @@ export class NoteModal extends Modal {
       name: "foreColor",
       icon: '<span style="font-weight: bold; color: red; font-family: serif;">A</span>',
       title: i18n.t("LABELS.TEXT_COLOR") || "Цвет текста",
-      result: () => {
+      result: function () {
         // Получаем текущее выделение
         const selection = window.getSelection()
         if (!selection.rangeCount) return
@@ -267,10 +267,24 @@ export class NoteModal extends Modal {
         // Сохраняем выделение для последующего применения цвета
         const selRange = selection.getRangeAt(0)
 
+        // Отладка - показываем title кнопки
+        console.log("Поиск кнопки с заголовком:", this.title)
+
+        // Находим кнопку по её заголовку
+        const button = document.querySelector(
+          '.pell-button[title="' + this.title + '"]'
+        )
+        if (!button) {
+          console.error("Кнопка не найдена:", this.title)
+          return
+        }
+
+        console.log("Кнопка найдена:", button)
+
         // Создаем контейнер для палитры
         const palette = document.createElement("div")
         palette.className = "color-palette"
-        palette.style.position = "fixed" // фиксированное позиционирование
+        palette.style.position = "absolute" // абсолютное позиционирование относительно модального окна
         palette.style.zIndex = "9999" // высокий z-index чтобы быть поверх всего
         palette.style.display = "flex"
         palette.style.flexDirection = "column" // вертикальное расположение с полем ввода внизу
@@ -400,22 +414,20 @@ export class NoteModal extends Modal {
         palette.appendChild(resetButton)
         palette.appendChild(inputContainer)
 
-        // Определяем позицию для палитры относительно курсора
-        const range = selRange
-        const rect = range.getBoundingClientRect()
-
-        // Позиционируем палитру над курсором
-        palette.style.top = `${rect.top - palette.offsetHeight - 10}px`
-        palette.style.left = `${rect.left}px`
+        // Позиционируем палитру относительно кнопки
+        const buttonRect = button.getBoundingClientRect()
+        palette.style.top = `${buttonRect.bottom + 5}px` // 5px под кнопкой
+        palette.style.left = `${buttonRect.left}px`
 
         // Добавляем палитру к DOM
         document.body.appendChild(palette)
 
         // Корректируем позицию, если выходит за пределы окна
         const paletteRect = palette.getBoundingClientRect()
-        if (paletteRect.top < 10) {
-          // Если палитра выходит за верхнюю границу, размещаем под курсором
-          palette.style.top = `${rect.bottom + 10}px`
+
+        if (paletteRect.bottom > window.innerHeight - 10) {
+          // Если палитра выходит за нижнюю границу, размещаем над кнопкой
+          palette.style.top = `${buttonRect.top - paletteRect.height - 5}px`
         }
 
         if (paletteRect.right > window.innerWidth - 10) {
@@ -445,7 +457,7 @@ export class NoteModal extends Modal {
       name: "backColor",
       icon: '<span style="background-color: red; color: white; font-family: serif; border: 1px solid #000; display: inline-block; width: 14px; height: 14px; text-align: center; line-height: 14px;">A</span>',
       title: i18n.t("LABELS.BACKGROUND_COLOR") || "Цвет фона",
-      result: () => {
+      result: function () {
         // Получаем текущее выделение
         const selection = window.getSelection()
         if (!selection.rangeCount) return
@@ -453,10 +465,24 @@ export class NoteModal extends Modal {
         // Сохраняем выделение для последующего применения цвета
         const selRange = selection.getRangeAt(0)
 
+        // Отладка - показываем title кнопки
+        console.log("Поиск кнопки с заголовком:", this.title)
+
+        // Находим кнопку по её заголовку
+        const button = document.querySelector(
+          '.pell-button[title="' + this.title + '"]'
+        )
+        if (!button) {
+          console.error("Кнопка не найдена:", this.title)
+          return
+        }
+
+        console.log("Кнопка найдена:", button)
+
         // Создаем контейнер для палитры
         const palette = document.createElement("div")
         palette.className = "color-palette"
-        palette.style.position = "fixed" // фиксированное позиционирование
+        palette.style.position = "absolute" // абсолютное позиционирование относительно модального окна
         palette.style.zIndex = "9999" // высокий z-index чтобы быть поверх всего
         palette.style.display = "flex"
         palette.style.flexDirection = "column" // вертикальное расположение с полем ввода внизу
@@ -586,22 +612,20 @@ export class NoteModal extends Modal {
         palette.appendChild(resetButton)
         palette.appendChild(inputContainer)
 
-        // Определяем позицию для палитры относительно курсора
-        const range = selRange
-        const rect = range.getBoundingClientRect()
-
-        // Позиционируем палитру над курсором
-        palette.style.top = `${rect.top - palette.offsetHeight - 10}px`
-        palette.style.left = `${rect.left}px`
+        // Позиционируем палитру относительно кнопки
+        const buttonRect = button.getBoundingClientRect()
+        palette.style.top = `${buttonRect.bottom + 5}px` // 5px под кнопкой
+        palette.style.left = `${buttonRect.left}px`
 
         // Добавляем палитру к DOM
         document.body.appendChild(palette)
 
         // Корректируем позицию, если выходит за пределы окна
         const paletteRect = palette.getBoundingClientRect()
-        if (paletteRect.top < 10) {
-          // Если палитра выходит за верхнюю границу, размещаем под курсором
-          palette.style.top = `${rect.bottom + 10}px`
+
+        if (paletteRect.bottom > window.innerHeight - 10) {
+          // Если палитра выходит за нижнюю границу, размещаем над кнопкой
+          palette.style.top = `${buttonRect.top - paletteRect.height - 5}px`
         }
 
         if (paletteRect.right > window.innerWidth - 10) {
@@ -639,6 +663,12 @@ export class NoteModal extends Modal {
 
         // Сохраняем выделение для последующего применения
         const selRange = selection.getRangeAt(0)
+
+        // Находим кнопку по её заголовку
+        const button = document.querySelector(
+          '.pell-button[title="' + this.title + '"]'
+        )
+        if (!button) return
 
         // Создаем контейнер для выпадающего меню
         const dropdown = document.createElement("div")
@@ -729,16 +759,27 @@ export class NoteModal extends Modal {
         })
 
         // Находим позицию для выпадающего меню относительно кнопки
-        // Используем кнопку, на которую нажали, как ориентир
-        const button = document.querySelector(
-          '.pell-button[title="' + this.title + '"]'
-        )
         const buttonRect = button.getBoundingClientRect()
         dropdown.style.top = `${buttonRect.bottom + 5}px`
         dropdown.style.left = `${buttonRect.left}px`
 
         // Добавляем выпадающее меню на страницу
         document.body.appendChild(dropdown)
+
+        // Корректируем позицию, если выходит за пределы окна
+        const dropdownRect = dropdown.getBoundingClientRect()
+
+        if (dropdownRect.bottom > window.innerHeight - 10) {
+          // Если меню выходит за нижнюю границу, размещаем над кнопкой
+          dropdown.style.top = `${buttonRect.top - dropdownRect.height - 5}px`
+        }
+
+        if (dropdownRect.right > window.innerWidth - 10) {
+          // Если меню выходит за правую границу
+          dropdown.style.left = `${
+            window.innerWidth - dropdownRect.width - 10
+          }px`
+        }
 
         // Обработчик для закрытия выпадающего меню при клике вне его
         const closeOnClickOutside = (e) => {

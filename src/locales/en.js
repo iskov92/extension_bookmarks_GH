@@ -37,7 +37,7 @@ export default {
     BOOKMARK_URL: "Bookmark URL",
     FILE_NOT_SELECTED: "No file selected",
     PREVIEW: "Preview",
-    CHOOSE_FILE: "Choose file",
+    CHOOSE_FILE: "Choose",
     NOTE_TITLE: "Note title",
     NOTE_CONTENT: "Note content",
     CREATED_AT: "Created",

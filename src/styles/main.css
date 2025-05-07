@@ -510,9 +510,10 @@ input:checked + .slider:before {
 .modal {
   background-color: var(--bg-primary);
   border-radius: var(--border-radius);
-  padding: 20px;
+  padding: 5px;
   min-width: 300px;
-  max-width: 500px;
+  max-width: 600px;
+  width: 50%;
   box-shadow: var(--shadow);
 }
 
@@ -525,10 +526,12 @@ input:checked + .slider:before {
 
 .modal-content {
   margin-bottom: 16px;
+  padding-top: 5px;
 }
 
 .modal-input-group {
   margin-bottom: 12px;
+  padding-bottom: 5px;
 }
 
 .modal-input-group label {
