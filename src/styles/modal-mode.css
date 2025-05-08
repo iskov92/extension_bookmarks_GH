@@ -1,0 +1,83 @@
+/* Стили для модального режима */
+body.modal-mode {
+  overflow: hidden;
+  background-color: var(--background-color);
+}
+
+body.modal-mode .header {
+  height: 40px;
+  min-height: 40px;
+  padding: 5px 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+body.modal-mode .logo-container,
+body.modal-mode .search-container,
+body.modal-mode .settings-button,
+body.modal-mode .trash-button {
+  display: none;
+}
+
+body.modal-mode .header-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+body.modal-mode .header-close {
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  width: 30px;
+  height: 30px;
+  font-size: 24px;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-color);
+}
+
+body.modal-mode .main-container {
+  width: 100%;
+  height: calc(100vh - 40px);
+  margin: 0;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+body.modal-mode .path-navigation {
+  margin-top: 5px;
+}
+
+body.modal-mode .folder-title-container {
+  margin-bottom: 10px;
+}
+
+body.modal-mode #bookmarks-container {
+  max-height: calc(100vh - 100px);
+}
+
+body.modal-mode .add-buttons {
+  display: none;
+}
+
+/* Стили для модальных окон внутри модального режима */
+body.modal-mode .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+body.modal-mode .modal {
+  max-width: 450px;
+  width: 90%;
+  max-height: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Стили для кнопок в модальном режиме */
+body.modal-mode .modal-footer button {
+  padding: 8px 16px;
+  font-size: 14px;
+}

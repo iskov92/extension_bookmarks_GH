@@ -9,13 +9,22 @@
     "bookmarks",
     "unlimitedStorage",
     "downloads",
-    "tabs"
+    "tabs",
+    "contextMenus",
+    "scripting"
   ],
   "host_permissions": ["*://*/*", "chrome://favicon/*"],
   "background": {
     "service_worker": "src/background.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content.js"],
+      "run_at": "document_end"
+    }
+  ],
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": {
