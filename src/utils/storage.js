@@ -817,6 +817,55 @@ export async function clearAllFavicons() {
   }
 }
 
+// Получить фавикон через Google Favicon Service (для ручного обновления)
+async function getGoogleFavicon(url) {
+  try {
+    if (!url) return "/assets/icons/link.svg"
+
+    // Проверка URL
+    let urlObj
+    try {
+      urlObj = new URL(url)
+    } catch (e) {
+      console.warn(`Некорректный URL для получения фавикона: ${url}`)
+      return "/assets/icons/link.svg"
+    }
+
+    const domain = urlObj.hostname
+    console.log(`Получение фавикона через Google для ${domain}`)
+
+    // Создаем URL для Google Favicon Service с максимальным размером
+    const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
+
+    // Проверяем доступность фавикона
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        console.log(`Успешно получен фавикон через Google для ${domain}`)
+        resolve(googleFaviconUrl)
+      }
+      img.onerror = () => {
+        console.warn(
+          `Google не смог получить фавикон для ${domain}, используем стандартную иконку`
+        )
+        resolve("/assets/icons/link.svg")
+      }
+      img.src = googleFaviconUrl
+
+      // Таймаут 2 секунды
+      setTimeout(() => {
+        console.warn(
+          `Таймаут получения фавикона через Google для ${domain}, используем стандартную иконку`
+        )
+        resolve("/assets/icons/link.svg")
+      }, 2000)
+    })
+  } catch (error) {
+    console.error("Ошибка при получении фавикона через Google:", error)
+    return "/assets/icons/link.svg"
+  }
+}
+
 // Обновить фавикон для отдельной закладки
 export async function updateBookmarkFavicon(bookmarkId) {
   try {
@@ -855,8 +904,9 @@ export async function updateBookmarkFavicon(bookmarkId) {
       }
     }
 
-    // Быстрое получение фавикона
-    const faviconUrl = await getFaviconFast(found.item.url)
+    // Получение фавикона через Google (для ручного обновления)
+    console.log("Запрос на ручное обновление фавикона для", found.item.url)
+    const faviconUrl = await getGoogleFavicon(found.item.url)
 
     // Если фавикон не изменился или не получен, возвращаем результат без сохранения
     if (!faviconUrl || faviconUrl === found.item.favicon) {
