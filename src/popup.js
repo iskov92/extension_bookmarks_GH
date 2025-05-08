@@ -1388,3 +1388,55 @@ async function renderBookmarks(folderContentElement, items) {
     folderContentElement.appendChild(itemElement)
   }
 }
+
+/**
+ * Применяет стили для модального режима интерфейса
+ */
+function applyModalModeStyles() {
+  // Добавляем класс к body для стилизации всего интерфейса
+  document.body.classList.add("modal-mode")
+
+  // Получаем параметры URL
+  const urlParams = new URLSearchParams(window.location.search)
+  const action = urlParams.get("action")
+
+  // Определяем заголовок в зависимости от действия
+  let headerTitle = "Менеджер закладок"
+  if (action === "addBookmark") {
+    headerTitle = i18n.t("MODALS.ADD_BOOKMARK") || "Добавить закладку"
+  } else if (action === "addNote") {
+    headerTitle = i18n.t("MODALS.CREATE_NOTE") || "Создать заметку"
+  }
+
+  // Модифицируем заголовок
+  const header = document.querySelector(".header")
+  if (header) {
+    // Убираем существующие элементы
+    while (header.firstChild) {
+      header.removeChild(header.firstChild)
+    }
+
+    // Добавляем заголовок
+    const titleElement = document.createElement("div")
+    titleElement.className = "header-title"
+    titleElement.textContent = headerTitle
+    header.appendChild(titleElement)
+
+    // Добавляем кнопку закрытия
+    const closeButton = document.createElement("div")
+    closeButton.className = "header-close"
+    closeButton.textContent = "×"
+    closeButton.addEventListener("click", () => {
+      window.close()
+    })
+    header.appendChild(closeButton)
+  }
+
+  // Скрываем кнопки добавления, если это действие добавления
+  if (action === "addBookmark" || action === "addNote") {
+    const addButtons = document.querySelector(".add-buttons")
+    if (addButtons) {
+      addButtons.style.display = "none"
+    }
+  }
+}
