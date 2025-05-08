@@ -281,25 +281,17 @@ function showSimpleBookmarkModal(url, title) {
       // Получаем значения из полей
       const titleInput = modal.querySelector(".title-input")
       const urlInput = modal.querySelector(".url-input")
-      const folderSelect = modal.querySelector(".folder-select")
+      const hiddenInput = modal.querySelector(".folder-select") // Используем скрытое поле
 
       const bookmarkTitle = titleInput.value.trim()
       const bookmarkUrl = urlInput.value.trim()
-      const selectedFolderId = folderSelect.value
+      const selectedFolderId = hiddenInput.value
 
       console.log("[Content] Пытаемся сохранить закладку:", {
         title: bookmarkTitle,
         url: bookmarkUrl,
         folderId: selectedFolderId,
       })
-
-      // Выводим содержимое списка папок для отладки
-      console.log("[Content] Список доступных папок:")
-      for (let i = 0; i < folderSelect.options.length; i++) {
-        console.log(
-          `- Опция ${i}: ${folderSelect.options[i].text} (ID: ${folderSelect.options[i].value})`
-        )
-      }
 
       // Проверяем заполнение полей
       if (!bookmarkTitle) {
@@ -312,7 +304,7 @@ function showSimpleBookmarkModal(url, title) {
         return
       }
 
-      if (selectedFolderId === "loading" || !selectedFolderId) {
+      if (!selectedFolderId) {
         alert("Пожалуйста, выберите папку для сохранения")
         return
       }
@@ -463,7 +455,7 @@ function showSimpleBookmarkModal(url, title) {
 }
 
 /**
- * Загружает структуру папок из хранилища и заполняет выпадающий список
+ * Загружает структуру папок из хранилища и создаёт многоуровневое выпадающее меню
  * @param {HTMLElement} modal - Элемент модального окна
  */
 function loadFolderStructure(modal) {
@@ -471,22 +463,39 @@ function loadFolderStructure(modal) {
     "[Content] Загружаем структуру папок напрямую из chrome.storage.local"
   )
 
-  const folderSelect = modal.querySelector(".folder-select")
+  const folderSelectContainer = modal.querySelector(".folder-select-container")
   const errorElement = modal.querySelector(".folder-loading-error")
 
-  // Отображаем состояние загрузки
-  folderSelect.innerHTML =
-    '<option value="loading" disabled selected>Загрузка папок...</option>'
-  errorElement.style.display = "none"
-
-  // Получаем данные напрямую из хранилища
+  // Проверяем настройки темы и получаем данные из хранилища одновременно
   chrome.storage.local.get(null, (data) => {
-    console.log("[Content] Получены данные из хранилища:", data)
+    // Определяем тему из хранилища
+    const isDarkTheme = data.isDarkTheme === undefined ? true : data.isDarkTheme
+    console.log(`[Content] Текущая тема: ${isDarkTheme ? "темная" : "светлая"}`)
 
-    // Всегда добавляем корневую папку
-    folderSelect.innerHTML = '<option value="0">Корневая папка</option>'
+    // Цвета для темной и светлой темы
+    const colors = isDarkTheme
+      ? {
+          bg: "rgba(0, 0, 0, 0.75)",
+          modal: "#1e1e1e",
+          text: "#e0e0e0",
+          border: "#444",
+          inputBg: "#252525",
+          inputBorder: "#444",
+          hoverBg: "#333",
+          dropdownBg: "#252525",
+        }
+      : {
+          bg: "rgba(0, 0, 0, 0.5)",
+          modal: "white",
+          text: "#333",
+          border: "#ccc",
+          inputBg: "white",
+          inputBorder: "#ccc",
+          hoverBg: "#f5f5f5",
+          dropdownBg: "white",
+        }
 
-    // Проверяем, есть ли данные
+    // Проверка наличия данных закладок
     if (!data || !data.gh_bookmarks) {
       console.error("[Content] Данные закладок отсутствуют в хранилище")
       errorElement.style.display = "block"
@@ -494,124 +503,449 @@ function loadFolderStructure(modal) {
     }
 
     const bookmarks = data.gh_bookmarks
+    console.log("[Content] Данные закладок получены:", bookmarks)
 
-    // Проверяем, является ли gh_bookmarks массивом (новый формат) или объектом со свойством children (старый формат)
+    // Создаем структуру выпадающего списка
+    createDropdownMenu(folderSelectContainer, bookmarks, colors, isDarkTheme)
+  })
+
+  /**
+   * Создает выпадающее меню для выбора папок
+   * @param {HTMLElement} container - Контейнер для меню
+   * @param {Array} bookmarks - Массив закладок
+   * @param {Object} colors - Объект с цветами для темы
+   * @param {boolean} isDarkTheme - Флаг темной темы
+   */
+  function createDropdownMenu(container, bookmarks, colors, isDarkTheme) {
+    // Очищаем контейнер
+    container.innerHTML = ""
+
+    // Создаем основной UI выпадающего списка
+    const dropdownContainer = document.createElement("div")
+    dropdownContainer.className = "folder-dropdown-wrapper"
+    dropdownContainer.innerHTML = `
+      <div class="folder-selected" style="width: 100%; padding: 8px; border: 1px solid ${colors.border}; border-radius: 4px; 
+        cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: ${colors.inputBg}; 
+        color: ${colors.text}; transition: border-color 0.2s ease;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; opacity: 0.7;">
+          <path d="M2 3C2 2.44772 2.44772 2 3 2H6.5C6.81476 2 7.10938 2.15229 7.29289 2.41421L8 3.5L13 3.5C13.5523 3.5 14 3.94772 14 4.5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" 
+            stroke="${colors.text}" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+        <span style="overflow: hidden; text-overflow: ellipsis; flex: 1;">Выберите папку</span>
+        <svg width="12" height="6" viewBox="0 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 1L6 5L11 1" stroke="${colors.text}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="folder-dropdown" style="display: none; position: absolute; width: 100%; max-height: 300px; overflow-y: auto; 
+        z-index: 1000; margin-top: 4px; border: 1px solid ${colors.border}; border-radius: 4px; background-color: ${colors.dropdownBg}; 
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2); scrollbar-width: none; padding: 4px 0;">
+      </div>
+      <input type="hidden" class="folder-select" value="" name="folder">
+    `
+    container.appendChild(dropdownContainer)
+
+    // Добавляем стили для скрытия полосы прокрутки в WebKit браузерах
+    const styleElement = document.createElement("style")
+    styleElement.textContent = `
+      .folder-dropdown::-webkit-scrollbar, 
+      .folder-submenu::-webkit-scrollbar {
+        width: 0;
+        background: transparent;
+        display: none;
+      }
+      .folder-dropdown, .folder-submenu {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+    `
+    document.head.appendChild(styleElement)
+
+    // Получаем элементы UI
+    const folderSelected = dropdownContainer.querySelector(".folder-selected")
+    const folderDropdown = dropdownContainer.querySelector(".folder-dropdown")
+    const hiddenInput = dropdownContainer.querySelector(".folder-select")
+
+    // Добавляем корневую папку
+    const rootFolderItem = document.createElement("div")
+    rootFolderItem.className = "folder-item root-folder"
+    rootFolderItem.dataset.id = "0"
+    rootFolderItem.style.cssText = `
+      padding: 8px 12px; 
+      cursor: pointer;
+      color: ${colors.text};
+      display: flex;
+      align-items: center;
+      transition: background-color 0.15s ease;
+    `
+    rootFolderItem.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; opacity: 0.7;">
+        <path d="M2 3C2 2.44772 2.44772 2 3 2H6.5C6.81476 2 7.10938 2.15229 7.29289 2.41421L8 3.5L13 3.5C13.5523 3.5 14 3.94772 14 4.5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" 
+          stroke="${colors.text}" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+      <span>Корневая папка</span>
+    `
+    folderDropdown.appendChild(rootFolderItem)
+
+    // Обработчики для корневой папки
+    rootFolderItem.addEventListener("click", () => {
+      // Убираем выделение со всех элементов
+      const allFolderItems = document.querySelectorAll(".folder-item")
+      allFolderItems.forEach((item) => {
+        item.style.backgroundColor = ""
+        item.style.fontWeight = "normal"
+      })
+
+      // Помечаем корневую папку как выбранную
+      rootFolderItem.style.backgroundColor = colors.hoverBg
+      const titleSpan = rootFolderItem.querySelector("span")
+      if (titleSpan) {
+        titleSpan.style.fontWeight = "500"
+      }
+
+      // Обновляем выбранное значение
+      folderSelected.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; opacity: 0.7;">
+          <path d="M2 3C2 2.44772 2.44772 2 3 2H6.5C6.81476 2 7.10938 2.15229 7.29289 2.41421L8 3.5L13 3.5C13.5523 3.5 14 3.94772 14 4.5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" 
+            stroke="${colors.text}" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+        <span style="overflow: hidden; text-overflow: ellipsis; flex: 1;">Корневая папка</span>
+        <svg width="12" height="6" viewBox="0 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 1L6 5L11 1" stroke="${colors.text}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `
+
+      hiddenInput.value = "0"
+      folderDropdown.style.display = "none"
+      console.log("[Content] Выбрана корневая папка (ID: 0)")
+    })
+
+    rootFolderItem.addEventListener("mouseover", () => {
+      rootFolderItem.style.backgroundColor = colors.hoverBg
+    })
+
+    rootFolderItem.addEventListener("mouseout", () => {
+      if (hiddenInput.value !== "0") {
+        rootFolderItem.style.backgroundColor = ""
+      }
+    })
+
+    // Находим все папки первого уровня, если используется новый формат (массив)
     if (Array.isArray(bookmarks)) {
-      console.log(
-        "[Content] Обнаружена структура в формате массива, обрабатываем..."
-      )
-
-      // Находим все папки в массиве
-      const folders = bookmarks.filter((item) => item && item.type === "folder")
-      console.log(
-        "[Content] Найдены папки верхнего уровня:",
-        folders.map((f) => `${f.title} (ID: ${f.id})`).join(", ")
-      )
-
-      if (folders.length === 0) {
-        console.log("[Content] Папки не найдены в массиве закладок")
-        return
-      }
-
-      // Рекурсивно добавляем папки в селект
-      function addFoldersToSelect(folders, indent = "") {
-        folders.forEach((folder) => {
-          const option = document.createElement("option")
-          option.value = folder.id
-          option.textContent = indent + folder.title
-          folderSelect.appendChild(option)
-          console.log(
-            `[Content] Добавлена папка в выпадающий список: ${
-              indent + folder.title
-            } (ID: ${folder.id})`
-          )
-
-          // Рекурсивно добавляем подпапки, если они есть
-          if (folder.children && Array.isArray(folder.children)) {
-            // Фильтруем только папки из детей
-            const subfolders = folder.children.filter(
-              (item) => item && item.type === "folder"
-            )
-            if (subfolders.length > 0) {
-              console.log(
-                `[Content] У папки ${folder.title} найдены подпапки: ${subfolders.length}`
-              )
-              addFoldersToSelect(subfolders, indent + "— ")
-            }
-          }
-        })
-      }
-
-      // Добавляем все папки в select
-      addFoldersToSelect(folders)
-    } else if (bookmarks && typeof bookmarks === "object") {
-      // Старый формат (объект с children)
-      console.log("[Content] Обнаружена структура в формате объекта с children")
-      if (!bookmarks.children || !Array.isArray(bookmarks.children)) {
-        console.error(
-          "[Content] Структура закладок повреждена, отсутствует массив children"
-        )
-        errorElement.style.display = "block"
-        return
-      }
-
-      // Находим все папки в children
-      const folders = bookmarks.children.filter(
+      // Находим папки
+      const topLevelFolders = bookmarks.filter(
         (item) => item && item.type === "folder"
       )
       console.log(
-        "[Content] Найдены папки:",
-        folders.map((f) => `${f.title} (ID: ${f.id})`).join(", ")
+        `[Content] Найдено ${topLevelFolders.length} папок верхнего уровня:`,
+        topLevelFolders.map((f) => f.title).join(", ")
       )
 
-      if (folders.length === 0) {
-        console.log("[Content] Папки не найдены")
-        return
-      }
+      // Добавляем папки в выпадающий список
+      topLevelFolders.forEach((folder) => {
+        addFolderToDropdown(
+          folder,
+          folderDropdown,
+          colors,
+          folderSelected,
+          hiddenInput
+        )
+      })
+    } else {
+      console.error("[Content] Неизвестный формат данных:", bookmarks)
+      errorElement.style.display = "block"
+    }
 
-      // Рекурсивно добавляем папки в селект
-      function addFoldersToSelect(folders, indent = "") {
-        folders.forEach((folder) => {
-          const option = document.createElement("option")
-          option.value = folder.id
-          option.textContent = indent + folder.title
-          folderSelect.appendChild(option)
-          console.log(
-            `[Content] Добавлена папка в выпадающий список: ${
-              indent + folder.title
-            } (ID: ${folder.id})`
-          )
-
-          // Рекурсивно добавляем подпапки
-          if (folder.children && folder.children.length > 0) {
-            const subfolders = folder.children.filter(
-              (item) => item && item.type === "folder"
-            )
-            if (subfolders.length > 0) {
-              console.log(
-                `[Content] У папки ${folder.title} найдены подпапки: ${subfolders.length}`
-              )
-              addFoldersToSelect(subfolders, indent + "— ")
+    // Функция для обновления состояния выбранной папки при открытии меню
+    const updateSelectedState = () => {
+      const folderId = hiddenInput.value
+      if (folderId) {
+        const folderItems = folderDropdown.querySelectorAll(".folder-item")
+        folderItems.forEach((item) => {
+          if (item.dataset.id === folderId) {
+            item.style.backgroundColor = colors.hoverBg
+            const titleSpan =
+              item.querySelector("span span") || item.querySelector("span")
+            if (titleSpan) {
+              titleSpan.style.fontWeight = "500"
             }
           }
         })
       }
-
-      // Добавляем все папки в select
-      addFoldersToSelect(folders)
-    } else {
-      console.error(
-        "[Content] Неизвестный формат данных в хранилище:",
-        bookmarks
-      )
-      errorElement.style.display = "block"
     }
 
-    console.log(
-      "[Content] Структура папок загружена, всего опций в выпадающем списке:",
-      folderSelect.options.length
-    )
-  })
+    // Добавляем обработчик клика для отображения/скрытия выпадающего списка
+    folderSelected.addEventListener("click", (e) => {
+      e.stopPropagation()
+      const isOpen = folderDropdown.style.display !== "none"
+      folderDropdown.style.display = isOpen ? "none" : "block"
+
+      // Добавляем активное состояние для input при открытии
+      if (!isOpen) {
+        folderSelected.style.borderColor = colors.primaryButton
+        updateSelectedState()
+      } else {
+        folderSelected.style.borderColor = colors.border
+      }
+    })
+
+    // Закрытие при клике вне меню
+    document.addEventListener("click", () => {
+      folderDropdown.style.display = "none"
+      folderSelected.style.borderColor = colors.border
+
+      // Закрываем все открытые подменю
+      const submenus = document.querySelectorAll(".submenu-active")
+      submenus.forEach((submenu) => submenu.classList.remove("submenu-active"))
+    })
+
+    // Предотвращаем закрытие при клике внутри меню
+    folderDropdown.addEventListener("click", (e) => {
+      e.stopPropagation()
+    })
+
+    // Устанавливаем обработчик для проверки выбрана ли папка при сохранении закладки
+    const saveBtn = document.querySelector(".save-btn")
+    if (saveBtn) {
+      const originalClickHandler = saveBtn.onclick
+      saveBtn.onclick = function (e) {
+        if (!hiddenInput.value) {
+          // Если папка не выбрана, подсвечиваем поле выбора папки красным
+          folderSelected.style.borderColor = "#ff5555"
+          setTimeout(() => {
+            folderSelected.style.borderColor = colors.border
+          }, 1500)
+          return false
+        }
+        // Если папка выбрана, вызываем оригинальный обработчик
+        if (originalClickHandler) {
+          return originalClickHandler.call(this, e)
+        }
+      }
+    }
+  }
+
+  /**
+   * Добавляет папку в выпадающий список
+   * @param {Object} folder - Объект папки
+   * @param {HTMLElement} container - Контейнер для добавления
+   * @param {Object} colors - Объект с цветами
+   * @param {HTMLElement} folderSelected - Элемент с текущим выбором
+   * @param {HTMLElement} hiddenInput - Скрытое поле для хранения ID
+   */
+  function addFolderToDropdown(
+    folder,
+    container,
+    colors,
+    folderSelected,
+    hiddenInput
+  ) {
+    // Создаем элемент папки
+    const folderItem = document.createElement("div")
+    folderItem.className = "folder-item"
+    folderItem.dataset.id = folder.id
+    folderItem.style.cssText = `
+      padding: 8px 12px; 
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: ${colors.text};
+      transition: background-color 0.15s ease;
+    `
+
+    // Добавляем название папки с иконкой
+    const folderContentSpan = document.createElement("span")
+    folderContentSpan.style.cssText = `
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    `
+
+    folderContentSpan.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; flex-shrink: 0; opacity: 0.7;">
+        <path d="M2 3C2 2.44772 2.44772 2 3 2H6.5C6.81476 2 7.10938 2.15229 7.29289 2.41421L8 3.5L13 3.5C13.5523 3.5 14 3.94772 14 4.5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" 
+          stroke="${colors.text}" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+      <span style="overflow: hidden; text-overflow: ellipsis;">${folder.title}</span>
+    `
+
+    folderItem.appendChild(folderContentSpan)
+
+    // Проверяем наличие вложенных папок
+    const hasSubfolders =
+      folder.children &&
+      Array.isArray(folder.children) &&
+      folder.children.some((child) => child && child.type === "folder")
+
+    // Добавляем стрелку и создаем подменю, если есть вложенные папки
+    if (hasSubfolders) {
+      // Добавляем стрелку
+      const arrowIcon = document.createElement("span")
+      arrowIcon.className = "folder-arrow"
+      arrowIcon.style.flexShrink = "0"
+      arrowIcon.innerHTML = `
+        <svg width="6" height="10" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 1L5 5L1 9" stroke="${colors.text}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `
+      folderItem.appendChild(arrowIcon)
+
+      // Создаем подменю
+      const submenu = document.createElement("div")
+      submenu.className = "folder-submenu"
+      submenu.style.cssText = `
+        display: none;
+        position: absolute;
+        left: 100%;
+        top: 0;
+        width: 200px;
+        max-height: 300px;
+        overflow-y: auto;
+        background-color: ${colors.dropdownBg};
+        border: 1px solid ${colors.border};
+        border-radius: 4px;
+        z-index: 1001;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: 4px 0;
+      `
+
+      // Находим вложенные папки
+      const subfolders = folder.children.filter(
+        (item) => item && item.type === "folder"
+      )
+
+      // Добавляем вложенные папки в подменю
+      subfolders.forEach((subfolder) => {
+        addFolderToDropdown(
+          subfolder,
+          submenu,
+          colors,
+          folderSelected,
+          hiddenInput
+        )
+      })
+
+      // Добавляем подменю к документу, но не как дочерний элемент
+      document.body.appendChild(submenu)
+
+      // Показываем подменю при наведении на папку
+      folderItem.addEventListener("mouseover", (e) => {
+        folderItem.style.backgroundColor = colors.hoverBg
+
+        // Позиционируем и показываем подменю
+        const rect = folderItem.getBoundingClientRect()
+
+        // Проверяем, поместится ли подменю справа
+        const rightEdge = rect.right + 205 // 200px ширина + 5px отступ
+        const viewportWidth = window.innerWidth
+
+        if (rightEdge > viewportWidth) {
+          // Если не поместится справа, показываем слева
+          submenu.style.left = "auto"
+          submenu.style.right = "100%"
+        } else {
+          // Иначе показываем справа
+          submenu.style.left = `${rect.right + 5}px` // 5px отступ
+          submenu.style.right = "auto"
+        }
+
+        submenu.style.top = `${rect.top}px`
+        submenu.style.display = "block"
+      })
+
+      // Скрываем подменю при уходе с папки или подменю
+      folderItem.addEventListener("mouseout", (e) => {
+        if (
+          !e.relatedTarget ||
+          (!submenu.contains(e.relatedTarget) && e.relatedTarget !== submenu)
+        ) {
+          folderItem.style.backgroundColor = ""
+
+          // Не скрываем подменю сразу, чтобы можно было перевести на него курсор
+          setTimeout(() => {
+            if (!submenu.matches(":hover") && !folderItem.matches(":hover")) {
+              submenu.style.display = "none"
+            }
+          }, 50)
+        }
+      })
+
+      // Обработка ухода курсора с подменю
+      submenu.addEventListener("mouseout", (e) => {
+        if (
+          !e.relatedTarget ||
+          (!submenu.contains(e.relatedTarget) && e.relatedTarget !== folderItem)
+        ) {
+          // Не скрываем подменю сразу
+          setTimeout(() => {
+            if (!submenu.matches(":hover") && !folderItem.matches(":hover")) {
+              submenu.style.display = "none"
+            }
+          }, 50)
+        }
+      })
+    }
+
+    // Добавляем обработчик клика для выбора папки
+    folderItem.addEventListener("click", () => {
+      // Убираем выделение со всех элементов
+      const allFolderItems = document.querySelectorAll(".folder-item")
+      allFolderItems.forEach((item) => {
+        item.style.backgroundColor = ""
+        item.style.fontWeight = "normal"
+      })
+
+      // Помечаем текущий элемент как выбранный
+      folderItem.style.backgroundColor = colors.hoverBg
+      const titleSpan = folderItem.querySelector("span span")
+      if (titleSpan) {
+        titleSpan.style.fontWeight = "500"
+      }
+
+      // Обновляем выбранное значение
+      folderSelected.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; opacity: 0.7;">
+          <path d="M2 3C2 2.44772 2.44772 2 3 2H6.5C6.81476 2 7.10938 2.15229 7.29289 2.41421L8 3.5L13 3.5C13.5523 3.5 14 3.94772 14 4.5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" 
+            stroke="${colors.text}" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+        <span style="overflow: hidden; text-overflow: ellipsis; flex: 1;">${folder.title}</span>
+        <svg width="12" height="6" viewBox="0 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 1L6 5L11 1" stroke="${colors.text}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `
+
+      hiddenInput.value = folder.id
+      container.style.display = "none"
+      console.log(`[Content] Выбрана папка: ${folder.title} (ID: ${folder.id})`)
+    })
+
+    // Эффект при наведении для папок без вложенных папок
+    if (!hasSubfolders) {
+      folderItem.addEventListener("mouseover", () => {
+        folderItem.style.backgroundColor = colors.hoverBg
+      })
+
+      folderItem.addEventListener("mouseout", () => {
+        folderItem.style.backgroundColor = ""
+      })
+    }
+
+    // Добавляем небольшой эффект отступа для визуальной иерархии
+    if (container.className === "folder-submenu") {
+      // Стили для папок во вложенных меню
+      const folderNameSpan = folderItem.querySelector("span")
+      if (folderNameSpan) {
+        folderNameSpan.style.fontSize = "13px" // Чуть меньший шрифт для подменю
+      }
+    }
+
+    // Добавляем папку в контейнер
+    container.appendChild(folderItem)
+  }
 }
 
 /**
