@@ -134,21 +134,46 @@ async function showAddBookmarkModal(tabId, url, title) {
 
   // Проверяем, загружен ли content script
   try {
-    const response = await chrome.tabs.sendMessage(tabId, { action: "ping" })
+    // Используем chrome.tabs.sendMessage с обработкой ошибки подключения
+    const checkContentScript = async () => {
+      return new Promise((resolve) => {
+        chrome.tabs.sendMessage(tabId, { action: "ping" }, (response) => {
+          // Если возникла ошибка подключения, просто возвращаем false
+          // вместо генерации исключения
+          if (chrome.runtime.lastError) {
+            console.log(
+              "[Background] Content script еще не загружен, будем инжектировать"
+            )
+            resolve(false)
+            return
+          }
 
-    if (response && response.status === "content_script_active") {
-      console.log(
-        "[Background] Content script активен, отправляем команду на отображение модального окна"
-      )
+          // Проверяем корректность ответа
+          if (response && response.status === "content_script_active") {
+            console.log(
+              "[Background] Content script активен, отправляем команду на отображение модального окна"
+            )
+            resolve(true)
+          } else {
+            console.log(
+              "[Background] Получен некорректный ответ от content script, будем переинжектировать"
+            )
+            resolve(false)
+          }
+        })
+      })
+    }
+
+    // Проверяем статус content script
+    const isContentScriptActive = await checkContentScript()
+
+    if (isContentScriptActive) {
       sendShowModalMessage(tabId, url, title)
     } else {
-      console.warn(
-        "[Background] Content script не ответил, пробуем инжектировать его"
-      )
       injectContentScriptAndShowModal(tabId, url, title)
     }
   } catch (error) {
-    console.error("[Background] Ошибка при проверке content script:", error)
+    console.error("[Background] Ошибка при работе с content script:", error)
     injectContentScriptAndShowModal(tabId, url, title)
   }
 }
