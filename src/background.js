@@ -17,7 +17,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       console.log(
         "[Background] При установке: закладки не обнаружены, создаем базовую структуру"
       )
-      await initializeDefaultBookmarks()
+      await forceInitializeBookmarks()
     } else {
       // Проверяем структуру на наличие проблем
       console.log("[Background] При установке: проверяем структуру закладок")
@@ -26,7 +26,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   } catch (error) {
     console.error("[Background] Ошибка при инициализации закладок:", error)
     // При ошибке создаем новую структуру
-    await initializeDefaultBookmarks()
+    await forceInitializeBookmarks()
   }
 
   // Создаем пункт контекстного меню
@@ -68,6 +68,160 @@ function createContextMenu() {
   }
 }
 
+// Обработчик клика по контекстному меню
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  console.log("[Background] Клик по контекстному меню:", info, tab)
+
+  if (info.menuItemId === "addToBookmarkManager") {
+    console.log("[Background] Выбран пункт 'Добавить в менеджер закладок GH'")
+
+    // Определяем URL и заголовок для закладки
+    let url = info.linkUrl || info.pageUrl
+    let title = ""
+
+    if (info.linkUrl) {
+      // Если был клик по ссылке, получаем текст ссылки через content script
+      console.log("[Background] Клик по ссылке:", info.linkUrl)
+
+      chrome.tabs.sendMessage(
+        tab.id,
+        {
+          action: "getLinkText",
+          linkUrl: info.linkUrl,
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "[Background] Ошибка при получении текста ссылки:",
+              chrome.runtime.lastError
+            )
+            // Используем URL в качестве заголовка, если не удалось получить текст ссылки
+            showAddBookmarkModal(tab.id, url, url)
+            return
+          }
+
+          if (response && response.success && response.linkText) {
+            console.log("[Background] Получен текст ссылки:", response.linkText)
+            showAddBookmarkModal(tab.id, url, response.linkText)
+          } else {
+            console.warn(
+              "[Background] Не удалось получить текст ссылки, используем URL"
+            )
+            showAddBookmarkModal(tab.id, url, url)
+          }
+        }
+      )
+    } else {
+      // Если клик по странице, используем её заголовок
+      console.log("[Background] Клик по странице:", tab.url, tab.title)
+      showAddBookmarkModal(tab.id, tab.url, tab.title)
+    }
+  }
+})
+
+/**
+ * Отображает модальное окно добавления закладки
+ * @param {number} tabId - ID вкладки
+ * @param {string} url - URL для закладки
+ * @param {string} title - Заголовок для закладки
+ */
+async function showAddBookmarkModal(tabId, url, title) {
+  console.log("[Background] Отображаем модальное окно добавления закладки:", {
+    tabId,
+    url,
+    title,
+  })
+
+  // Проверяем, загружен ли content script
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, { action: "ping" })
+
+    if (response && response.status === "content_script_active") {
+      console.log(
+        "[Background] Content script активен, отправляем команду на отображение модального окна"
+      )
+      sendShowModalMessage(tabId, url, title)
+    } else {
+      console.warn(
+        "[Background] Content script не ответил, пробуем инжектировать его"
+      )
+      injectContentScriptAndShowModal(tabId, url, title)
+    }
+  } catch (error) {
+    console.error("[Background] Ошибка при проверке content script:", error)
+    injectContentScriptAndShowModal(tabId, url, title)
+  }
+}
+
+/**
+ * Инжектирует content script и показывает модальное окно
+ * @param {number} tabId - ID вкладки
+ * @param {string} url - URL для закладки
+ * @param {string} title - Заголовок для закладки
+ */
+async function injectContentScriptAndShowModal(tabId, url, title) {
+  console.log("[Background] Инжектируем content script в вкладку:", tabId)
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ["src/content.js"],
+    })
+
+    console.log("[Background] Content script успешно инжектирован")
+
+    // Даем небольшую задержку для инициализации script
+    setTimeout(() => {
+      sendShowModalMessage(tabId, url, title)
+    }, 500)
+  } catch (error) {
+    console.error(
+      "[Background] Ошибка при инжектировании content script:",
+      error
+    )
+    alert(
+      "Не удалось отобразить модальное окно. Пожалуйста, откройте расширение напрямую."
+    )
+  }
+}
+
+/**
+ * Отправляет сообщение для отображения модального окна
+ * @param {number} tabId - ID вкладки
+ * @param {string} url - URL для закладки
+ * @param {string} title - Заголовок для закладки
+ */
+function sendShowModalMessage(tabId, url, title) {
+  console.log(
+    "[Background] Отправляем сообщение на отображение модального окна"
+  )
+
+  chrome.tabs.sendMessage(
+    tabId,
+    {
+      action: "showAddBookmarkModal",
+      data: { url, title },
+    },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "[Background] Ошибка при отправке сообщения:",
+          chrome.runtime.lastError
+        )
+        alert(
+          "Не удалось отобразить модальное окно. Пожалуйста, откройте расширение напрямую."
+        )
+        return
+      }
+
+      console.log(
+        "[Background] Ответ на отображение модального окна:",
+        response
+      )
+    }
+  )
+}
+
 // Обрабатывает сообщения от popup и content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("[Background] Получено сообщение:", request, "от:", sender)
@@ -95,7 +249,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.log("[Background] Текущая структура закладок удалена")
 
       // Создаем новую базовую структуру
-      await initializeDefaultBookmarks()
+      await forceInitializeBookmarks()
 
       // Получаем свежесозданные данные для проверки
       chrome.storage.local.get("gh_bookmarks", (newData) => {
@@ -142,67 +296,143 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fixBookmarksStructure") {
     console.log("[Background] Получен запрос на исправление структуры закладок")
 
-    // Асинхронно исправляем структуру закладок
-    fixBookmarksStructure()
-      .then((result) => {
-        if (result === true) {
-          console.log("[Background] Структура успешно исправлена")
+    try {
+      // Получаем данные из хранилища для проверки
+      chrome.storage.local.get("gh_bookmarks", async (data) => {
+        console.log(
+          "[Background] Данные в хранилище:",
+          data ? "существуют" : "отсутствуют"
+        )
 
-          // Дополнительная проверка после исправления
-          chrome.storage.local.get("gh_bookmarks", (data) => {
-            if (!data || !data.gh_bookmarks || !data.gh_bookmarks.children) {
+        // Создаем новую базовую структуру
+        const newStructure = {
+          id: "0",
+          title: "root",
+          type: "folder",
+          children: [],
+        }
+
+        // Если есть существующие данные, пытаемся их использовать
+        if (
+          data &&
+          data.gh_bookmarks &&
+          typeof data.gh_bookmarks === "object" &&
+          data.gh_bookmarks.children &&
+          Array.isArray(data.gh_bookmarks.children)
+        ) {
+          console.log(
+            "[Background] Используем существующие данные для реконструкции"
+          )
+
+          // Функция для глубокого копирования и фильтрации структуры
+          const cleanStructure = (item) => {
+            if (!item || typeof item !== "object") return null
+
+            // Базовая проверка полей
+            const hasValidId = item.id && typeof item.id === "string"
+            const hasValidTitle = item.title && typeof item.title === "string"
+            const hasValidType =
+              item.type && (item.type === "folder" || item.type === "bookmark")
+
+            if (!hasValidId || !hasValidTitle || !hasValidType) {
+              console.warn("[Background] Найден некорректный элемент:", item)
+              return null
+            }
+
+            // Создаем новый объект с проверенными свойствами
+            const newItem = {
+              id: item.id,
+              title: item.title,
+              type: item.type,
+            }
+
+            // Добавляем URL для закладок
+            if (
+              item.type === "bookmark" &&
+              item.url &&
+              typeof item.url === "string"
+            ) {
+              newItem.url = item.url
+            }
+
+            // Проверяем и обрабатываем вложенные элементы
+            if (
+              item.type === "folder" &&
+              item.children &&
+              Array.isArray(item.children)
+            ) {
+              newItem.children = item.children
+                .map((child) => cleanStructure(child))
+                .filter((child) => child !== null)
+            } else if (item.type === "folder") {
+              // Если это папка без children, создаем пустой массив
+              newItem.children = []
+            }
+
+            return newItem
+          }
+
+          // Копируем и очищаем существующую структуру
+          const cleanedStructure = cleanStructure(data.gh_bookmarks)
+
+          if (cleanedStructure) {
+            console.log(
+              "[Background] Структура успешно очищена и восстановлена"
+            )
+            newStructure.id = cleanedStructure.id
+            newStructure.title = cleanedStructure.title
+            newStructure.children = cleanedStructure.children
+          } else {
+            console.warn(
+              "[Background] Не удалось очистить структуру, создаем новую"
+            )
+            // Добавляем стандартные папки
+            newStructure.children.push(
+              createDefaultFolder("Избранное"),
+              createDefaultFolder("Работа"),
+              createDefaultFolder("Личное")
+            )
+          }
+        } else {
+          console.log("[Background] Создаем новую структуру с базовыми папками")
+          // Добавляем стандартные папки
+          newStructure.children.push(
+            createDefaultFolder("Избранное"),
+            createDefaultFolder("Работа"),
+            createDefaultFolder("Личное")
+          )
+        }
+
+        // Сохраняем новую структуру
+        await new Promise((resolve) => {
+          chrome.storage.local.set({ gh_bookmarks: newStructure }, () => {
+            if (chrome.runtime.lastError) {
               console.error(
-                "[Background] После исправления структура все еще некорректна, пересоздаем"
+                "[Background] Ошибка при сохранении структуры:",
+                chrome.runtime.lastError
               )
-              // Если после исправления структура все еще некорректна, пересоздаем заново
-              initializeDefaultBookmarks().then(() => {
-                sendResponse({
-                  success: true,
-                  message: "Структура полностью пересоздана",
-                })
-              })
+              resolve(false)
             } else {
-              // Проверяем достаточно ли хорошо исправлена структура
-              const needsRecreation = checkIfNeedsRecreation(data.gh_bookmarks)
-
-              if (needsRecreation) {
-                console.warn(
-                  "[Background] Структура исправлена, но все еще имеет проблемы, пересоздаем"
-                )
-                // Пересоздаем только если структура действительно требует этого
-                initializeDefaultBookmarks().then(() => {
-                  sendResponse({
-                    success: true,
-                    message:
-                      "Структура полностью пересоздана из-за неустранимых проблем",
-                  })
-                })
-              } else {
-                console.log(
-                  "[Background] Структура корректно исправлена, пересоздание не требуется"
-                )
-                sendResponse({ success: true })
-              }
+              console.log("[Background] Структура успешно сохранена")
+              resolve(true)
             }
           })
-        } else {
-          console.log("[Background] Структура не требовала исправлений")
-          sendResponse({ success: true })
-        }
-      })
-      .catch((error) => {
-        console.error(
-          "[Background] Ошибка при исправлении структуры закладок:",
-          error
-        )
-        // При ошибке создаем новую структуру с нуля
-        initializeDefaultBookmarks().then(() => {
-          sendResponse({
-            success: true,
-            message: "Создана новая структура после ошибки",
-          })
+        })
+
+        // Отправляем успешный ответ
+        sendResponse({
+          success: true,
+          message: "Структура закладок успешно исправлена",
+          structure: newStructure,
         })
       })
+    } catch (error) {
+      console.error("[Background] Ошибка при исправлении структуры:", error)
+      sendResponse({
+        success: false,
+        error: "Ошибка при исправлении структуры: " + error.message,
+      })
+    }
 
     return true
   }
@@ -211,1467 +441,365 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getFolderStructure") {
     console.log("[Background] Получен запрос на получение структуры папок")
 
-    // Выводим информацию об отправителе
-    console.log("[Background] Отправитель запроса:", sender)
+    // Получаем данные из хранилища
+    chrome.storage.local.get("gh_bookmarks", (data) => {
+      console.log(
+        "[Background] Данные из хранилища получены:",
+        data ? "Да" : "Нет"
+      )
 
-    try {
-      // Получаем данные из хранилища
-      chrome.storage.local.get("gh_bookmarks", async (data) => {
+      if (data && data.gh_bookmarks) {
         console.log(
-          "[Background] Результат получения данных из хранилища:",
-          data ? "Данные получены" : "Данные не получены"
+          "[Background] Структура данных:",
+          JSON.stringify(data.gh_bookmarks).substring(0, 1000)
+        )
+      }
+
+      // Если в хранилище ничего нет, просто возвращаем пустой массив
+      if (!data || !data.gh_bookmarks) {
+        console.log(
+          "[Background] В хранилище нет закладок, возвращаем пустой массив"
+        )
+        sendResponse({
+          success: true,
+          folders: [],
+          message: "В хранилище нет закладок",
+        })
+        return
+      }
+
+      const bookmarks = data.gh_bookmarks
+
+      // Если структура повреждена, просто возвращаем пустой массив
+      if (
+        !bookmarks ||
+        !bookmarks.children ||
+        !Array.isArray(bookmarks.children)
+      ) {
+        console.log(
+          "[Background] Структура закладок повреждена, возвращаем пустой массив"
+        )
+        sendResponse({
+          success: true,
+          folders: [],
+          message: "Структура закладок повреждена",
+        })
+        return
+      }
+
+      // Извлекаем только папки
+      const folders = []
+      bookmarks.children.forEach((item) => {
+        if (item && item.type === "folder") {
+          // Копируем только нужные свойства
+          folders.push({
+            id: item.id,
+            title: item.title,
+            type: "folder",
+            children:
+              item.children && Array.isArray(item.children)
+                ? extractNestedFolders(item.children)
+                : [],
+          })
+        }
+      })
+
+      // Выведем все папки для отладки
+      folders.forEach((folder) => {
+        console.log(
+          `[Background] Папка: ${folder.title} (ID: ${folder.id}), подпапок: ${folder.children.length}`
+        )
+      })
+
+      console.log("[Background] Найдено папок:", folders.length)
+      sendResponse({
+        success: true,
+        folders: folders,
+      })
+    })
+
+    return true
+  }
+
+  // Получение текущей структуры закладок для отладки
+  if (request.action === "getBookmarksDebug") {
+    console.log(
+      "[Background] Запрос на получение структуры закладок для отладки"
+    )
+
+    chrome.storage.local.get("gh_bookmarks", async (data) => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "[Background] Ошибка при получении данных:",
+          chrome.runtime.lastError
+        )
+        sendResponse({
+          success: false,
+          error: chrome.runtime.lastError.message,
+        })
+        return
+      }
+
+      // Если запрошена принудительная инициализация
+      if (request.forceInit) {
+        console.log(
+          "[Background] Запрошена принудительная инициализация структуры"
+        )
+        try {
+          const newStructure = await forceInitializeBookmarks()
+          sendResponse({
+            success: true,
+            message: "Структура принудительно переинициализирована",
+            bookmarks: newStructure,
+          })
+        } catch (error) {
+          sendResponse({
+            success: false,
+            error: "Ошибка при принудительной инициализации: " + error.message,
+          })
+        }
+        return
+      }
+
+      if (!data || !data.gh_bookmarks) {
+        console.warn(
+          "[Background] Структура закладок отсутствует, создаем новую"
         )
 
-        if (data && data.gh_bookmarks) {
-          console.log(
-            "[Background] Структура gh_bookmarks:",
-            "id:",
-            data.gh_bookmarks.id,
-            "title:",
-            data.gh_bookmarks.title,
-            "type:",
-            data.gh_bookmarks.type,
-            "children:",
-            data.gh_bookmarks.children
-              ? `Array(${data.gh_bookmarks.children.length})`
-              : "отсутствует"
+        try {
+          // Инициализируем структуру закладок
+          const newStructure = await forceInitializeBookmarks()
+          sendResponse({
+            success: true,
+            message: "Создана новая структура закладок",
+            bookmarks: newStructure,
+          })
+        } catch (error) {
+          sendResponse({
+            success: false,
+            error: "Не удалось создать структуру: " + error.message,
+          })
+        }
+      } else {
+        // Проверяем корректность структуры
+        let bookmarks = data.gh_bookmarks
+        let needsFix = false
+
+        if (!bookmarks.id || !bookmarks.type || !bookmarks.title) {
+          console.warn(
+            "[Background] Структура некорректна, отсутствуют базовые свойства"
+          )
+          needsFix = true
+
+          // Добавляем базовые свойства
+          bookmarks.id = bookmarks.id || "0"
+          bookmarks.type = bookmarks.type || "folder"
+          bookmarks.title = bookmarks.title || "root"
+        }
+
+        if (!bookmarks.children || !Array.isArray(bookmarks.children)) {
+          console.warn("[Background] Отсутствует массив children, добавляем")
+          needsFix = true
+          bookmarks.children = []
+        }
+
+        // Проверяем наличие хотя бы одной папки
+        const hasFolders = bookmarks.children.some(
+          (item) => item && item.type === "folder" && item.id && item.title
+        )
+
+        if (!hasFolders && bookmarks.children.length === 0) {
+          console.warn("[Background] В структуре нет папок, добавляем базовые")
+          needsFix = true
+
+          // Добавляем базовые папки
+          bookmarks.children.push(
+            {
+              id: "folder_favorites_" + Date.now(),
+              title: "Избранное",
+              type: "folder",
+              children: [],
+            },
+            {
+              id: "folder_work_" + Date.now(),
+              title: "Работа",
+              type: "folder",
+              children: [],
+            },
+            {
+              id: "folder_personal_" + Date.now(),
+              title: "Личное",
+              type: "folder",
+              children: [],
+            }
           )
         }
 
-        // Проверка на наличие данных
-        if (!data || !data.gh_bookmarks) {
-          console.error(
-            "[Background] Закладки не найдены в хранилище, создаем базовую структуру"
-          )
+        if (needsFix) {
+          console.log("[Background] Исправляем структуру закладок")
 
-          // Инициализируем базовую структуру
-          const initialized = await initializeDefaultBookmarks()
-
-          if (!initialized) {
-            console.error("[Background] Не удалось инициализировать структуру")
-            sendResponse({
-              success: false,
-              error: "Не удалось создать базовую структуру закладок",
-            })
-            return
-          }
-
-          // Получаем свежесозданные данные
-          chrome.storage.local.get("gh_bookmarks", (newData) => {
-            console.log(
-              "[Background] Новые данные после инициализации:",
-              newData ? "Данные получены" : "Данные не получены"
-            )
-
-            if (newData && newData.gh_bookmarks) {
-              console.log(
-                "[Background] Новая структура gh_bookmarks:",
-                "id:",
-                newData.gh_bookmarks.id,
-                "title:",
-                newData.gh_bookmarks.title,
-                "type:",
-                newData.gh_bookmarks.type,
-                "children:",
-                newData.gh_bookmarks.children
-                  ? `Array(${newData.gh_bookmarks.children.length})`
-                  : "отсутствует"
-              )
-            }
-
-            if (
-              !newData ||
-              !newData.gh_bookmarks ||
-              !newData.gh_bookmarks.children
-            ) {
-              console.error("[Background] Не удалось создать базовую структуру")
-              sendResponse({
-                success: false,
-                error: "Не удалось создать базовую структуру",
-              })
-              return
-            }
-
-            // Извлекаем папки из новой структуры
-            try {
-              // Создаем массив папок напрямую, если extractFolders не работает
-              const folders = []
-
-              if (
-                newData.gh_bookmarks.children &&
-                newData.gh_bookmarks.children.length > 0
-              ) {
-                newData.gh_bookmarks.children.forEach((item) => {
-                  if (item && item.type === "folder") {
-                    folders.push({
-                      id: item.id,
-                      title: item.title,
-                      type: "folder",
-                      children: [],
-                    })
-                  }
-                })
-              }
-
-              console.log("[Background] Папки из новой структуры:", folders)
-              sendResponse({ success: true, folders: folders })
-            } catch (error) {
+          // Сохраняем исправленную структуру
+          chrome.storage.local.set({ gh_bookmarks: bookmarks }, () => {
+            if (chrome.runtime.lastError) {
               console.error(
-                "[Background] Ошибка при извлечении папок из новой структуры:",
-                error
+                "[Background] Ошибка при сохранении исправленной структуры:",
+                chrome.runtime.lastError
               )
               sendResponse({
                 success: false,
                 error:
-                  "Ошибка при извлечении папок из новой структуры: " +
-                  error.message,
+                  "Не удалось сохранить исправленную структуру: " +
+                  chrome.runtime.lastError.message,
               })
-            }
-          })
-          return
-        }
-
-        const bookmarks = data.gh_bookmarks
-        console.log(
-          "[Background] Полученные закладки:",
-          "id:",
-          bookmarks.id,
-          "title:",
-          bookmarks.title,
-          "type:",
-          bookmarks.type
-        )
-
-        // Если bookmarks не является объектом или не имеет нужных свойств, создаем новую структуру
-        if (!bookmarks || typeof bookmarks !== "object") {
-          console.error(
-            "[Background] Некорректная структура закладок, создаем заново"
-          )
-
-          await initializeDefaultBookmarks()
-
-          // Получаем свежесозданные данные
-          chrome.storage.local.get("gh_bookmarks", (newData) => {
-            // Создаем массив папок напрямую
-            const folders = []
-
-            if (
-              newData.gh_bookmarks.children &&
-              newData.gh_bookmarks.children.length > 0
-            ) {
-              newData.gh_bookmarks.children.forEach((item) => {
-                if (item && item.type === "folder") {
-                  folders.push({
-                    id: item.id,
-                    title: item.title,
-                    type: "folder",
-                    children: [],
-                  })
-                }
-              })
-            }
-
-            sendResponse({ success: true, folders: folders })
-          })
-          return
-        }
-
-        // Проверяем наличие children у корневого элемента
-        if (!bookmarks.children || !Array.isArray(bookmarks.children)) {
-          console.error(
-            "[Background] Корневой элемент не имеет корректного массива children"
-          )
-          console.log(
-            "[Background] Детали корневого элемента:",
-            JSON.stringify(bookmarks).substring(0, 500)
-          )
-
-          // Создаем новую структуру с нуля
-          await initializeDefaultBookmarks()
-
-          // Получаем свежесозданные данные
-          chrome.storage.local.get("gh_bookmarks", (newData) => {
-            if (
-              !newData ||
-              !newData.gh_bookmarks ||
-              !newData.gh_bookmarks.children
-            ) {
-              console.error("[Background] Не удалось создать новую структуру")
+            } else {
+              console.log(
+                "[Background] Исправленная структура успешно сохранена"
+              )
               sendResponse({
-                success: false,
-                error: "Не удалось создать новую структуру закладок",
-              })
-              return
-            }
-
-            // Создаем массив папок напрямую
-            const folders = []
-
-            if (
-              newData.gh_bookmarks.children &&
-              newData.gh_bookmarks.children.length > 0
-            ) {
-              newData.gh_bookmarks.children.forEach((item) => {
-                if (item && item.type === "folder") {
-                  folders.push({
-                    id: item.id,
-                    title: item.title,
-                    type: "folder",
-                    children: [],
-                  })
-                }
+                success: true,
+                bookmarks: bookmarks,
+                message: "Структура исправлена",
               })
             }
-
-            sendResponse({ success: true, folders: folders })
           })
-          return
-        }
-
-        try {
-          // Извлекаем только папки из дерева закладок - используем прямое формирование массива
-          console.log("[Background] Начинаем извлечение папок из закладок...")
-
-          const folders = []
-
-          if (bookmarks.children && bookmarks.children.length > 0) {
-            bookmarks.children.forEach((item) => {
-              if (item && item.type === "folder") {
-                folders.push({
-                  id: item.id,
-                  title: item.title,
-                  type: "folder",
-                  children: [],
-                })
-              }
-            })
-          }
-
-          console.log("[Background] Папки из хранилища:", folders)
-
-          // Проверяем, не пуст ли массив папок
-          if (!folders || folders.length === 0) {
-            console.warn(
-              "[Background] Не найдено ни одной папки, создаем базовую структуру"
-            )
-
-            // Создаем новую структуру с нуля
-            await initializeDefaultBookmarks()
-
-            // Получаем свежесозданные данные
-            chrome.storage.local.get("gh_bookmarks", (newData) => {
-              if (
-                !newData ||
-                !newData.gh_bookmarks ||
-                !newData.gh_bookmarks.children
-              ) {
-                console.error("[Background] Не удалось создать новую структуру")
-                sendResponse({
-                  success: false,
-                  error: "Не удалось создать новую структуру закладок",
-                })
-                return
-              }
-
-              // Создаем массив папок напрямую
-              const newFolders = []
-
-              if (
-                newData.gh_bookmarks.children &&
-                newData.gh_bookmarks.children.length > 0
-              ) {
-                newData.gh_bookmarks.children.forEach((item) => {
-                  if (item && item.type === "folder") {
-                    newFolders.push({
-                      id: item.id,
-                      title: item.title,
-                      type: "folder",
-                      children: [],
-                    })
-                  }
-                })
-              }
-
-              sendResponse({ success: true, folders: newFolders })
-            })
-            return
-          }
-
-          // Отправляем реальную структуру папок
-          sendResponse({ success: true, folders: folders })
-        } catch (error) {
-          console.error("[Background] Ошибка при извлечении папок:", error)
+        } else {
+          console.log(
+            "[Background] Структура корректна, возвращаем без изменений"
+          )
           sendResponse({
-            success: false,
-            error: "Ошибка при извлечении папок: " + error.message,
+            success: true,
+            bookmarks: bookmarks,
           })
         }
-      })
-    } catch (error) {
-      console.error(
-        "[Background] Критическая ошибка при получении структуры папок:",
-        error
-      )
+      }
+    })
+
+    return true
+  }
+
+  // Обработка сохранения закладки из контекстного меню
+  if (request.action === "saveBookmark") {
+    console.log(
+      "[Background] Получен запрос на сохранение закладки:",
+      request.data
+    )
+
+    const { parentId, bookmark } = request.data
+
+    if (!bookmark || !bookmark.title || !bookmark.url) {
+      console.error("[Background] Некорректные данные закладки:", bookmark)
       sendResponse({
         success: false,
-        error: "Критическая ошибка: " + error.message,
+        error: "Некорректные данные закладки",
       })
+      return true
     }
 
-    return true
-  }
-
-  // Сохранение закладки в выбранную папку
-  if (request.action === "saveBookmark") {
-    console.log("Получен запрос на сохранение закладки:", request.data)
-
-    const { parentId, title, url } = request.data
-
+    // Получаем текущую структуру из хранилища
     chrome.storage.local.get("gh_bookmarks", (data) => {
-      if (!data.gh_bookmarks) {
-        console.error("Не удалось получить закладки из хранилища")
-        sendResponse({ success: false, error: "Не удалось получить закладки" })
-        return
-      }
-
-      try {
-        // Получаем favicon через Google Favicon Service
-        const hostname = new URL(url).hostname
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
-
-        // Создаем новую закладку
-        const newBookmark = {
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2),
-          title: title,
-          url: url,
-          type: "bookmark",
-          icon: faviconUrl,
-          addedAt: new Date().toISOString(),
-        }
-
-        // Добавляем закладку в выбранную папку
-        let bookmarks = data.gh_bookmarks
-
-        // Проверяем, инициализировано ли свойство children
-        if (!bookmarks.children) {
-          console.log(
-            "Свойство children не инициализировано в корневом объекте, создаем его"
-          )
-          bookmarks.children = []
-        }
-
-        let result = { success: false, error: "Не удалось добавить закладку" }
-
-        if (parentId === "0") {
-          // Добавляем в корневую папку
-          console.log("Добавляем закладку в корневую папку")
-          bookmarks.children.push(newBookmark)
-          result = { success: true }
-        } else {
-          // Добавляем во вложенную папку
-          console.log(`Добавляем закладку в папку с ID: ${parentId}`)
-          result = addBookmarkToFolder(
-            bookmarks.children,
-            parentId,
-            newBookmark
-          )
-        }
-
-        if (!result.success) {
-          console.error("Не удалось добавить закладку в папку:", result.error)
-          sendResponse({ success: false, error: result.error })
-          return
-        }
-
-        // Сохраняем обновленные закладки
-        chrome.storage.local.set({ gh_bookmarks: bookmarks }, () => {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "Ошибка при сохранении закладок:",
-              chrome.runtime.lastError
-            )
-            sendResponse({
-              success: false,
-              error: chrome.runtime.lastError.message,
-            })
-          } else {
-            console.log("Закладка успешно сохранена")
-            sendResponse({ success: true, bookmark: newBookmark })
-          }
-        })
-      } catch (error) {
-        console.error("Ошибка при создании закладки:", error)
-        sendResponse({ success: false, error: error.message })
-      }
-    })
-
-    return true
-  }
-
-  // Обработка запроса на получение HTML страницы
-  if (request.action === "getHtmlContent") {
-    fetchHtmlContent(request.url)
-      .then((htmlContent) => {
-        sendResponse({ success: true, htmlContent })
-      })
-      .catch((error) => {
-        console.error("Ошибка при получении HTML:", error)
-        sendResponse({ success: false, error: error.message })
-      })
-
-    return true // Указывает, что ответ будет отправлен асинхронно
-  }
-
-  // Обработка запроса на извлечение фавиконов из HTML
-  if (request.action === "extractFavicons") {
-    const favicons = extractFaviconsFromHTML(request.html, request.baseUrl)
-    sendResponse({ success: true, favicons })
-    return true
-  }
-
-  // Оригинальный обработчик экспорта закладок
-  if (request.type === "EXPORT_BOOKMARKS") {
-    chrome.storage.local.get("gh_bookmarks", (data) => {
-      sendResponse({ bookmarks: data.gh_bookmarks?.children || [] })
-    })
-    return true // Для асинхронного ответа
-  }
-
-  // Новый обработчик экспорта закладок
-  if (request.action === "exportBookmarks") {
-    try {
-      chrome.downloads.download({
-        url: request.dataUrl,
-        filename: "bookmarks_export.html",
-        saveAs: true,
-      })
-      sendResponse({ success: true })
-    } catch (error) {
-      console.error("Ошибка при экспорте закладок:", error)
-      sendResponse({ success: false, error: error.message })
-    }
-    return true
-  }
-
-  // Обработка запроса на проверку конкретных путей фавиконов
-  if (request.action === "checkFaviconPaths") {
-    checkFaviconPaths(request.url, request.paths)
-      .then((results) => {
-        sendResponse({ success: true, results })
-      })
-      .catch((error) => {
-        console.error("Ошибка при проверке путей фавиконов:", error)
-        sendResponse({ success: false, error: error.message })
-      })
-
-    return true
-  }
-
-  // Создание новой папки
-  if (request.action === "createFolder") {
-    console.log("Получен запрос на создание новой папки:", request.data)
-
-    const { parentId, title } = request.data
-
-    chrome.storage.local.get("gh_bookmarks", async (data) => {
-      if (!data || !data.gh_bookmarks) {
-        console.error("Не удалось получить закладки из хранилища")
-
-        // Попробуем создать базовую структуру
-        await initializeDefaultBookmarks()
-
-        // Повторно получаем данные
-        chrome.storage.local.get("gh_bookmarks", (newData) => {
-          if (!newData || !newData.gh_bookmarks) {
-            sendResponse({
-              success: false,
-              error: "Не удалось создать базовую структуру",
-            })
-            return
-          }
-
-          // Продолжаем с созданием папки в новой структуре
-          createFolderInStructure(
-            newData.gh_bookmarks,
-            parentId,
-            title,
-            sendResponse
-          )
-        })
-        return true
-      }
-
-      // Создаем папку в существующей структуре
-      createFolderInStructure(data.gh_bookmarks, parentId, title, sendResponse)
-    })
-
-    return true
-  }
-
-  // Если не найден обработчик, возвращаем ошибку
-  console.log("[Background] Не найден обработчик для действия:", request.action)
-  sendResponse({ success: false, error: "Неизвестное действие" })
-  return true
-})
-
-// Обработчик клика по пункту контекстного меню
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  console.log("Обработчик клика по контекстному меню вызван", info, tab)
-
-  if (info.menuItemId === "addToBookmarkManager") {
-    console.log("Клик по пункту 'Добавить в менеджер закладок GH'")
-
-    let url = info.linkUrl || tab.url
-    let title = tab.title
-
-    console.log("URL для добавления:", url)
-    console.log("Заголовок для добавления:", title)
-
-    // Если был клик по ссылке, получаем текст ссылки
-    if (info.linkUrl) {
-      console.log("Это клик по ссылке, запрашиваем текст ссылки")
-
-      // В этом случае нам нужно получить текст ссылки из контента страницы
-      chrome.tabs.sendMessage(
-        tab.id,
-        { action: "getLinkText", linkUrl: info.linkUrl },
-        (response) => {
-          const error = chrome.runtime.lastError
-          if (error) {
-            console.error(
-              "Ошибка при отправке сообщения в content script:",
-              error
-            )
-            // Продолжаем без текста ссылки
-            showAddBookmarkModal(tab.id, url, title)
-            return
-          }
-
-          console.log("Получен ответ от content script:", response)
-
-          if (response && response.linkText) {
-            title = response.linkText
-            console.log("Обновленный заголовок:", title)
-          }
-          // Отправляем команду на отображение модального окна
-          showAddBookmarkModal(tab.id, url, title)
-        }
-      )
-    } else {
-      console.log("Это клик по странице, используем заголовок страницы")
-      // Отправляем команду на отображение модального окна напрямую
-      showAddBookmarkModal(tab.id, url, title)
-    }
-  }
-})
-
-/**
- * Отправляет команду в content script для отображения модального окна добавления закладки
- * @param {number} tabId - ID вкладки
- * @param {string} url - URL закладки
- * @param {string} title - Заголовок закладки
- */
-function showAddBookmarkModal(tabId, url, title) {
-  // Проверяем, загружен ли content script
-  chrome.tabs.sendMessage(tabId, { action: "ping" }, (response) => {
-    const error = chrome.runtime.lastError
-    if (error) {
-      console.log("Content script не загружен, загружаем его")
-
-      // Content script не загружен, внедряем его
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: tabId },
-          files: ["src/content.js"],
-        },
-        () => {
-          // После загрузки content script ждем немного и отправляем сообщение
-          setTimeout(() => {
-            sendShowModalMessage(tabId, url, title)
-          }, 500) // Ждем 500 мс для полной инициализации скрипта
-        }
-      )
-    } else {
-      // Content script загружен, отправляем сообщение
-      sendShowModalMessage(tabId, url, title)
-    }
-  })
-}
-
-/**
- * Отправляет сообщение в content script для отображения модального окна
- * @param {number} tabId - ID вкладки
- * @param {string} url - URL закладки
- * @param {string} title - Заголовок закладки
- */
-function sendShowModalMessage(tabId, url, title) {
-  chrome.tabs.sendMessage(
-    tabId,
-    {
-      action: "showAddBookmarkModal",
-      data: {
-        url: url,
-        title: title,
-      },
-    },
-    (response) => {
-      const error = chrome.runtime.lastError
-      if (error) {
-        console.error("Ошибка при отправке сообщения в content script:", error)
-        // Открываем обычное окно расширения как запасной вариант
-        chrome.windows.create({
-          url: chrome.runtime.getURL(
-            `src/popup.html?action=addBookmark&url=${encodeURIComponent(
-              url
-            )}&title=${encodeURIComponent(title)}`
-          ),
-          type: "popup",
-          width: 800,
-          height: 600,
-        })
-      } else {
-        console.log("Модальное окно успешно отображено")
-      }
-    }
-  )
-}
-
-// Функция для получения HTML содержимого страницы
-async function fetchHtmlContent(url) {
-  try {
-    console.log(`Получение HTML содержимого для ${url}`)
-    const response = await fetch(url, {
-      cache: "no-cache",
-      headers: {
-        Accept: "text/html",
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
-    return await response.text()
-  } catch (error) {
-    console.error(`Ошибка при получении HTML для ${url}:`, error)
-    throw error
-  }
-}
-
-// Функция для извлечения фавиконов из HTML
-function extractFaviconsFromHTML(html, baseUrl) {
-  try {
-    const urlObj = new URL(baseUrl)
-
-    // Создаем DOM-парсер для анализа HTML
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, "text/html")
-
-    // Ищем различные типы иконок в порядке приоритета
-    const iconSelectors = [
-      // Веб-стандартные иконки
-      'link[rel="icon"][href]',
-      'link[rel="shortcut icon"][href]',
-      'link[rel="apple-touch-icon"][href]',
-      'link[rel="apple-touch-icon-precomposed"][href]',
-      // Специфические форматы
-      'link[rel="icon"][type="image/svg+xml"][href]',
-      'link[rel="icon"][type="image/png"][href]',
-      'link[rel="icon"][type="image/x-icon"][href]',
-      // Общие метатеги для соц. сетей и превью
-      'meta[property="og:image"][content]',
-      'meta[name="twitter:image"][content]',
-    ]
-
-    const iconURLs = []
-
-    // Проверяем все селекторы и собираем возможные URL иконок
-    for (const selector of iconSelectors) {
-      const elements = doc.querySelectorAll(selector)
-      for (const element of elements) {
-        let iconURL = selector.includes("meta")
-          ? element.getAttribute("content")
-          : element.getAttribute("href")
-
-        // Обрабатываем относительные пути
-        if (
-          iconURL &&
-          !iconURL.match(/^https?:\/\//i) &&
-          !iconURL.startsWith("data:")
-        ) {
-          if (iconURL.startsWith("/")) {
-            iconURL = `${urlObj.origin}${iconURL}`
-          } else {
-            // Обработка относительных путей без начального '/'
-            const pathParts = urlObj.pathname.split("/")
-            pathParts.pop() // Удаляем последний элемент (имя файла)
-            const basePath = pathParts.join("/")
-            iconURL = `${urlObj.origin}${basePath}/${iconURL}`
-          }
-        }
-
-        if (iconURL) {
-          iconURLs.push({
-            url: iconURL,
-            priority: iconSelectors.indexOf(selector) + 1, // Приоритет соответствует порядку в массиве
-          })
-        }
-      }
-    }
-
-    // Сортируем по приоритету
-    iconURLs.sort((a, b) => a.priority - b.priority)
-
-    return iconURLs
-  } catch (error) {
-    console.error("Ошибка при извлечении фавиконов из HTML:", error)
-    return []
-  }
-}
-
-// Функция для проверки доступности конкретных путей фавиконов
-async function checkFaviconPaths(baseUrl, paths) {
-  const results = []
-  const urlObj = new URL(baseUrl)
-
-  for (const path of paths) {
-    try {
-      const faviconUrl = path.startsWith("http")
-        ? path
-        : `${urlObj.origin}${path}`
-      console.log(`Проверка фавикона по адресу: ${faviconUrl}`)
-
-      // Используем HEAD запрос для проверки доступности
-      const response = await fetch(faviconUrl, {
-        method: "HEAD",
-        cache: "no-cache",
-      })
-
-      if (response.ok) {
-        results.push({
-          url: faviconUrl,
-          exists: true,
-          contentType: response.headers.get("content-type"),
-        })
-      } else {
-        results.push({
-          url: faviconUrl,
-          exists: false,
-          status: response.status,
-        })
-      }
-    } catch (error) {
-      console.warn(`Ошибка при проверке пути ${path}:`, error)
-      results.push({
-        url: path.startsWith("http") ? path : `${urlObj.origin}${path}`,
-        exists: false,
-        error: error.message,
-      })
-    }
-  }
-
-  return results
-}
-
-// Обработка запуска расширения для создания контекстного меню
-chrome.runtime.onStartup.addListener(async () => {
-  console.log("Расширение запущено")
-
-  try {
-    // Проверяем существование структуры закладок
-    const data = await new Promise((resolve) =>
-      chrome.storage.local.get("gh_bookmarks", resolve)
-    )
-
-    if (!data || !data.gh_bookmarks) {
       console.log(
-        "При запуске: закладки не обнаружены, создаем базовую структуру"
-      )
-      await initializeDefaultBookmarks()
-    } else {
-      // Проверяем структуру на наличие проблем
-      console.log("При запуске: проверяем структуру закладок")
-      await fixBookmarksStructure()
-    }
-  } catch (error) {
-    console.error("Ошибка при проверке закладок при запуске:", error)
-    // При ошибке создаем новую структуру
-    await initializeDefaultBookmarks()
-  }
-
-  // Создаем контекстное меню
-  createContextMenu()
-})
-
-/**
- * Проверяет, требуется ли пересоздание структуры закладок
- * @param {Object} bookmarks - Структура закладок
- * @returns {boolean} - true, если структура требует пересоздания
- */
-function checkIfNeedsRecreation(bookmarks) {
-  // Проверяем наличие критических проблем, которые нельзя исправить
-
-  // 1. Проверка корневого элемента
-  if (!bookmarks || typeof bookmarks !== "object") {
-    console.error(
-      "[Background] Критическая проблема: корневой элемент не является объектом"
-    )
-    return true
-  }
-
-  // 2. Проверка обязательных свойств корневого элемента
-  if (!bookmarks.id || !bookmarks.title || !bookmarks.type) {
-    console.error(
-      "[Background] Критическая проблема: отсутствуют обязательные свойства в корневом элементе"
-    )
-    return true
-  }
-
-  // 3. Проверка массива children
-  if (!bookmarks.children || !Array.isArray(bookmarks.children)) {
-    console.error(
-      "[Background] Критическая проблема: children не существует или не является массивом"
-    )
-    return true
-  }
-
-  // 4. Проверка содержимого children - должна быть хотя бы одна папка
-  const hasFolders = bookmarks.children.some(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      (item.type === "folder" ||
-        (item.children && Array.isArray(item.children)))
-  )
-
-  if (!hasFolders) {
-    console.error("[Background] Критическая проблема: в структуре нет папок")
-    return true
-  }
-
-  // 5. Проверка корректности всех элементов в children
-  const hasInvalidItems = bookmarks.children.some(
-    (item) => !item || typeof item !== "object" || !item.id || !item.title
-  )
-
-  if (hasInvalidItems) {
-    console.error(
-      "[Background] Критическая проблема: есть некорректные элементы в children"
-    )
-    return true
-  }
-
-  // Структура достаточно хороша, пересоздание не требуется
-  return false
-}
-
-/**
- * Проверяет и исправляет структуру закладок в хранилище
- * @returns {Promise} Promise, который разрешается после завершения проверки
- */
-async function fixBookmarksStructure() {
-  console.log("Проверка и исправление структуры закладок")
-
-  try {
-    const data = await new Promise((resolve) =>
-      chrome.storage.local.get("gh_bookmarks", resolve)
-    )
-
-    if (!data || !data.gh_bookmarks) {
-      console.warn("Закладки не найдены, создаем базовую структуру")
-
-      // Создаем базовую структуру папок
-      await initializeDefaultBookmarks()
-      return true
-    }
-
-    let bookmarks = data.gh_bookmarks
-    let modified = false
-
-    console.log(
-      "Текущая структура корневого элемента:",
-      "id:",
-      bookmarks.id,
-      "title:",
-      bookmarks.title,
-      "type:",
-      bookmarks.type,
-      "children:",
-      bookmarks.children ? `Array(${bookmarks.children.length})` : "отсутствует"
-    )
-
-    // Если есть старая версия со структурой, которая может быть несовместима,
-    // проверяем ее формат и при необходимости миграции полностью пересоздаем
-    if (isOldStructureFormat(bookmarks)) {
-      console.log(
-        "[Background] Обнаружена устаревшая или несовместимая структура, выполняем полное пересоздание"
-      )
-      await initializeDefaultBookmarks()
-      return true
-    }
-
-    // Проверяем наличие id у корневого элемента
-    if (!bookmarks.id) {
-      console.log("Корневой элемент не имеет id, добавляем")
-      bookmarks.id = "0"
-      modified = true
-    }
-
-    // Проверяем наличие type у корневого элемента
-    if (!bookmarks.type) {
-      console.log("Корневой элемент не имеет type, добавляем")
-      bookmarks.type = "folder"
-      modified = true
-    }
-
-    // Проверяем наличие title у корневого элемента
-    if (!bookmarks.title) {
-      console.log("Корневой элемент не имеет title, добавляем")
-      bookmarks.title = "root"
-      modified = true
-    }
-
-    // Проверяем наличие children у корневого элемента
-    if (!bookmarks.children || !Array.isArray(bookmarks.children)) {
-      console.log("Корневой элемент не имеет корректного children, добавляем")
-      bookmarks.children = []
-      modified = true
-    }
-
-    // Проверяем наличие папок верхнего уровня
-    if (bookmarks.children.length === 0) {
-      console.log("Нет папок верхнего уровня, добавляем стандартные папки")
-      bookmarks.children.push(
-        createDefaultFolder("Избранное"),
-        createDefaultFolder("Работа"),
-        createDefaultFolder("Личное")
-      )
-      modified = true
-    }
-
-    // Проверяем наличие type у папок верхнего уровня
-    let hasFixedFolders = false
-    const recursivelyFixFolders = (items) => {
-      if (!items || !Array.isArray(items)) return
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-
-        // Проверяем, что item существует и является объектом
-        if (!item || typeof item !== "object") {
-          console.log(
-            `Элемент #${i} в массиве не является объектом, удаляем его`
-          )
-          items.splice(i, 1)
-          i-- // Уменьшаем индекс, т.к. элемент удален
-          hasFixedFolders = true
-          continue
-        }
-
-        // Проверяем, что у объекта есть обязательные свойства
-        if (!item.id) {
-          console.log(
-            `Элемент ${item.title || "без имени"} не имеет id, добавляем`
-          )
-          item.id =
-            Date.now().toString(36) + Math.random().toString(36).substr(2)
-          hasFixedFolders = true
-        }
-
-        // Определяем тип объекта, если он отсутствует
-        if (!item.type) {
-          if (item.url) {
-            console.log(
-              `Элемент ${
-                item.title || "без имени"
-              } не имеет type, но имеет URL, устанавливаем type='bookmark'`
-            )
-            item.type = "bookmark"
-          } else if (item.children || Array.isArray(item.children)) {
-            console.log(
-              `Элемент ${
-                item.title || "без имени"
-              } не имеет type, но имеет children, устанавливаем type='folder'`
-            )
-            item.type = "folder"
-          } else {
-            console.log(
-              `Элемент ${
-                item.title || "без имени"
-              } не имеет type и неясного типа, устанавливаем type='folder'`
-            )
-            item.type = "folder"
-          }
-          hasFixedFolders = true
-        }
-
-        // Проверяем, что папки имеют массив children
-        if (
-          item.type === "folder" &&
-          (!item.children || !Array.isArray(item.children))
-        ) {
-          console.log(
-            `Папка ${
-              item.title || "без имени"
-            } не имеет корректного children, добавляем пустой массив`
-          )
-          item.children = []
-          hasFixedFolders = true
-        }
-
-        // Проверяем, что закладки имеют URL
-        if (item.type === "bookmark" && !item.url) {
-          console.log(
-            `Закладка ${
-              item.title || "без имени"
-            } не имеет URL, добавляем заглушку`
-          )
-          item.url = "https://example.com/"
-          hasFixedFolders = true
-        }
-
-        // Проверяем, что все элементы имеют заголовок
-        if (!item.title) {
-          console.log(
-            `Элемент ${item.id} не имеет заголовка, добавляем заглушку`
-          )
-          item.title = item.type === "folder" ? "Папка" : "Закладка"
-          hasFixedFolders = true
-        }
-
-        // Рекурсивно проверяем дочерние элементы
-        if (item.children && Array.isArray(item.children)) {
-          recursivelyFixFolders(item.children)
-        }
-      }
-    }
-
-    recursivelyFixFolders(bookmarks.children)
-
-    if (hasFixedFolders) {
-      modified = true
-    }
-
-    // Если были внесены изменения, сохраняем обновленную структуру
-    if (modified) {
-      console.log("Структура закладок исправлена, сохраняем изменения")
-      await new Promise((resolve) =>
-        chrome.storage.local.set({ gh_bookmarks: bookmarks }, resolve)
-      )
-      console.log("Структура закладок успешно обновлена")
-      return true
-    } else {
-      console.log("Структура закладок корректна, изменения не требуются")
-      return false
-    }
-  } catch (error) {
-    console.error("Ошибка при исправлении структуры закладок:", error)
-
-    // При критической ошибке создаем новую структуру с нуля
-    console.log("Критическая ошибка, создаем новую структуру закладок")
-    await initializeDefaultBookmarks()
-    return true
-  }
-}
-
-/**
- * Проверяет, является ли структура устаревшей или несовместимой
- * @param {Object} bookmarks - Структура закладок
- * @returns {boolean} - true, если структура устаревшая или несовместимая
- */
-function isOldStructureFormat(bookmarks) {
-  // Проверяем признаки старой структуры данных
-
-  // Если корневой элемент не имеет id, type, title или children,
-  // но при этом имеет другие свойства, считаем структуру устаревшей
-  if (typeof bookmarks === "object" && Object.keys(bookmarks).length > 0) {
-    const hasNewFormat =
-      bookmarks.id &&
-      bookmarks.type === "folder" &&
-      bookmarks.title &&
-      Array.isArray(bookmarks.children)
-
-    if (!hasNewFormat) {
-      // Проверяем, есть ли в структуре признаки старого формата
-      const hasOldFormat =
-        bookmarks.bookmarks || bookmarks.folders || bookmarks.version
-
-      if (hasOldFormat) {
-        console.log("[Background] Обнаружен устаревший формат данных")
-        return true
-      }
-    }
-  }
-
-  return false
-}
-
-/**
- * Инициализирует базовую структуру закладок
- * @returns {Promise} Promise, который разрешается после инициализации
- */
-async function initializeDefaultBookmarks() {
-  console.log("[Background] Начинаем инициализацию базовой структуры закладок")
-
-  try {
-    // Создаем базовую структуру папок
-    const defaultBookmarks = {
-      id: "0",
-      title: "root",
-      type: "folder",
-      children: [
-        createDefaultFolder("Избранное"),
-        createDefaultFolder("Работа"),
-        createDefaultFolder("Личное"),
-      ],
-    }
-
-    console.log(
-      "[Background] Структура для сохранения:",
-      JSON.stringify(defaultBookmarks)
-    )
-
-    // Проверяем структуру перед сохранением
-    if (
-      !defaultBookmarks.children ||
-      !Array.isArray(defaultBookmarks.children)
-    ) {
-      console.error(
-        "[Background] Критическая ошибка: children не является массивом перед сохранением"
-      )
-      defaultBookmarks.children = [
-        createDefaultFolder("Избранное"),
-        createDefaultFolder("Работа"),
-        createDefaultFolder("Личное"),
-      ]
-    }
-
-    // Сначала удаляем существующие данные
-    await new Promise((resolve) =>
-      chrome.storage.local.remove("gh_bookmarks", resolve)
-    )
-
-    // Сохраняем новую структуру
-    await new Promise((resolve) =>
-      chrome.storage.local.set({ gh_bookmarks: defaultBookmarks }, (result) => {
-        const error = chrome.runtime.lastError
-        if (error) {
-          console.error("[Background] Ошибка при сохранении структуры:", error)
-        } else {
-          console.log("[Background] Структура успешно сохранена")
-        }
-        resolve()
-      })
-    )
-
-    // Проверяем, что структура действительно сохранилась
-    const data = await new Promise((resolve) =>
-      chrome.storage.local.get("gh_bookmarks", resolve)
-    )
-
-    if (!data || !data.gh_bookmarks || !data.gh_bookmarks.children) {
-      console.error(
-        "[Background] Критическая ошибка: структура не сохранилась корректно"
-      )
-      return false
-    }
-
-    console.log(
-      "[Background] Проверка созданной структуры:",
-      "id:",
-      data.gh_bookmarks.id,
-      "children:",
-      data.gh_bookmarks.children
-        ? data.gh_bookmarks.children.length
-        : "отсутствуют"
-    )
-
-    return true
-  } catch (error) {
-    console.error("[Background] Ошибка при инициализации закладок:", error)
-    return false
-  }
-}
-
-/**
- * Создает объект папки по умолчанию с уникальным ID
- * @param {string} title - Название папки
- * @returns {Object} - Объект папки
- */
-function createDefaultFolder(title) {
-  const folder = {
-    id:
-      "folder_" +
-      Date.now().toString(36) +
-      Math.random().toString(36).substr(2),
-    title: title,
-    type: "folder",
-    children: [],
-  }
-
-  console.log("[Background] Создана папка по умолчанию:", title, folder.id)
-
-  return folder
-}
-
-/**
- * Извлекает только папки из дерева закладок
- * @param {Array} items - Массив элементов закладок
- * @returns {Array} - Массив папок с сохранением иерархии
- */
-function extractFolders(items) {
-  // Безопасная проверка входных данных
-  if (!items) {
-    console.error("extractFolders: items is null or undefined")
-    console.trace("Трассировка вызова extractFolders с null/undefined")
-    return []
-  }
-
-  // Проверка, что items - массив
-  if (!Array.isArray(items)) {
-    console.error(
-      "extractFolders: items не является массивом",
-      typeof items,
-      items
-    )
-    console.trace("Трассировка вызова extractFolders с не-массивом")
-
-    // Если передан объект, возможно, это корневой объект закладок, попробуем извлечь папки из его children
-    if (
-      typeof items === "object" &&
-      items !== null &&
-      items.children &&
-      Array.isArray(items.children)
-    ) {
-      console.log(
-        "Извлекаем папки из children корневого объекта:",
-        items.children.length
-      )
-      return extractFolders(items.children)
-    }
-
-    return []
-  }
-
-  console.log(
-    `extractFolders: Обрабатываю ${items.length} элементов:`,
-    JSON.stringify(items).substring(0, 300) + "..."
-  )
-  const folders = []
-
-  // Проходим по всем элементам первого уровня
-  for (const item of items) {
-    // Пропускаем null и undefined
-    if (!item) {
-      console.warn("Пропускаем null/undefined элемент")
-      continue
-    }
-
-    // Пропускаем не-объекты
-    if (typeof item !== "object") {
-      console.warn(`Пропускаем элемент с типом ${typeof item}`)
-      continue
-    }
-
-    // Проверяем, является ли элемент папкой
-    const isFolder =
-      item.type === "folder" ||
-      (item.children && Array.isArray(item.children)) ||
-      (item.type === undefined && !item.url)
-
-    if (isFolder) {
-      console.log(
-        `Найдена папка: ${item.title || "Без названия"} (ID: ${
-          item.id || "без ID"
-        })`
+        "[Background] Текущая структура перед сохранением:",
+        data && data.gh_bookmarks
+          ? `ID: ${data.gh_bookmarks.id}, тип: ${data.gh_bookmarks.type}`
+          : "отсутствует"
       )
 
-      // Создаем копию папки
-      const folder = {
-        id:
-          item.id ||
-          Date.now().toString(36) + Math.random().toString(36).substr(2),
-        title: item.title || "Папка",
-        type: "folder",
-        children: [],
-      }
+      // Если структуры нет, создаем пустую корневую папку
+      let bookmarks =
+        data && data.gh_bookmarks
+          ? data.gh_bookmarks
+          : {
+              id: "0",
+              title: "root",
+              type: "folder",
+              children: [],
+            }
 
-      // Если у папки есть иконка, сохраняем её
-      if (item.icon) {
-        folder.icon = item.icon
-      }
-
-      // Рекурсивно извлекаем вложенные папки из всех дочерних элементов
-      if (
-        item.children &&
-        Array.isArray(item.children) &&
-        item.children.length > 0
-      ) {
-        console.log(
-          `Папка ${folder.title} имеет ${item.children.length} дочерних элементов`
-        )
-
-        try {
-          // Рекурсивно извлекаем структуру вложенных папок
-          folder.children = extractFolders(item.children)
-          console.log(
-            `Извлечено ${folder.children.length} вложенных папок для ${folder.title}`
-          )
-        } catch (error) {
-          console.error(
-            `Ошибка при извлечении вложенных папок для ${folder.title}:`,
-            error
-          )
-          folder.children = [] // Устанавливаем пустой массив в случае ошибки
-        }
-      }
-
-      folders.push(folder)
-    }
-  }
-
-  console.log(`extractFolders: Найдено ${folders.length} папок`)
-  return folders
-}
-
-/**
- * Добавляет закладку в указанную папку
- * @param {Array} items - Массив элементов для поиска папки
- * @param {string} folderId - ID папки, в которую нужно добавить закладку
- * @param {Object} bookmark - Объект закладки для добавления
- * @returns {Object} - Результат операции
- */
-function addBookmarkToFolder(items, folderId, bookmark) {
-  console.log(
-    `Поиск папки с ID ${folderId} для добавления закладки ${bookmark.title}`
-  )
-
-  if (!items || !Array.isArray(items)) {
-    console.error("addBookmarkToFolder: items не является массивом", items)
-    return { success: false, error: "Некорректная структура закладок" }
-  }
-
-  // Проходим по всем элементам
-  for (const item of items) {
-    // Проверяем, является ли текущий элемент искомой папкой
-    if (item.id === folderId && item.type === "folder") {
-      console.log(`Найдена папка ${item.title} (ID: ${item.id})`)
-
-      // Проверяем, инициализировано ли свойство children
-      if (!item.children) {
-        console.log(`Инициализируем массив children для папки ${item.title}`)
-        item.children = []
-      }
-
-      // Проверяем, что children - это массив
-      if (!Array.isArray(item.children)) {
-        console.error(
-          `Свойство children папки ${item.title} не является массивом`
-        )
-        return { success: false, error: "Некорректная структура папки" }
-      }
-
-      // Добавляем закладку в папку
-      item.children.push(bookmark)
-      console.log(
-        `Закладка ${bookmark.title} успешно добавлена в папку ${item.title}`
-      )
-      return { success: true }
-    }
-
-    // Если у текущего элемента есть дочерние элементы, рекурсивно ищем в них
-    if (
-      item.children &&
-      Array.isArray(item.children) &&
-      item.children.length > 0
-    ) {
-      const result = addBookmarkToFolder(item.children, folderId, bookmark)
-      if (result.success) {
-        return result
-      }
-    }
-  }
-
-  console.warn(`Папка с ID ${folderId} не найдена`)
-  return { success: false, error: "Папка не найдена" }
-}
-
-/**
- * Создает папку в структуре закладок
- * @param {Object} bookmarks - Структура закладок
- * @param {string} parentId - ID родительской папки
- * @param {string} title - Название новой папки
- * @param {Function} sendResponse - Функция для отправки ответа
- */
-function createFolderInStructure(bookmarks, parentId, title, sendResponse) {
-  try {
-    // Создаем новую папку
-    const newFolder = createDefaultFolder(title)
-    console.log(`Создана новая папка: ${title} с ID: ${newFolder.id}`)
-
-    // Если parentId === "0", добавляем папку в корень
-    if (parentId === "0") {
+      // Убедимся, что у корневого элемента есть children
       if (!bookmarks.children) {
         bookmarks.children = []
       }
 
-      bookmarks.children.push(newFolder)
-      console.log(`Папка ${title} добавлена в корневую папку`)
+      // Если parentId = "0", добавляем в корень
+      if (parentId === "0") {
+        console.log(
+          "[Background] Добавляем закладку в корневую папку:",
+          bookmark.title
+        )
+        bookmarks.children.push(bookmark)
 
-      // Сохраняем обновленную структуру
-      chrome.storage.local.set({ gh_bookmarks: bookmarks }, () => {
-        if (chrome.runtime.lastError) {
+        // Логируем обновленную структуру
+        console.log(
+          "[Background] Обновленная структура корня:",
+          `Количество детей: ${bookmarks.children.length}`
+        )
+      } else {
+        // Иначе ищем указанную папку и добавляем в нее
+        console.log(
+          "[Background] Пытаемся добавить закладку в папку ID:",
+          parentId
+        )
+        const result = addBookmarkToFolder(
+          bookmarks.children,
+          parentId,
+          bookmark
+        )
+        if (!result.success) {
           console.error(
-            "Ошибка при сохранении папки:",
-            chrome.runtime.lastError
+            "[Background] Ошибка добавления закладки:",
+            result.error
           )
           sendResponse({
             success: false,
-            error: chrome.runtime.lastError.message,
+            error: result.error,
           })
-        } else {
-          console.log("Папка успешно сохранена")
-          sendResponse({
-            success: true,
-            folder: newFolder,
-          })
+          return
         }
-      })
-    } else {
-      // Добавляем папку во вложенную папку
-      const result = addFolderToFolder(bookmarks.children, parentId, newFolder)
-
-      if (!result.success) {
-        console.error("Не удалось добавить папку:", result.error)
-        sendResponse({ success: false, error: result.error })
-        return
+        console.log("[Background] Закладка успешно добавлена в папку")
       }
 
+      // Логируем структуру перед сохранением
+      console.log(
+        "[Background] Сохраняем структуру, общее количество детей:",
+        bookmarks.children.length
+      )
+
       // Сохраняем обновленную структуру
       chrome.storage.local.set({ gh_bookmarks: bookmarks }, () => {
         if (chrome.runtime.lastError) {
           console.error(
-            "Ошибка при сохранении папки:",
+            "[Background] Ошибка сохранения:",
             chrome.runtime.lastError
           )
           sendResponse({
             success: false,
             error: chrome.runtime.lastError.message,
           })
-        } else {
-          console.log("Папка успешно сохранена")
+          return
+        }
+
+        console.log("[Background] Закладка успешно сохранена")
+
+        // Проверяем, что действительно сохранилось
+        chrome.storage.local.get("gh_bookmarks", (updatedData) => {
+          console.log(
+            "[Background] Проверка после сохранения:",
+            updatedData && updatedData.gh_bookmarks
+              ? `Количество детей: ${updatedData.gh_bookmarks.children.length}`
+              : "Структура отсутствует"
+          )
+
           sendResponse({
             success: true,
-            folder: newFolder,
+            message: "Закладка успешно сохранена",
           })
-        }
+        })
       })
-    }
-  } catch (error) {
-    console.error("Ошибка при создании папки:", error)
-    sendResponse({ success: false, error: error.message })
+    })
+
+    return true
   }
-}
+})
 
 /**
  * Добавляет папку в указанную родительскую папку
@@ -1707,4 +835,288 @@ function addFolderToFolder(items, parentId, folder) {
   }
 
   return { success: false, error: "Родительская папка не найдена" }
+}
+
+/**
+ * Добавляет закладку в указанную папку по ID
+ * @param {Array} items - Массив элементов для поиска родительской папки
+ * @param {string} parentId - ID родительской папки
+ * @param {Object} bookmark - Объект новой закладки
+ * @returns {Object} - Результат операции
+ */
+function addBookmarkToFolder(items, parentId, bookmark) {
+  if (!items || !Array.isArray(items)) {
+    return { success: false, error: "Некорректный массив элементов" }
+  }
+
+  for (const item of items) {
+    if (item.id === parentId && item.type === "folder") {
+      console.log(
+        `[Background] Найдена родительская папка ${item.title} (ID: ${item.id})`
+      )
+
+      if (!item.children) {
+        item.children = []
+      }
+
+      item.children.push(bookmark)
+      console.log(
+        `[Background] Закладка ${bookmark.title} добавлена в папку ${item.title}`
+      )
+      return { success: true }
+    }
+
+    if (
+      item.children &&
+      Array.isArray(item.children) &&
+      item.children.length > 0
+    ) {
+      const result = addBookmarkToFolder(item.children, parentId, bookmark)
+      if (result.success) {
+        return result
+      }
+    }
+  }
+
+  return { success: false, error: "Родительская папка не найдена" }
+}
+
+/**
+ * Рекурсивно извлекает вложенные папки из дерева
+ * @param {Array} items - Массив элементов
+ * @returns {Array} - Массив папок
+ */
+function extractNestedFolders(items) {
+  if (!items || !Array.isArray(items)) return []
+
+  const folders = []
+
+  items.forEach((item) => {
+    if (item && typeof item === "object" && item.type === "folder") {
+      console.log(
+        `[Background] extractNestedFolders: обрабатываем папку ${item.title} (ID: ${item.id})`
+      )
+
+      // Создаем объект папки
+      const folder = {
+        id: item.id,
+        title: item.title,
+        type: "folder",
+        children: [],
+      }
+
+      // Рекурсивно извлекаем дочерние папки
+      if (item.children && Array.isArray(item.children)) {
+        folder.children = extractNestedFolders(item.children)
+        console.log(
+          `[Background] extractNestedFolders: для папки ${item.title} найдено ${folder.children.length} вложенных папок`
+        )
+      }
+
+      folders.push(folder)
+    }
+  })
+
+  console.log(
+    `[Background] extractNestedFolders: извлечено ${folders.length} папок из ${items.length} элементов`
+  )
+  return folders
+}
+
+/**
+ * Генерирует уникальный идентификатор для элементов закладок
+ * @returns {string} - Уникальный ID
+ */
+function generateUniqueId() {
+  const timestamp = Date.now().toString(36)
+  const randomStr = Math.random().toString(36).substring(2, 10)
+  return `gh_${timestamp}_${randomStr}`
+}
+
+/**
+ * Проверяет и исправляет структуру закладок в хранилище
+ * @returns {Promise} Promise, который разрешается после завершения проверки
+ */
+async function fixBookmarksStructure() {
+  console.log("[Background] Проверка и исправление структуры закладок")
+
+  try {
+    const data = await new Promise((resolve) =>
+      chrome.storage.local.get("gh_bookmarks", resolve)
+    )
+
+    if (!data || !data.gh_bookmarks) {
+      console.warn(
+        "[Background] Закладки не найдены, создаем базовую структуру"
+      )
+      // Создаем базовую структуру папок
+      await forceInitializeBookmarks()
+      return true
+    }
+
+    // Получаем структуру
+    let bookmarks = data.gh_bookmarks
+    let modified = false
+
+    // Проверяем наличие базовых свойств у корневого элемента
+    if (!bookmarks.id || !bookmarks.type || !bookmarks.title) {
+      console.log("[Background] Исправляем базовые свойства корневого элемента")
+      bookmarks.id = bookmarks.id || "0"
+      bookmarks.type = bookmarks.type || "folder"
+      bookmarks.title = bookmarks.title || "root"
+      modified = true
+    }
+
+    // Проверяем наличие массива детей
+    if (!bookmarks.children || !Array.isArray(bookmarks.children)) {
+      console.log("[Background] Добавляем массив children")
+      bookmarks.children = []
+      modified = true
+    }
+
+    // Проверяем наличие папок
+    if (bookmarks.children.length === 0) {
+      console.log("[Background] Добавляем стандартные папки")
+      bookmarks.children.push(
+        {
+          id: "folder_favorites_" + Date.now(),
+          title: "Избранное",
+          type: "folder",
+          children: [],
+        },
+        {
+          id: "folder_work_" + Date.now(),
+          title: "Работа",
+          type: "folder",
+          children: [],
+        },
+        {
+          id: "folder_personal_" + Date.now(),
+          title: "Личное",
+          type: "folder",
+          children: [],
+        }
+      )
+      modified = true
+    }
+
+    // Если были внесены изменения, сохраняем структуру
+    if (modified) {
+      console.log("[Background] Сохраняем исправленную структуру")
+      await new Promise((resolve) =>
+        chrome.storage.local.set({ gh_bookmarks: bookmarks }, resolve)
+      )
+      return true
+    } else {
+      console.log("[Background] Структура корректна, изменения не требуются")
+      return false
+    }
+  } catch (error) {
+    console.error(
+      "[Background] Ошибка при исправлении структуры закладок:",
+      error
+    )
+    // При критической ошибке создаем структуру заново
+    await forceInitializeBookmarks()
+    return true
+  }
+}
+
+/**
+ * Принудительно создает базовую структуру закладок
+ * @returns {Promise<Object>} Promise, который разрешается созданной структурой
+ */
+async function forceInitializeBookmarks() {
+  console.log("[Background] Создание базовой структуры закладок")
+
+  // Создаем базовую структуру с тремя основными папками
+  const rootStructure = {
+    id: "0",
+    title: "root",
+    type: "folder",
+    children: [
+      {
+        id: "folder_favorites_" + Date.now(),
+        title: "Избранное",
+        type: "folder",
+        children: [],
+      },
+      {
+        id: "folder_work_" + Date.now(),
+        title: "Работа",
+        type: "folder",
+        children: [],
+      },
+      {
+        id: "folder_personal_" + Date.now(),
+        title: "Личное",
+        type: "folder",
+        children: [],
+      },
+    ],
+  }
+
+  // Сохраняем структуру в хранилище
+  try {
+    await new Promise((resolve, reject) =>
+      chrome.storage.local.set({ gh_bookmarks: rootStructure }, () => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "[Background] Ошибка сохранения структуры:",
+            chrome.runtime.lastError
+          )
+          reject(chrome.runtime.lastError)
+        } else {
+          console.log("[Background] Базовая структура успешно создана")
+          resolve()
+        }
+      })
+    )
+    return rootStructure
+  } catch (error) {
+    console.error(
+      "[Background] Критическая ошибка при создании структуры:",
+      error
+    )
+    throw error
+  }
+}
+
+/**
+ * Инициализирует базовую структуру закладок
+ * @returns {Promise} Promise, который разрешается после инициализации
+ */
+async function initializeDefaultBookmarks() {
+  // Просто вызываем новую функцию для обеспечения обратной совместимости
+  console.log(
+    "[Background] Вызов initializeDefaultBookmarks перенаправлен на forceInitializeBookmarks"
+  )
+  return await forceInitializeBookmarks()
+}
+
+/**
+ * Извлекает только папки из массива элементов
+ * @param {Array} items - Массив элементов
+ * @returns {Array} - Массив папок
+ */
+function extractFolders(items) {
+  if (!items || !Array.isArray(items)) return []
+
+  const folders = []
+
+  items.forEach((item) => {
+    if (item && item.type === "folder") {
+      folders.push({
+        id: item.id,
+        title: item.title,
+        type: "folder",
+        children:
+          item.children && Array.isArray(item.children)
+            ? extractFolders(item.children)
+            : [],
+      })
+    }
+  })
+
+  return folders
 }
