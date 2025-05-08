@@ -121,6 +121,10 @@ function showSimpleBookmarkModal(url, title) {
           dropdownItemHover: "#f5f5f5",
         }
 
+    // Блокируем скролл на странице
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
     // Создаем модальное окно
     const modal = document.createElement("div")
     modal.style.cssText = `
@@ -271,8 +275,20 @@ function showSimpleBookmarkModal(url, title) {
     // Функция закрытия с анимацией
     function closeModal() {
       modal.style.opacity = "0"
+      // Восстанавливаем скролл страницы
+      document.body.style.overflow = originalOverflow
+
       setTimeout(() => {
         document.body.removeChild(modal)
+
+        // Удаляем все подменю и мосты, которые могли остаться в DOM
+        document
+          .querySelectorAll('.folder-submenu, [style*="pointer-events: auto"]')
+          .forEach((el) => {
+            if (el.parentNode) {
+              el.parentNode.removeChild(el)
+            }
+          })
       }, 200)
     }
 
@@ -557,6 +573,9 @@ function loadFolderStructure(modal) {
         scrollbar-width: none;
         -ms-overflow-style: none;
       }
+      .folder-submenu {
+        background-color: ${colors.dropdownBg} !important;
+      }
     `
     document.head.appendChild(styleElement)
 
@@ -795,18 +814,17 @@ function loadFolderStructure(modal) {
       // Создаем подменю
       const submenu = document.createElement("div")
       submenu.className = "folder-submenu"
+      submenu.setAttribute("data-parent-id", folder.id)
       submenu.style.cssText = `
         display: none;
-        position: absolute;
-        left: 100%;
-        top: 0;
+        position: fixed;
         width: 200px;
         max-height: 300px;
         overflow-y: auto;
         background-color: ${colors.dropdownBg};
         border: 1px solid ${colors.border};
         border-radius: 4px;
-        z-index: 1001;
+        z-index: 2000000;
         box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         scrollbar-width: none;
         -ms-overflow-style: none;
@@ -832,8 +850,19 @@ function loadFolderStructure(modal) {
       // Добавляем подменю к документу, но не как дочерний элемент
       document.body.appendChild(submenu)
 
+      // Переменная для отслеживания активного состояния подменю
+      let submenuActive = false
+
+      // Используем делегирование событий для родительского контейнера
+      let timeout
+      let isOverSubmenu = false
+      let isOverFolderItem = false
+
       // Показываем подменю при наведении на папку
-      folderItem.addEventListener("mouseover", (e) => {
+      folderItem.addEventListener("mouseenter", (e) => {
+        clearTimeout(timeout)
+        isOverFolderItem = true
+
         folderItem.style.backgroundColor = colors.hoverBg
 
         // Позиционируем и показываем подменю
@@ -845,48 +874,104 @@ function loadFolderStructure(modal) {
 
         if (rightEdge > viewportWidth) {
           // Если не поместится справа, показываем слева
-          submenu.style.left = "auto"
-          submenu.style.right = "100%"
+          submenu.style.left = rect.left - 205 + "px"
         } else {
           // Иначе показываем справа
-          submenu.style.left = `${rect.right + 5}px` // 5px отступ
-          submenu.style.right = "auto"
+          submenu.style.left = rect.right + 5 + "px" // 5px отступ
         }
 
-        submenu.style.top = `${rect.top}px`
+        submenu.style.top = rect.top + "px"
         submenu.style.display = "block"
       })
 
-      // Скрываем подменю при уходе с папки или подменю
-      folderItem.addEventListener("mouseout", (e) => {
-        if (
-          !e.relatedTarget ||
-          (!submenu.contains(e.relatedTarget) && e.relatedTarget !== submenu)
-        ) {
-          folderItem.style.backgroundColor = ""
+      folderItem.addEventListener("mouseleave", (e) => {
+        isOverFolderItem = false
 
-          // Не скрываем подменю сразу, чтобы можно было перевести на него курсор
-          setTimeout(() => {
-            if (!submenu.matches(":hover") && !folderItem.matches(":hover")) {
-              submenu.style.display = "none"
-            }
-          }, 50)
-        }
+        // Даем небольшую задержку перед скрытием
+        clearTimeout(timeout)
+        timeout = setTimeout(() => {
+          if (!isOverSubmenu && !isOverFolderItem) {
+            submenu.style.display = "none"
+            folderItem.style.backgroundColor = ""
+          }
+        }, 200)
       })
 
-      // Обработка ухода курсора с подменю
-      submenu.addEventListener("mouseout", (e) => {
-        if (
-          !e.relatedTarget ||
-          (!submenu.contains(e.relatedTarget) && e.relatedTarget !== folderItem)
-        ) {
-          // Не скрываем подменю сразу
-          setTimeout(() => {
-            if (!submenu.matches(":hover") && !folderItem.matches(":hover")) {
-              submenu.style.display = "none"
-            }
-          }, 50)
+      submenu.addEventListener("mouseenter", () => {
+        clearTimeout(timeout)
+        isOverSubmenu = true
+      })
+
+      submenu.addEventListener("mouseleave", () => {
+        isOverSubmenu = false
+
+        // Даем небольшую задержку перед скрытием
+        clearTimeout(timeout)
+        timeout = setTimeout(() => {
+          if (!isOverSubmenu && !isOverFolderItem) {
+            submenu.style.display = "none"
+            folderItem.style.backgroundColor = ""
+          }
+        }, 200)
+      })
+
+      // Создаем и добавляем невидимую полосу для соединения элемента и подменю
+      // Это решит проблему с исчезновением подменю при движении курсора
+      const bridge = document.createElement("div")
+      bridge.style.cssText = `
+        position: fixed;
+        z-index: 2000000;
+        background-color: transparent;
+        display: none;
+        pointer-events: auto;
+      `
+
+      document.body.appendChild(bridge)
+
+      // Обновляем позицию bridge при показе подменю
+      const updateBridgePosition = () => {
+        if (submenu.style.display === "block") {
+          const folderRect = folderItem.getBoundingClientRect()
+          const submenuRect = submenu.getBoundingClientRect()
+
+          // Определяем, с какой стороны находится подменю
+          if (submenuRect.left > folderRect.right) {
+            // Подменю справа
+            bridge.style.left = folderRect.right + "px"
+            bridge.style.width = submenuRect.left - folderRect.right + "px"
+          } else {
+            // Подменю слева
+            bridge.style.left = submenuRect.right + "px"
+            bridge.style.width = folderRect.left - submenuRect.right + "px"
+          }
+
+          bridge.style.top = folderRect.top + "px"
+          bridge.style.height = folderRect.height + "px"
+          bridge.style.display = "block"
+
+          // Мы также можем добавить обработчики событий для моста
+          bridge.onmouseenter = () => {
+            clearTimeout(timeout)
+          }
+        } else {
+          bridge.style.display = "none"
         }
+      }
+
+      // Обновляем позицию моста при показе/скрытии подменю
+      const originalDisplay = submenu.style.display
+      Object.defineProperty(submenu.style, "display", {
+        set: function (value) {
+          this.setProperty("display", value)
+          if (value === "block") {
+            setTimeout(updateBridgePosition, 0)
+          } else {
+            bridge.style.display = "none"
+          }
+        },
+        get: function () {
+          return this.getPropertyValue("display")
+        },
       })
     }
 
