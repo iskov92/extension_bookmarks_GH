@@ -167,40 +167,93 @@ export class NestedMenu {
           if (showFavicons && bookmark.favicon) {
             // Если включены фавиконы и у закладки есть сохраненный фавикон, используем его
             try {
-              // Предварительно проверяем, что URL фавикона корректен
-              new URL(bookmark.favicon)
+              // Проверяем специальный маркер для относительных путей расширения
+              if (
+                bookmark.favicon &&
+                bookmark.favicon.startsWith("$EXTENSION_PATH$")
+              ) {
+                try {
+                  // Получаем базовый URL расширения и заменяем маркер
+                  const baseUrl = chrome.runtime.getURL("/")
+                  icon.src = bookmark.favicon.replace(
+                    "$EXTENSION_PATH$",
+                    baseUrl
+                  )
+                } catch (e) {
+                  // Если не удалось, используем относительный путь
+                  icon.src = bookmark.favicon.replace("$EXTENSION_PATH$", "")
+                }
+              } else if (
+                bookmark.favicon &&
+                (bookmark.favicon.startsWith("/") ||
+                  bookmark.favicon.startsWith("./") ||
+                  bookmark.favicon.startsWith("../"))
+              ) {
+                // Это относительный путь внутри расширения
+                try {
+                  // Пытаемся преобразовать в абсолютный путь
+                  const baseUrl = chrome.runtime.getURL("/")
+                  icon.src = baseUrl + bookmark.favicon.replace(/^\//, "")
+                } catch (e) {
+                  // Если не удалось, используем как есть
+                  icon.src = bookmark.favicon
+                }
+              } else if (bookmark.favicon) {
+                // Предварительно проверяем, что URL фавикона корректен
+                new URL(bookmark.favicon)
 
-              // Устанавливаем обработчик ошибки до установки src
-              icon.onerror = () => {
-                // При ошибке загрузки удаляем свойство favicon у закладки в следующем обновлении
-                if (typeof updateBookmark === "function") {
+                // Устанавливаем обработчик ошибки до установки src
+                icon.onerror = () => {
+                  // При ошибке загрузки удаляем свойство favicon у закладки в следующем обновлении
+                  if (typeof updateBookmark === "function") {
+                    try {
+                      // Делаем копию без свойства favicon
+                      const { favicon, ...bookmarkWithoutFavicon } = bookmark
+                      updateBookmark(bookmark.id, bookmarkWithoutFavicon).catch(
+                        (err) =>
+                          console.warn(
+                            "Не удалось обновить закладку после ошибки фавикона:",
+                            err
+                          )
+                      )
+                    } catch (error) {
+                      console.warn("Ошибка при обновлении закладки:", error)
+                    }
+                  }
+
+                  // Устанавливаем стандартную иконку
                   try {
-                    // Делаем копию без свойства favicon
-                    const { favicon, ...bookmarkWithoutFavicon } = bookmark
-                    updateBookmark(bookmark.id, bookmarkWithoutFavicon).catch(
-                      (err) =>
-                        console.warn(
-                          "Не удалось обновить закладку после ошибки фавикона:",
-                          err
-                        )
-                    )
-                  } catch (error) {
-                    console.warn("Ошибка при обновлении закладки:", error)
+                    const baseUrl = chrome.runtime.getURL("/")
+                    icon.src = baseUrl + "assets/icons/link.svg"
+                  } catch (e) {
+                    icon.src = "/assets/icons/link.svg"
                   }
                 }
 
-                // Устанавливаем стандартную иконку
-                icon.src = "/assets/icons/link.svg"
+                // После установки обработчика ошибки устанавливаем src
+                icon.src = bookmark.favicon
+              } else {
+                // Нет фавикона
+                try {
+                  const baseUrl = chrome.runtime.getURL("/")
+                  icon.src = baseUrl + "assets/icons/link.svg"
+                } catch (e) {
+                  icon.src = "/assets/icons/link.svg"
+                }
               }
-
-              // После установки обработчика ошибки устанавливаем src
-              icon.src = bookmark.favicon
             } catch (urlError) {
               console.warn(
                 `Некорректный URL фавикона: ${bookmark.favicon}`,
                 urlError
               )
-              icon.src = "/assets/icons/link.svg"
+
+              // Используем стандартную иконку с безопасным путем
+              try {
+                const baseUrl = chrome.runtime.getURL("/")
+                icon.src = baseUrl + "assets/icons/link.svg"
+              } catch (e) {
+                icon.src = "/assets/icons/link.svg"
+              }
 
               // Удаляем некорректный фавикон из закладки
               if (typeof updateBookmark === "function") {

@@ -248,23 +248,179 @@ function sendShowModalMessage(tabId, url, title) {
 }
 
 // Обрабатывает сообщения от popup и content scripts
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("[Background] Получено сообщение:", request, "от:", sender)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("[Background] Получено сообщение:", message)
+
+  // Обработка запросов на получение HTML содержимого для извлечения фавикона
+  if (message.action === "getHtmlContent" && message.url) {
+    console.log(
+      "[Background] Запрос на получение HTML содержимого:",
+      message.url
+    )
+
+    try {
+      // Используем fetch для получения HTML-кода страницы (обходя CORS-ограничения)
+      // Добавляем таймаут и дополнительные параметры для более надежного получения HTML
+      const fetchOptions = {
+        method: "GET",
+        headers: {
+          Accept: "text/html,application/xhtml+xml,application/xml",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
+          "Cache-Control": "no-cache",
+          // Имитируем запрос от обычного браузера
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        },
+        // Не отправляем куки и другие учетные данные
+        credentials: "omit",
+        // Обходим CORS-проверки
+        mode: "no-cors",
+        // Отключаем редиректы, чтобы получить реальный HTML
+        redirect: "follow",
+        // Таймаут запроса 5 секунд
+        timeout: 5000,
+      }
+
+      // Используем Promise с таймаутом для ограничения времени выполнения запроса
+      const fetchWithTimeout = (url, options = {}) => {
+        // Создаем контроллер для возможности прервать запрос
+        const controller = new AbortController()
+        const { timeout } = options
+
+        // Устанавливаем таймаут
+        const timeoutId = setTimeout(() => controller.abort(), timeout || 5000)
+
+        return fetch(url, {
+          ...options,
+          signal: controller.signal,
+        })
+          .then((response) => {
+            clearTimeout(timeoutId)
+            return response
+          })
+          .catch((error) => {
+            clearTimeout(timeoutId)
+            throw error
+          })
+      }
+
+      fetchWithTimeout(message.url, fetchOptions)
+        .then((response) => {
+          if (!response.ok) {
+            console.warn(
+              `[Background] Ответ не OK: ${response.status} ${response.statusText}`
+            )
+
+            // Если получили Error 4xx или 5xx, попробуем получить HTML через альтернативный подход с веб-api
+            // Сначала создаем активную вкладку и пытаемся получить контент напрямую
+            return { altFetch: true, status: response.status }
+          }
+          return response.text().then((html) => ({ html }))
+        })
+        .then((result) => {
+          if (result.altFetch) {
+            // Если основной запрос не удался, попробуем получить фавикон напрямую через Google
+            console.log(
+              "[Background] Основной запрос не удался, возвращаем статус для альтернативного подхода"
+            )
+            sendResponse({
+              success: false,
+              error: `HTTP error: ${result.status}`,
+              altFetchRequired: true, // Флаг для клиента что нужно использовать альтернативный метод
+            })
+            return
+          }
+
+          if (result.html) {
+            console.log(
+              "[Background] HTML получен успешно, размер:",
+              result.html.length
+            )
+            sendResponse({ success: true, htmlContent: result.html })
+          } else {
+            console.warn("[Background] Получен пустой HTML")
+            sendResponse({ success: false, error: "Получен пустой HTML" })
+          }
+        })
+        .catch((error) => {
+          console.error("[Background] Ошибка при получении HTML:", error)
+          sendResponse({
+            success: false,
+            error: error.message,
+            isAborted: error.name === "AbortError",
+            altFetchRequired: true, // Просим клиента использовать Google напрямую
+          })
+        })
+    } catch (error) {
+      console.error("[Background] Исключение при выполнении запроса:", error)
+      sendResponse({
+        success: false,
+        error: "Внутренняя ошибка при выполнении запроса: " + error.message,
+        altFetchRequired: true,
+      })
+    }
+
+    // Возвращаем true для поддержки асинхронного ответа
+    return true
+  }
+
+  // Обработка запросов на проверку существования фавиконов по известным путям
+  if (
+    message.action === "checkFaviconPaths" &&
+    message.url &&
+    Array.isArray(message.paths)
+  ) {
+    console.log(
+      "[Background] Проверка известных путей фавиконов для:",
+      message.url
+    )
+
+    const results = []
+    let completedChecks = 0
+
+    // Проверяем каждый путь на существование
+    message.paths.forEach((path) => {
+      const fullUrl = message.url + path
+
+      fetch(fullUrl, { method: "HEAD", mode: "no-cors" })
+        .then((response) => {
+          results.push({
+            path: path,
+            url: fullUrl,
+            exists: response.ok,
+            status: response.status,
+          })
+        })
+        .catch(() => {
+          results.push({ path: path, url: fullUrl, exists: false })
+        })
+        .finally(() => {
+          completedChecks++
+
+          // Когда все проверки завершены, отправляем ответ
+          if (completedChecks === message.paths.length) {
+            sendResponse({ success: true, results })
+          }
+        })
+    })
+
+    return true
+  }
 
   // Обработка тестового соединения
-  if (request.action === "testConnection") {
-    console.log("[Background] Получен тестовый запрос:", request.data)
+  if (message.action === "testConnection") {
+    console.log("[Background] Получен тестовый запрос:", message.data)
     sendResponse({
       success: true,
       message: "Соединение работает",
-      received: request.data,
+      received: message.data,
       timestamp: Date.now(),
     })
     return true
   }
 
   // Добавим новый обработчик для полного сброса и пересоздания структуры
-  if (request.action === "resetBookmarksStructure") {
+  if (message.action === "resetBookmarksStructure") {
     console.log(
       "[Background] Получен запрос на полный сброс структуры закладок"
     )
@@ -308,17 +464,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Обработка сообщения о загрузке content script
-  if (request.action === "contentScriptLoaded") {
+  if (message.action === "contentScriptLoaded") {
     console.log(
       "[Background] Content script загружен на странице:",
-      request.url
+      message.url
     )
     sendResponse({ status: "received" })
     return true
   }
 
   // Запрос на исправление структуры закладок
-  if (request.action === "fixBookmarksStructure") {
+  if (message.action === "fixBookmarksStructure") {
     console.log("[Background] Получен запрос на исправление структуры закладок")
 
     try {
@@ -463,7 +619,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Получение структуры папок для модального окна
-  if (request.action === "getFolderStructure") {
+  if (message.action === "getFolderStructure") {
     console.log("[Background] Получен запрос на получение структуры папок")
 
     // Получаем данные из хранилища
@@ -547,7 +703,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Получение текущей структуры закладок для отладки
-  if (request.action === "getBookmarksDebug") {
+  if (message.action === "getBookmarksDebug") {
     console.log(
       "[Background] Запрос на получение структуры закладок для отладки"
     )
@@ -566,7 +722,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       // Если запрошена принудительная инициализация
-      if (request.forceInit) {
+      if (message.forceInit) {
         console.log(
           "[Background] Запрошена принудительная инициализация структуры"
         )
@@ -703,13 +859,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Обработка сохранения закладки из контекстного меню
-  if (request.action === "saveBookmark") {
+  if (message.action === "saveBookmark") {
     console.log(
       "[Background] Получен запрос на сохранение закладки:",
-      request.data
+      message.data
     )
 
-    const { parentId, bookmark } = request.data
+    const { parentId, bookmark } = message.data
 
     if (!bookmark || !bookmark.title || !bookmark.url) {
       console.error("[Background] Некорректные данные закладки:", bookmark)
