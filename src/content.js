@@ -898,7 +898,12 @@ function loadFolderStructure(modal) {
           submenu.style.left = rect.right + 5 + "px" // 5px отступ
         }
 
-        submenu.style.top = rect.top + "px"
+        // Выравниваем подменю по центру родительского элемента
+        // Вычисляем положение с учетом паддингов (4px сверху в folder-submenu)
+        // и высоты элемента родителя
+        const parentHeight = rect.height
+        const offsetY = Math.floor(parentHeight / 2) - 14 // 14px = половина высоты элемента (28px) в подменю
+        submenu.style.top = rect.top - 4 + offsetY + "px" // -4px компенсирует паддинг подменю
         submenu.style.display = "block"
 
         // Добавляем это подменю в цепочку открытых
