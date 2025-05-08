@@ -949,10 +949,75 @@ export async function getFaviconFast(url) {
       window.faviconDirectCache = {}
     }
 
-    // Специальные проверки для Google Docs
+    // Специальные проверки для Google сервисов
+    // 1. Google Drive
+    if (domain === "drive.google.com") {
+      return "https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png"
+    }
+
+    // 2. YouTube channels
+    if (domain === "www.youtube.com" || domain === "youtube.com") {
+      // Обрабатываем все YouTube URL, включая видео, каналы, плейлисты
+      if (
+        fullPath.includes("/channel/") ||
+        fullPath.includes("/user/") ||
+        fullPath.includes("/c/") ||
+        fullPath.includes("/playlists") ||
+        fullPath.includes("/watch") ||
+        fullPath.includes("/shorts/") ||
+        fullPath.includes("/feed/") ||
+        urlObj.search.includes("list=") || // Добавлена проверка параметра list для плейлистов
+        fullPath.includes("/playlist") || // Добавлена проверка пути playlist
+        fullPath === "/" // Главная страница YouTube
+      ) {
+        return "https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144.png"
+      }
+      // Для любого YouTube URL, который не попал в предыдущие условия
+      return "https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144.png"
+    }
+
+    // 3. Google Docs
     if (domain === "docs.google.com") {
+      // Проверки для простых URL без идентификатора документа
+      if (
+        fullPath === "/" ||
+        fullPath === "/document/" ||
+        fullPath.startsWith("/document") ||
+        fullPath === "/document"
+      ) {
+        return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
+      }
+
       // Распознаем тип документа Google Docs по URL пути
       const pathParts = fullPath.split("/").filter((part) => part)
+
+      // Проверка на URL с id документа (например, /document/d/{docId}/edit)
+      if (fullPath.includes("/document/d/")) {
+        return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
+      }
+
+      if (fullPath.includes("/spreadsheets/d/")) {
+        return "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico"
+      }
+
+      if (fullPath.includes("/presentation/d/")) {
+        return "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico"
+      }
+
+      if (fullPath.includes("/forms/d/")) {
+        return "https://ssl.gstatic.com/docs/forms/device_home/android_192.png"
+      }
+
+      if (fullPath.includes("/drawings/d/")) {
+        return "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png"
+      }
+
+      // Если в пути есть docId, но тип не определен выше
+      if (fullPath.includes("/d/")) {
+        return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
+      }
+
+      // Стандартная обработка по первому сегменту пути
       if (pathParts.length > 0) {
         const docType = pathParts[0]
 
@@ -968,8 +1033,6 @@ export async function getFaviconFast(url) {
             "https://ssl.gstatic.com/docs/forms/device_home/android_192.png",
           drawings:
             "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png",
-          // Добавляем новый кейс для обработки просто "https://docs.google.com/"
-          "": "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png",
         }
 
         if (googleDocsIcons[docType]) {
@@ -978,7 +1041,7 @@ export async function getFaviconFast(url) {
       }
 
       // Если не определили точный тип, возвращаем иконку Google Docs по умолчанию
-      return "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png"
+      return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
     }
 
     // Создаем уникальный ключ для кэша
@@ -993,9 +1056,9 @@ export async function getFaviconFast(url) {
     const specialCases = {
       // Популярные социальные сети
       "youtube.com":
-        "https://www.youtube.com/s/desktop/1c3cebd9/img/favicon_144x144.png",
+        "https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144.png",
       "www.youtube.com":
-        "https://www.youtube.com/s/desktop/1c3cebd9/img/favicon_144x144.png",
+        "https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144.png",
       "facebook.com":
         "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZIVX-5C-b.ico",
       "www.facebook.com":
