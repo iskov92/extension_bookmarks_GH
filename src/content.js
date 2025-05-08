@@ -278,6 +278,9 @@ function showSimpleBookmarkModal(url, title) {
       // Восстанавливаем скролл страницы
       document.body.style.overflow = originalOverflow
 
+      // Закрываем все открытые подменю
+      closeAllSubmenus()
+
       setTimeout(() => {
         document.body.removeChild(modal)
 
@@ -576,6 +579,14 @@ function loadFolderStructure(modal) {
       .folder-submenu {
         background-color: ${colors.dropdownBg} !important;
       }
+      .folder-item {
+        height: 28px;
+        display: flex;
+        align-items: center;
+      }
+      .folder-item svg {
+        flex-shrink: 0;
+      }
     `
     document.head.appendChild(styleElement)
 
@@ -770,6 +781,8 @@ function loadFolderStructure(modal) {
       align-items: center;
       color: ${colors.text};
       transition: background-color 0.15s ease;
+      height: 28px;
+      box-sizing: border-box;
     `
 
     // Добавляем название папки с иконкой
@@ -858,6 +871,11 @@ function loadFolderStructure(modal) {
       let isOverSubmenu = false
       let isOverFolderItem = false
 
+      // Создаем глобальный массив для отслеживания открытых подменю, если его еще нет
+      if (!window.openSubmenuChain) {
+        window.openSubmenuChain = []
+      }
+
       // Показываем подменю при наведении на папку
       folderItem.addEventListener("mouseenter", (e) => {
         clearTimeout(timeout)
@@ -882,6 +900,19 @@ function loadFolderStructure(modal) {
 
         submenu.style.top = rect.top + "px"
         submenu.style.display = "block"
+
+        // Добавляем это подменю в цепочку открытых
+        // Сначала удаляем все подменю того же уровня и глубже
+        const currentMenuLevel = getMenuLevel(folderItem)
+        removeMenusAtLevelAndDeeper(currentMenuLevel + 1)
+
+        // Добавляем текущее подменю в цепочку
+        window.openSubmenuChain.push({
+          submenu: submenu,
+          level: currentMenuLevel + 1,
+          parentItem: folderItem,
+          bridge: bridge,
+        })
       })
 
       folderItem.addEventListener("mouseleave", (e) => {
@@ -891,8 +922,8 @@ function loadFolderStructure(modal) {
         clearTimeout(timeout)
         timeout = setTimeout(() => {
           if (!isOverSubmenu && !isOverFolderItem) {
-            submenu.style.display = "none"
-            folderItem.style.backgroundColor = ""
+            // Вместо прямого скрытия, вызываем функцию очистки, которая проверит всю цепочку
+            checkAndCleanSubmenuChain()
           }
         }, 200)
       })
@@ -909,8 +940,8 @@ function loadFolderStructure(modal) {
         clearTimeout(timeout)
         timeout = setTimeout(() => {
           if (!isOverSubmenu && !isOverFolderItem) {
-            submenu.style.display = "none"
-            folderItem.style.backgroundColor = ""
+            // Вместо прямого скрытия, вызываем функцию очистки
+            checkAndCleanSubmenuChain()
           }
         }, 200)
       })
@@ -918,6 +949,7 @@ function loadFolderStructure(modal) {
       // Создаем и добавляем невидимую полосу для соединения элемента и подменю
       // Это решит проблему с исчезновением подменю при движении курсора
       const bridge = document.createElement("div")
+      bridge.className = "folder-bridge"
       bridge.style.cssText = `
         position: fixed;
         z-index: 2000000;
@@ -973,6 +1005,60 @@ function loadFolderStructure(modal) {
           return this.getPropertyValue("display")
         },
       })
+
+      // Функция для определения уровня вложенности меню
+      function getMenuLevel(element) {
+        let level = 0
+        let parent = element.parentElement
+        while (parent) {
+          if (parent.classList.contains("folder-submenu")) {
+            level++
+          }
+          parent = parent.parentElement
+        }
+        return level
+      }
+
+      // Функция для удаления подменю определенного уровня и глубже
+      function removeMenusAtLevelAndDeeper(level) {
+        if (!window.openSubmenuChain) return
+
+        const toRemove = []
+        for (let i = 0; i < window.openSubmenuChain.length; i++) {
+          const item = window.openSubmenuChain[i]
+          if (item.level >= level) {
+            if (item.submenu) item.submenu.style.display = "none"
+            if (item.bridge) item.bridge.style.display = "none"
+            if (item.parentItem) item.parentItem.style.backgroundColor = ""
+            toRemove.push(i)
+          }
+        }
+
+        // Удаляем элементы в обратном порядке, чтобы не сбивать индексы
+        for (let i = toRemove.length - 1; i >= 0; i--) {
+          window.openSubmenuChain.splice(toRemove[i], 1)
+        }
+      }
+
+      // Функция для проверки и очистки цепочки подменю
+      function checkAndCleanSubmenuChain() {
+        // Если нет активных подменю, закрываем всю цепочку
+        const activeSubmenu = document.querySelector(".folder-submenu:hover")
+        const activeItem = document.querySelector(".folder-item:hover")
+        const activeBridge = document.querySelector(".folder-bridge:hover")
+
+        if (!activeSubmenu && !activeItem && !activeBridge) {
+          // Закрываем все подменю
+          if (window.openSubmenuChain) {
+            window.openSubmenuChain.forEach((item) => {
+              if (item.submenu) item.submenu.style.display = "none"
+              if (item.bridge) item.bridge.style.display = "none"
+              if (item.parentItem) item.parentItem.style.backgroundColor = ""
+            })
+            window.openSubmenuChain = []
+          }
+        }
+      }
     }
 
     // Добавляем обработчик клика для выбора папки
@@ -1030,6 +1116,27 @@ function loadFolderStructure(modal) {
 
     // Добавляем папку в контейнер
     container.appendChild(folderItem)
+  }
+
+  // Функция для очистки всех открытых подменю при закрытии модального окна
+  function closeAllSubmenus() {
+    if (window.openSubmenuChain) {
+      window.openSubmenuChain.forEach((item) => {
+        if (item.submenu) item.submenu.style.display = "none"
+        if (item.bridge) item.bridge.style.display = "none"
+        if (item.parentItem) item.parentItem.style.backgroundColor = ""
+      })
+      window.openSubmenuChain = []
+    }
+
+    // Удаляем все подменю и мосты из DOM
+    document
+      .querySelectorAll(".folder-submenu, .folder-bridge")
+      .forEach((el) => {
+        if (el.parentNode) {
+          el.parentNode.removeChild(el)
+        }
+      })
   }
 }
 
