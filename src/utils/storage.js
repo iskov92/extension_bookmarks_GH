@@ -992,77 +992,57 @@ export async function getFaviconFast(url) {
     // Список специальных случаев для популярных сайтов (оставляем как есть)
     const specialCases = {
       // Популярные социальные сети
-      "youtube.com":
-        "https://www.youtube.com/s/desktop/1c3cebd9/img/favicon_144x144.png",
-      "www.youtube.com":
-        "https://www.youtube.com/s/desktop/1c3cebd9/img/favicon_144x144.png",
+      "youtube.com": "https://www.youtube.com/favicon.ico",
+      "www.youtube.com": "https://www.youtube.com/favicon.ico",
       "facebook.com":
         "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZIVX-5C-b.ico",
       "www.facebook.com":
         "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZIVX-5C-b.ico",
-      "twitter.com":
-        "https://abs.twimg.com/responsive-web/web/icon-ios.b1fc727a.png",
-      "www.twitter.com":
-        "https://abs.twimg.com/responsive-web/web/icon-ios.b1fc727a.png",
-      "instagram.com":
-        "https://www.instagram.com/static/images/ico/apple-touch-icon-180x180-precomposed.png/c06fdb2357bd.png",
-      "www.instagram.com":
-        "https://www.instagram.com/static/images/ico/apple-touch-icon-180x180-precomposed.png/c06fdb2357bd.png",
-      "linkedin.com": "https://static.licdn.com/sc/h/2if24wp7oqlodqdlgei1n1520",
-      "www.linkedin.com":
-        "https://static.licdn.com/sc/h/2if24wp7oqlodqdlgei1n1520",
+      "twitter.com": "https://twitter.com/favicon.ico",
+      "www.twitter.com": "https://twitter.com/favicon.ico",
+      "instagram.com": "https://www.instagram.com/favicon.ico",
+      "www.instagram.com": "https://www.instagram.com/favicon.ico",
+      "linkedin.com": "https://www.linkedin.com/favicon.ico",
+      "www.linkedin.com": "https://www.linkedin.com/favicon.ico",
 
       // Поисковые системы
-      "google.com":
-        "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
-      "www.google.com":
-        "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
-      "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-      "www.bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-      "yandex.ru":
-        "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
-      "www.yandex.ru":
-        "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
+      "google.com": "https://www.google.com/favicon.ico",
+      "www.google.com": "https://www.google.com/favicon.ico",
+      "bing.com": "https://www.bing.com/favicon.ico",
+      "www.bing.com": "https://www.bing.com/favicon.ico",
+      "yandex.ru": "https://yandex.ru/favicon.ico",
+      "www.yandex.ru": "https://yandex.ru/favicon.ico",
 
       // Почтовые сервисы
-      "gmail.com":
-        "https://www.gstatic.com/images/branding/product/1x/gmail_512dp.png",
-      "outlook.com":
-        "https://outlook-1.cdn.office.net/assets/clear.r7KmX24vzmV.png",
-      "www.outlook.com":
-        "https://outlook-1.cdn.office.net/assets/clear.r7KmX24vzmV.png",
+      "gmail.com": "https://mail.google.com/favicon.ico",
+      "outlook.com": "https://outlook.com/favicon.ico",
+      "www.outlook.com": "https://outlook.com/favicon.ico",
 
       // Популярные магазины
       "amazon.com": "https://www.amazon.com/favicon.ico",
       "www.amazon.com": "https://www.amazon.com/favicon.ico",
-      "ebay.com": "https://pages.ebay.com/favicon.ico",
-      "www.ebay.com": "https://pages.ebay.com/favicon.ico",
+      "ebay.com": "https://www.ebay.com/favicon.ico",
+      "www.ebay.com": "https://www.ebay.com/favicon.ico",
 
       // Развлекательные платформы
-      "netflix.com":
-        "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico",
-      "www.netflix.com":
-        "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico",
-      "twitch.tv":
-        "https://static.twitchcdn.net/assets/favicon-32-d6025c14e900565d6177.png",
-      "www.twitch.tv":
-        "https://static.twitchcdn.net/assets/favicon-32-d6025c14e900565d6177.png",
+      "netflix.com": "https://www.netflix.com/favicon.ico",
+      "www.netflix.com": "https://www.netflix.com/favicon.ico",
+      "twitch.tv": "https://www.twitch.tv/favicon.ico",
+      "www.twitch.tv": "https://www.twitch.tv/favicon.ico",
 
       // Популярные новостные сайты
-      "cnn.com": "https://www.cnn.com/media/sites/cnn/apple-touch-icon.png",
-      "www.cnn.com": "https://www.cnn.com/media/sites/cnn/apple-touch-icon.png",
-      "bbc.com":
-        "https://static.files.bbci.co.uk/core/website/assets/static/bbc-icon-196.d36e7f0c85ccd9a3e10c2be8964c0d67.png",
-      "www.bbc.com":
-        "https://static.files.bbci.co.uk/core/website/assets/static/bbc-icon-196.d36e7f0c85ccd9a3e10c2be8964c0d67.png",
+      "cnn.com": "https://www.cnn.com/favicon.ico",
+      "www.cnn.com": "https://www.cnn.com/favicon.ico",
+      "bbc.com": "https://www.bbc.com/favicon.ico",
+      "www.bbc.com": "https://www.bbc.com/favicon.ico",
 
       // Технологические компании
       "apple.com": "https://www.apple.com/favicon.ico",
       "www.apple.com": "https://www.apple.com/favicon.ico",
-      "microsoft.com": "https://c.s-microsoft.com/favicon.ico",
-      "www.microsoft.com": "https://c.s-microsoft.com/favicon.ico",
-      "github.com": "https://github.githubassets.com/favicons/favicon.svg",
-      "www.github.com": "https://github.githubassets.com/favicons/favicon.svg",
+      "microsoft.com": "https://www.microsoft.com/favicon.ico",
+      "www.microsoft.com": "https://www.microsoft.com/favicon.ico",
+      "github.com": "https://github.com/favicon.ico",
+      "www.github.com": "https://github.com/favicon.ico",
     }
 
     // Проверяем, есть ли домен в специальных случаях
@@ -1073,19 +1053,15 @@ export async function getFaviconFast(url) {
     }
 
     // Быстрый выбор фавикона без дополнительных проверок качества
-    // Просто выбираем первый доступный источник
+    // Используем гарантированно работающий источник - Google
+    const googleFavicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+      domain
+    )}&sz=64`
 
-    // Стратегия 1: Используем DuckDuckGo или Google (всегда работают)
-    const quickSources = [
-      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    ]
+    // Сохраняем в кэш
+    window.faviconDirectCache[cacheKey] = googleFavicon
 
-    // Выбираем первый источник и сразу кэшируем
-    const bestFavicon = quickSources[0]
-    window.faviconDirectCache[cacheKey] = bestFavicon
-
-    return bestFavicon
+    return googleFavicon
   } catch (error) {
     console.error("Ошибка в getFaviconFast:", error)
     return `/assets/icons/link.svg`

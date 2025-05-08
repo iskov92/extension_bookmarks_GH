@@ -150,55 +150,167 @@ export class NestedMenu {
         // Для закладок используем фавикон с учетом настройки отображения
         try {
           // Получаем настройку отображения фавиконов
-          const { getFaviconsEnabled } = await import("../utils/storage.js")
-          const showFavicons = await getFaviconsEnabled()
+          let showFavicons = true // По умолчанию показываем фавиконы
+
+          try {
+            const { getFaviconsEnabled } = await import("../utils/storage.js")
+            if (typeof getFaviconsEnabled === "function") {
+              showFavicons = await getFaviconsEnabled()
+            }
+          } catch (settingsError) {
+            console.warn(
+              "Не удалось получить настройку отображения фавиконов, используем значение по умолчанию:",
+              settingsError
+            )
+          }
 
           if (showFavicons && bookmark.favicon) {
             // Если включены фавиконы и у закладки есть сохраненный фавикон, используем его
-            icon.src = bookmark.favicon
+            try {
+              // Предварительно проверяем, что URL фавикона корректен
+              new URL(bookmark.favicon)
 
-            // Обработчик ошибки загрузки фавикона
-            icon.onerror = () => {
-              icon.src = ICONS.LINK
+              // Устанавливаем обработчик ошибки до установки src
+              icon.onerror = () => {
+                // При ошибке загрузки удаляем свойство favicon у закладки в следующем обновлении
+                if (typeof updateBookmark === "function") {
+                  try {
+                    // Делаем копию без свойства favicon
+                    const { favicon, ...bookmarkWithoutFavicon } = bookmark
+                    updateBookmark(bookmark.id, bookmarkWithoutFavicon).catch(
+                      (err) =>
+                        console.warn(
+                          "Не удалось обновить закладку после ошибки фавикона:",
+                          err
+                        )
+                    )
+                  } catch (error) {
+                    console.warn("Ошибка при обновлении закладки:", error)
+                  }
+                }
+
+                // Устанавливаем стандартную иконку
+                icon.src = "/assets/icons/link.svg"
+              }
+
+              // После установки обработчика ошибки устанавливаем src
+              icon.src = bookmark.favicon
+            } catch (urlError) {
+              console.warn(
+                `Некорректный URL фавикона: ${bookmark.favicon}`,
+                urlError
+              )
+              icon.src = "/assets/icons/link.svg"
+
+              // Удаляем некорректный фавикон из закладки
+              if (typeof updateBookmark === "function") {
+                try {
+                  const { favicon, ...bookmarkWithoutFavicon } = bookmark
+                  updateBookmark(bookmark.id, bookmarkWithoutFavicon).catch(
+                    (err) =>
+                      console.warn(
+                        "Не удалось удалить некорректный фавикон:",
+                        err
+                      )
+                  )
+                } catch (error) {
+                  console.warn("Ошибка при обновлении закладки:", error)
+                }
+              }
             }
           } else if (showFavicons && bookmark.url) {
             // Если включены фавиконы, но у закладки нет сохраненного фавикона, пробуем загрузить его
-            const getFaviconFunc =
-              window.getFavicon ||
-              (typeof getFavicon === "function" ? getFavicon : null)
+            let getFaviconFunc = null
+
+            try {
+              // Проверяем в разных местах
+              if (
+                window.getFavicon &&
+                typeof window.getFavicon === "function"
+              ) {
+                getFaviconFunc = window.getFavicon
+              } else if (typeof getFavicon === "function") {
+                getFaviconFunc = getFavicon
+              } else {
+                // Импортируем функцию из storage.js
+                const { getFaviconFast } = await import("../utils/storage.js")
+                if (typeof getFaviconFast === "function") {
+                  getFaviconFunc = getFaviconFast
+                }
+              }
+            } catch (importError) {
+              console.warn(
+                "Не удалось импортировать функцию getFaviconFast:",
+                importError
+              )
+            }
 
             if (getFaviconFunc) {
-              const faviconUrl = await getFaviconFunc(bookmark.url)
-              if (faviconUrl && faviconUrl !== "/assets/icons/link.svg") {
-                icon.src = faviconUrl
+              try {
+                const faviconUrl = await getFaviconFunc(bookmark.url)
+                if (faviconUrl && faviconUrl !== "/assets/icons/link.svg") {
+                  icon.src = faviconUrl
 
-                // Обновляем закладку в хранилище, чтобы сохранить фавикон для будущего использования
-                if (typeof updateBookmark === "function") {
-                  updateBookmark(bookmark.id, {
-                    ...bookmark,
-                    favicon: faviconUrl,
-                  }).catch((err) =>
-                    console.error("Ошибка при обновлении фавикона:", err)
-                  )
+                  // Обработчик ошибки загрузки фавикона
+                  icon.onerror = () => {
+                    console.warn(`Не удалось загрузить фавикон: ${faviconUrl}`)
+                    icon.src = "/assets/icons/link.svg"
+                  }
+
+                  // Обновляем закладку в хранилище, чтобы сохранить фавикон для будущего использования
+                  try {
+                    if (typeof updateBookmark === "function") {
+                      updateBookmark(bookmark.id, {
+                        ...bookmark,
+                        favicon: faviconUrl,
+                      }).catch((err) =>
+                        console.error("Ошибка при обновлении фавикона:", err)
+                      )
+                    }
+                  } catch (updateError) {
+                    console.warn(
+                      "Ошибка при обновлении фавикона в хранилище:",
+                      updateError
+                    )
+                  }
+                } else {
+                  icon.src = "/assets/icons/link.svg"
                 }
-              } else {
-                icon.src = ICONS.LINK
+              } catch (faviconError) {
+                console.warn("Ошибка при получении фавикона:", faviconError)
+                icon.src = "/assets/icons/link.svg"
               }
             } else {
-              icon.src = ICONS.LINK
+              // Если функция getFavicon недоступна, используем Google Favicon API напрямую
+              try {
+                const domain = new URL(bookmark.url).hostname
+                icon.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+                  domain
+                )}&sz=64`
+
+                // Обработчик ошибки загрузки фавикона
+                icon.onerror = () => {
+                  icon.src = "/assets/icons/link.svg"
+                }
+              } catch (urlError) {
+                console.warn("Ошибка при обработке URL:", urlError)
+                icon.src = "/assets/icons/link.svg"
+              }
             }
           } else {
             // Если фавиконы отключены, используем стандартную иконку
-            icon.src = ICONS.LINK
+            icon.src = "/assets/icons/link.svg"
           }
         } catch (error) {
           console.error("Ошибка при определении настройки фавиконов:", error)
-          icon.src = ICONS.LINK
+          icon.src = "/assets/icons/link.svg"
         }
 
         // Обработчик ошибки загрузки фавикона
-        icon.onerror = () => {
-          icon.src = ICONS.LINK
+        if (!icon.onerror) {
+          icon.onerror = () => {
+            icon.src = "/assets/icons/link.svg"
+          }
         }
       }
 

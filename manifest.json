@@ -13,7 +13,7 @@
     "contextMenus",
     "scripting"
   ],
-  "host_permissions": ["*://*/*", "chrome://favicon/*"],
+  "host_permissions": ["*://*/*"],
   "background": {
     "service_worker": "src/background.js",
     "type": "module"
@@ -39,7 +39,7 @@
     "128": "assets/logo/icon128.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: chrome://favicon/ https://* http://*"
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: https://* http://*"
   },
   "web_accessible_resources": [
     {
