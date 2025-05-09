@@ -660,22 +660,7 @@ export async function getGoogleFavicon(url) {
       return googleFaviconUrl
     }
 
-    // Если Google вернул заглушку, пробуем найти фавикон по стандартным путям
-    console.log(`[ФавиконЛог] Пробуем найти фавикон по стандартным путям...`)
-    const standardFaviconUrl = await checkStandardFaviconPaths(url)
-
-    if (standardFaviconUrl) {
-      console.log(
-        `[ФавиконЛог] Успешно найден фавикон по стандартному пути: ${standardFaviconUrl}`
-      )
-      return standardFaviconUrl
-    }
-
-    console.log(
-      `[ФавиконЛог] Стандартные пути не дали результата, пробуем HTML...`
-    )
-
-    // Если стандартные пути не сработали, пробуем получить фавикон из HTML
+    // Если Google вернул заглушку, пробуем получить фавикон из HTML
     console.log(`[ФавиконЛог] Пробуем получить фавикон из HTML страницы...`)
     const htmlFaviconUrl = await getFaviconFromHtml(url)
 
@@ -687,6 +672,19 @@ export async function getGoogleFavicon(url) {
     } else {
       console.log(`[ФавиконЛог] Не удалось получить фавикон из HTML`)
     }
+
+    // Если HTML не сработал, пробуем найти фавикон по стандартным путям
+    console.log(`[ФавиконЛог] Пробуем найти фавикон по стандартным путям...`)
+    const standardFaviconUrl = await checkStandardFaviconPaths(url)
+
+    if (standardFaviconUrl) {
+      console.log(
+        `[ФавиконЛог] Успешно найден фавикон по стандартному пути: ${standardFaviconUrl}`
+      )
+      return standardFaviconUrl
+    }
+
+    console.log(`[ФавиконЛог] Стандартные пути не дали результата`)
 
     // Если не удалось получить фавикон, возвращаем стандартный логотип
     console.log(`[ФавиконЛог] Используем стандартную иконку`)
@@ -789,7 +787,7 @@ async function getFaviconFromHtml(url) {
           action: "getHtmlContent",
           url: url,
         },
-        (response) => {
+        async (response) => {
           clearTimeout(timeoutId)
 
           console.log(
@@ -858,11 +856,12 @@ async function getFaviconFromHtml(url) {
               `[ФавиконЛог] getFaviconFromHtml: HTML успешно распарсен`
             )
 
-            // Ищем фавиконы в порядке предпочтения
+            // Массив найденных фавиконов для проверки
+            const foundFavicons = []
 
             // 1. SVG иконки (обычно лучшего качества)
             const svgIcon = doc.querySelector(
-              'link[rel="icon"][type="image/svg+xml"]'
+              'link[rel="icon"][type="image/svg+xml"], link[rel="icon"][href$=".svg"]'
             )
             if (svgIcon && svgIcon.href) {
               try {
@@ -892,8 +891,12 @@ async function getFaviconFromHtml(url) {
                 console.log(
                   `[ФавиконЛог] getFaviconFromHtml: Найдена SVG иконка: ${fullUrl}, оригинальный путь: ${iconHref}`
                 )
-                resolve(fullUrl)
-                return
+
+                foundFavicons.push({
+                  type: "svg",
+                  url: fullUrl,
+                  priority: 1, // Наивысший приоритет
+                })
               } catch (e) {
                 console.log(
                   `[ФавиконЛог] getFaviconFromHtml: Ошибка обработки SVG иконки:`,
@@ -934,8 +937,12 @@ async function getFaviconFromHtml(url) {
                 console.log(
                   `[ФавиконЛог] getFaviconFromHtml: Найдена Apple Touch Icon: ${fullUrl}, оригинальный путь: ${iconHref}`
                 )
-                resolve(fullUrl)
-                return
+
+                foundFavicons.push({
+                  type: "appleTouch",
+                  url: fullUrl,
+                  priority: 2, // Высокий приоритет
+                })
               } catch (e) {
                 console.log(
                   `[ФавиконЛог] getFaviconFromHtml: Ошибка обработки Apple Touch Icon:`,
@@ -945,53 +952,118 @@ async function getFaviconFromHtml(url) {
             }
 
             // 3. Обычные иконки
-            const standardIcon = doc.querySelector(
+            const standardIcons = doc.querySelectorAll(
               'link[rel="icon"], link[rel="shortcut icon"], link[rel="Shortcut Icon"]'
             )
-            if (standardIcon && standardIcon.href) {
-              try {
-                // Создаем абсолютный URL, используя origin сайта
-                const iconHref = standardIcon.getAttribute("href")
-                let fullUrl
 
-                // Проверяем, является ли путь абсолютным URL
-                if (
-                  iconHref.startsWith("http://") ||
-                  iconHref.startsWith("https://")
-                ) {
-                  fullUrl = iconHref
-                } else if (iconHref.startsWith("//")) {
-                  // Протокол-относительный URL
-                  fullUrl = baseUrl.protocol + iconHref
-                } else if (iconHref.startsWith("/")) {
-                  // Абсолютный путь относительно корня сайта
-                  fullUrl = baseUrl.origin + iconHref
-                } else {
-                  // Относительный путь
-                  const pathWithoutFile =
-                    baseUrl.pathname.split("/").slice(0, -1).join("/") + "/"
-                  fullUrl = baseUrl.origin + pathWithoutFile + iconHref
+            if (standardIcons && standardIcons.length > 0) {
+              for (const standardIcon of standardIcons) {
+                if (standardIcon.href) {
+                  try {
+                    // Создаем абсолютный URL, используя origin сайта
+                    const iconHref = standardIcon.getAttribute("href")
+                    let fullUrl
+
+                    // Проверяем, является ли путь абсолютным URL
+                    if (
+                      iconHref.startsWith("http://") ||
+                      iconHref.startsWith("https://")
+                    ) {
+                      fullUrl = iconHref
+                    } else if (iconHref.startsWith("//")) {
+                      // Протокол-относительный URL
+                      fullUrl = baseUrl.protocol + iconHref
+                    } else if (iconHref.startsWith("/")) {
+                      // Абсолютный путь относительно корня сайта
+                      fullUrl = baseUrl.origin + iconHref
+                    } else {
+                      // Относительный путь
+                      const pathWithoutFile =
+                        baseUrl.pathname.split("/").slice(0, -1).join("/") + "/"
+                      fullUrl = baseUrl.origin + pathWithoutFile + iconHref
+                    }
+
+                    console.log(
+                      `[ФавиконЛог] getFaviconFromHtml: Найдена стандартная иконка: ${fullUrl}, оригинальный путь: ${iconHref}`
+                    )
+
+                    // Определяем приоритет в зависимости от типа
+                    let priority = 3 // Базовый приоритет для обычных иконок
+
+                    // Если это SVG, повышаем приоритет
+                    if (iconHref.endsWith(".svg")) {
+                      priority = 1.5
+                    }
+                    // Если это PNG или ICO, используем небольшой приоритет
+                    else if (iconHref.endsWith(".png")) {
+                      priority = 2.5
+                    } else if (iconHref.endsWith(".ico")) {
+                      priority = 3.5
+                    }
+
+                    foundFavicons.push({
+                      type: "standard",
+                      url: fullUrl,
+                      priority: priority,
+                    })
+                  } catch (e) {
+                    console.log(
+                      `[ФавиконЛог] getFaviconFromHtml: Ошибка обработки стандартной иконки:`,
+                      e
+                    )
+                  }
                 }
-
-                console.log(
-                  `[ФавиконЛог] getFaviconFromHtml: Найдена стандартная иконка: ${fullUrl}, оригинальный путь: ${iconHref}`
-                )
-                resolve(fullUrl)
-                return
-              } catch (e) {
-                console.log(
-                  `[ФавиконЛог] getFaviconFromHtml: Ошибка обработки стандартной иконки:`,
-                  e
-                )
               }
             }
 
-            // 4. Если ничего не нашли, пробуем стандартный путь
+            // 4. Добавляем стандартный путь к favicon.ico как запасной вариант
             const defaultFaviconUrl = `${baseUrl.origin}/favicon.ico`
+            foundFavicons.push({
+              type: "default",
+              url: defaultFaviconUrl,
+              priority: 4, // Самый низкий приоритет
+            })
+
+            // Если нашли какие-то фавиконы, сортируем их по приоритету и проверяем доступность
+            if (foundFavicons.length > 0) {
+              // Сортируем по приоритету (от меньшего к большему - чем меньше число, тем выше приоритет)
+              foundFavicons.sort((a, b) => a.priority - b.priority)
+
+              console.log(
+                `[ФавиконЛог] getFaviconFromHtml: Найдено ${foundFavicons.length} фавиконов для проверки`
+              )
+
+              // Проверяем каждый фавикон на доступность
+              for (const favicon of foundFavicons) {
+                console.log(
+                  `[ФавиконЛог] getFaviconFromHtml: Проверяем доступность фавикона: ${favicon.url}`
+                )
+
+                // Проверяем доступность через background.js
+                const isAvailable = await checkFaviconAvailability(favicon.url)
+
+                if (isAvailable) {
+                  console.log(
+                    `[ФавиконЛог] getFaviconFromHtml: Фавикон доступен и будет использован: ${favicon.url}`
+                  )
+                  resolve(favicon.url)
+                  return
+                } else {
+                  console.log(
+                    `[ФавиконЛог] getFaviconFromHtml: Фавикон недоступен: ${favicon.url}`
+                  )
+                }
+              }
+
+              console.log(
+                `[ФавиконЛог] getFaviconFromHtml: Ни один из найденных фавиконов не доступен`
+              )
+            }
+
             console.log(
-              `[ФавиконЛог] getFaviconFromHtml: Не найдено иконок, используем стандартный путь: ${defaultFaviconUrl}`
+              `[ФавиконЛог] getFaviconFromHtml: Не найдено доступных иконок, возвращаем null`
             )
-            resolve(defaultFaviconUrl)
+            resolve(null)
           } catch (error) {
             console.error(
               `[ФавиконЛог] getFaviconFromHtml: Ошибка при обработке HTML:`,
@@ -1062,6 +1134,10 @@ export async function updateBookmarkFavicon(bookmarkId) {
       `[ФавиконЛог] Найдена закладка: ID=${found.item.id}, URL=${found.item.url}, Title=${found.item.title}`
     )
 
+    // Запоминаем старый фавикон для информации
+    const oldFavicon = found.item.favicon || ""
+    console.log(`[ФавиконЛог] Текущий фавикон закладки: ${oldFavicon}`)
+
     // Получение фавикона через Google
     let faviconUrl = await getGoogleFavicon(found.item.url)
 
@@ -1078,17 +1154,6 @@ export async function updateBookmarkFavicon(bookmarkId) {
         console.log(
           `[ФавиконЛог] Ошибка при получении стандартного фавикона: ${e.message}`
         )
-      }
-    }
-
-    // Если фавикон не изменился, возвращаем результат без сохранения
-    if (faviconUrl === found.item.favicon) {
-      console.log(`[ФавиконЛог] Фавикон не изменился: ${faviconUrl}`)
-      return {
-        success: true,
-        updated: false,
-        url: found.item.url,
-        title: found.item.title,
       }
     }
 
@@ -1134,6 +1199,12 @@ export async function updateBookmarkFavicon(bookmarkId) {
       `[ФавиконЛог] Обновлен фавикон для закладки: ${found.item.title}, новый фавикон: ${normalizedFaviconUrl}`
     )
 
+    if (oldFavicon === normalizedFaviconUrl) {
+      console.log(
+        `[ФавиконЛог] Информация: новый фавикон совпадает с предыдущим, но всё равно обновляем`
+      )
+    }
+
     // Сохраняем изменения
     await saveBookmarks(bookmarks)
     console.log(
@@ -1142,10 +1213,11 @@ export async function updateBookmarkFavicon(bookmarkId) {
 
     return {
       success: true,
-      updated: true,
+      updated: true, // Всегда считаем обновленным при ручном обновлении
       url: found.item.url,
       title: found.item.title,
       favicon: normalizedFaviconUrl,
+      previousFavicon: oldFavicon, // Добавляем информацию о предыдущем фавиконе
     }
   } catch (error) {
     console.error("Ошибка при обновлении фавикона закладки:", error)
