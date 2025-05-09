@@ -470,15 +470,12 @@ export async function getFavicon(url) {
       `https://${domain}/favicon-196x196.png`,
       `https://${domain}/favicon-152x152.png`,
 
-      // 4. DuckDuckGo - улучшенные фавиконы
-      `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-
-      // 5. Google Favicon Service - надежный, но не HD (используем максимальный доступный размер)
+      // 4. Google Favicon Service - надежный, но не HD (используем максимальный доступный размер)
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
         domain
       )}&sz=128`,
 
-      // 6. Стандартные пути к favicon.ico
+      // 5. Стандартные пути к favicon.ico
       `https://${domain}/favicon.ico`,
     ]
 
@@ -818,7 +815,7 @@ export async function clearAllFavicons() {
 }
 
 // Получить фавикон через Google Favicon Service (для ручного обновления)
-async function getGoogleFavicon(url) {
+export async function getGoogleFavicon(url) {
   try {
     if (!url) return "/assets/icons/link.svg"
 
@@ -1027,17 +1024,6 @@ async function getFaviconFromHtml(url) {
           console.log(
             `Фавикон для ${domain} получен через Google API, но является заглушкой - ищем альтернативу`
           )
-        }
-
-        // Пробуем другие известные сервисы получения фавиконов
-        const duckDuckGoUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`
-        const isDuckDuckGoAvailable = await checkImageAvailability(
-          duckDuckGoUrl
-        )
-
-        if (isDuckDuckGoAvailable) {
-          console.log(`Фавикон для ${domain} получен через DuckDuckGo`)
-          return duckDuckGoUrl
         }
 
         // Проверяем стандартные пути
@@ -1579,7 +1565,37 @@ export async function getFaviconFast(url) {
       return specialUrl
     }
 
-    // Используем стандартную иконку расширения вместо внешних сервисов
+    // Пробуем получить фавикон через DuckDuckGo
+    const duckDuckGoUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`
+    try {
+      // Кэшируем URL DuckDuckGo (без проверки доступности для скорости)
+      window.faviconDirectCache[cacheKey] = duckDuckGoUrl
+      return duckDuckGoUrl
+    } catch (e) {
+      console.warn(
+        `Не удалось получить фавикон через DuckDuckGo для ${domain}:`,
+        e
+      )
+    }
+
+    // Если не удалось получить через DuckDuckGo, пробуем через Google
+    try {
+      const googleUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+      window.faviconDirectCache[cacheKey] = googleUrl
+      return googleUrl
+    } catch (e) {
+      console.warn(`Не удалось получить фавикон через Google для ${domain}:`, e)
+    }
+
+    // Проверяем стандартные пути
+    const isRootFaviconAvailable = await checkImageAvailability(
+      `https://${domain}/favicon.ico`
+    )
+    if (isRootFaviconAvailable) {
+      return `https://${domain}/favicon.ico`
+    }
+
+    // Если все способы не сработали, используем стандартную иконку расширения
     try {
       const baseUrl = chrome.runtime.getURL("/")
       const standardIcon = `${baseUrl}assets/icons/link.svg`
