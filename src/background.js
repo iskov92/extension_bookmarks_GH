@@ -977,6 +977,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true
   }
+
+  // Обработка запроса на обновление фавикона из страницы (новый подход для ручного обновления фавикона 980-1050 и 1373-1542 - рабочий вариант)
+  if (message.action === "updateFaviconFromPage") {
+    console.log(
+      "[Background] Запрос на обновление фавикона из страницы:",
+      message
+    )
+
+    // Создаем новую вкладку с URL закладки
+    chrome.tabs.create({ url: message.url, active: true }, async (tab) => {
+      try {
+        // Ждем, пока вкладка полностью загрузится
+        await waitForTabLoad(tab.id)
+
+        // Инжектируем скрипт для извлечения фавикона из DOM
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          function: extractFaviconFromDOM,
+        })
+
+        // Получаем результат выполнения скрипта
+        const result = results[0].result
+        console.log("[Background] Результат извлечения фавикона:", result)
+
+        if (result.success && result.faviconUrl) {
+          // Обновляем фавикон в хранилище
+          await updateBookmarkFaviconInStorage(
+            message.bookmarkId,
+            result.faviconUrl
+          )
+
+          // Закрываем вкладку
+          chrome.tabs.remove(tab.id)
+
+          // Отправляем ответ об успешном обновлении
+          sendResponse({
+            success: true,
+            updated: true,
+            favicon: result.faviconUrl,
+          })
+        } else {
+          // Если не удалось получить фавикон, закрываем вкладку и отправляем ошибку
+          chrome.tabs.remove(tab.id)
+          sendResponse({
+            success: false,
+            error: result.error || "Не удалось получить фавикон из страницы",
+          })
+        }
+      } catch (error) {
+        console.error("[Background] Ошибка при обновлении фавикона:", error)
+
+        // Закрываем вкладку при ошибке
+        try {
+          chrome.tabs.remove(tab.id)
+        } catch (e) {
+          console.error("[Background] Ошибка при закрытии вкладки:", e)
+        }
+
+        sendResponse({
+          success: false,
+          error: error.message || "Неизвестная ошибка",
+        })
+      }
+    })
+
+    // Возвращаем true для асинхронного ответа
+    return true
+  }
+
+  // Для других сообщений
+  return false
 })
 
 /**
@@ -1297,4 +1368,174 @@ function extractFolders(items) {
   })
 
   return folders
+}
+
+/**
+ * Ожидает полной загрузки вкладки
+ * @param {number} tabId - ID вкладки
+ * @returns {Promise} - Promise, который разрешается, когда вкладка загружена
+ */
+function waitForTabLoad(tabId) {
+  return new Promise((resolve, reject) => {
+    function listener(updatedTabId, changeInfo) {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener)
+        // Даем дополнительное время для полной загрузки DOM и ресурсов
+        setTimeout(resolve, 1000)
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(listener)
+
+    // Таймаут на случай, если вкладка не загрузится
+    setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener)
+      reject(new Error("Таймаут загрузки вкладки"))
+    }, 30000)
+  })
+}
+
+/**
+ * Функция для извлечения фавикона из DOM страницы
+ * Выполняется в контексте страницы через chrome.scripting.executeScript
+ */
+function extractFaviconFromDOM() {
+  try {
+    // Массив для хранения найденных фавиконов
+    const favicons = []
+
+    // 1. Ищем Apple Touch Icon (обычно высокого качества)
+    const appleTouchIcons = document.querySelectorAll(
+      'link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
+    )
+    if (appleTouchIcons.length > 0) {
+      for (const icon of appleTouchIcons) {
+        if (icon.href) {
+          favicons.push({
+            url: icon.href,
+            size: parseInt(icon.sizes?.value?.split("x")[0] || 0),
+            type: "apple-touch-icon",
+          })
+        }
+      }
+    }
+
+    // 2. Ищем SVG иконки
+    const svgIcons = document.querySelectorAll(
+      'link[rel="icon"][type="image/svg+xml"], link[rel="icon"][href$=".svg"]'
+    )
+    if (svgIcons.length > 0) {
+      for (const icon of svgIcons) {
+        if (icon.href) {
+          favicons.push({
+            url: icon.href,
+            size: 1000, // Высокий приоритет для SVG
+            type: "svg",
+          })
+        }
+      }
+    }
+
+    // 3. Ищем стандартные иконки
+    const standardIcons = document.querySelectorAll(
+      'link[rel="icon"], link[rel="shortcut icon"]'
+    )
+    if (standardIcons.length > 0) {
+      for (const icon of standardIcons) {
+        if (icon.href) {
+          const size = parseInt(icon.sizes?.value?.split("x")[0] || 0)
+          favicons.push({
+            url: icon.href,
+            size: size || 32, // Стандартный размер, если не указан
+            type: "standard",
+          })
+        }
+      }
+    }
+
+    // 4. Добавляем стандартный путь к favicon.ico
+    favicons.push({
+      url: new URL("/favicon.ico", window.location.origin).href,
+      size: 16,
+      type: "default",
+    })
+
+    // Сортируем по размеру (от большего к меньшему)
+    favicons.sort((a, b) => b.size - a.size)
+
+    // Возвращаем лучший фавикон
+    if (favicons.length > 0) {
+      return {
+        success: true,
+        faviconUrl: favicons[0].url,
+        allFavicons: favicons,
+      }
+    }
+
+    return {
+      success: false,
+      error: "Фавиконы не найдены на странице",
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || "Ошибка при извлечении фавикона",
+    }
+  }
+}
+
+/**
+ * Обновляет фавикон закладки в хранилище
+ * @param {string} bookmarkId - ID закладки
+ * @param {string} faviconUrl - URL фавикона
+ */
+async function updateBookmarkFaviconInStorage(bookmarkId, faviconUrl) {
+  return new Promise((resolve, reject) => {
+    // Получаем текущие закладки из хранилища
+    chrome.storage.local.get("gh_bookmarks", (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError)
+        return
+      }
+
+      const bookmarks = result.gh_bookmarks || []
+
+      // Функция для поиска и обновления закладки
+      function updateFaviconInTree(items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+
+          if (item.id === bookmarkId) {
+            // Нашли нужную закладку, обновляем фавикон
+            item.favicon = faviconUrl
+            return true
+          }
+
+          if (item.type === "folder" && Array.isArray(item.children)) {
+            if (updateFaviconInTree(item.children)) {
+              return true
+            }
+          }
+        }
+
+        return false
+      }
+
+      // Обновляем фавикон в дереве закладок
+      const updated = updateFaviconInTree(bookmarks)
+
+      if (updated) {
+        // Сохраняем обновленные закладки
+        chrome.storage.local.set({ gh_bookmarks: bookmarks }, () => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError)
+          } else {
+            resolve(true)
+          }
+        })
+      } else {
+        reject(new Error("Закладка не найдена"))
+      }
+    })
+  })
 }
