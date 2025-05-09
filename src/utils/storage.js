@@ -814,7 +814,102 @@ export async function clearAllFavicons() {
   }
 }
 
-// Получить фавикон через Google Favicon Service (для ручного обновления)
+/**
+ * Проверяет, является ли фавикон от Google стандартной заглушкой
+ *
+ * Google часто возвращает заглушки вместо реальных фавиконов для
+ * доменов, которые не имеют фавиконов или недоступны.
+ * Признаки заглушки:
+ * - Размер точно 16x16 или 24x24 пикселей
+ * - Идеальное соотношение сторон 1:1
+ */
+async function checkGoogleFavicon(faviconUrl) {
+  return new Promise((resolve) => {
+    const img = new Image()
+
+    img.onload = () => {
+      try {
+        // Точные параметры заглушки от Google:
+        // - Размер 24x24 пикселей (внешний)
+        // - Внутренний размер 16x16 пикселей
+        // - Соотношение сторон точно 1:1
+        // - Размер файла около 726 байт
+
+        // 1. Проверка размера
+        const isDefaultSize =
+          (img.width === 24 && img.height === 24) ||
+          (img.width === 16 && img.height === 16)
+
+        // 2. Проверка соотношения сторон (должно быть точно 1:1)
+        const aspectRatio = img.width / img.height
+        const isPerfectSquare = Math.abs(aspectRatio - 1) < 0.001
+
+        // Оценка, является ли иконка заглушкой от Google
+        const isDefaultFavicon = isDefaultSize && isPerfectSquare
+
+        // Логируем подробную информацию для отладки
+        console.log(`Проверка фавикона от Google (${faviconUrl}):
+          - размер: ${img.width}x${img.height}px
+          - соотношение сторон: ${aspectRatio.toFixed(2)}
+          - размер соответствует заглушке: ${isDefaultSize ? "Да" : "Нет"}
+          - идеальный квадрат: ${isPerfectSquare ? "Да" : "Нет"}
+          - вердикт: ${isDefaultFavicon ? "это заглушка" : "не заглушка"}
+        `)
+
+        resolve({
+          isValid: !isDefaultFavicon, // Валидный = не заглушка
+          width: img.width,
+          height: img.height,
+          aspectRatio: aspectRatio,
+          isDefaultFavicon: isDefaultFavicon,
+          reason: isDefaultFavicon
+            ? "Определен как заглушка от Google: размер 24x24 или 16x16 с соотношением сторон 1:1"
+            : "Валидный фавикон: не соответствует параметрам заглушки Google",
+        })
+      } catch (e) {
+        console.warn("Ошибка при анализе фавикона:", e)
+        resolve({
+          isValid: true, // В случае ошибки считаем валидным
+          width: img.width,
+          height: img.height,
+          error: e.message,
+          reason: `Произошла ошибка при анализе: ${e.message}. Считаем фавикон валидным.`,
+        })
+      }
+    }
+
+    img.onerror = () => {
+      resolve({
+        isValid: false,
+        error: "Ошибка загрузки фавикона",
+        reason: "Не удалось загрузить изображение фавикона",
+      })
+    }
+
+    // Для изображений с других доменов предотвращаем отправку учетных данных
+    img.crossOrigin = "anonymous"
+    img.src = faviconUrl
+
+    // Таймаут 2 секунды
+    setTimeout(() => {
+      resolve({
+        isValid: false,
+        error: "Таймаут загрузки фавикона",
+        reason: "Превышено время ожидания загрузки фавикона (2 секунды)",
+      })
+    }, 2000)
+  })
+}
+
+/**
+ * Получить фавикон через Google Favicon Service для ручного обновления фавикона.
+ *
+ * Алгоритм работы:
+ * 1. Пытаемся получить фавикон через Google (не DuckDuckGo)
+ * 2. Проверяем, не является ли полученный фавикон заглушкой
+ * 3. Если получена заглушка, ищем фавикон в HTML страницы по data-url
+ * 4. Если не получилось найти фавикон, используем стандартную иконку
+ */
 export async function getGoogleFavicon(url) {
   try {
     if (!url) return "/assets/icons/link.svg"
@@ -907,86 +1002,14 @@ export async function getGoogleFavicon(url) {
   }
 }
 
-// Проверяет, является ли фавикон от Google стандартной заглушкой
-async function checkGoogleFavicon(faviconUrl) {
-  return new Promise((resolve) => {
-    const img = new Image()
-
-    img.onload = () => {
-      try {
-        // Точные параметры заглушки от Google:
-        // - Размер 24x24 пикселей (внешний)
-        // - Внутренний размер 16x16 пикселей
-        // - Соотношение сторон точно 1:1
-        // - Размер файла около 726 байт
-
-        // 1. Проверка размера
-        const isDefaultSize =
-          (img.width === 24 && img.height === 24) ||
-          (img.width === 16 && img.height === 16)
-
-        // 2. Проверка соотношения сторон (должно быть точно 1:1)
-        const aspectRatio = img.width / img.height
-        const isPerfectSquare = Math.abs(aspectRatio - 1) < 0.001
-
-        // Оценка, является ли иконка заглушкой от Google
-        const isDefaultFavicon = isDefaultSize && isPerfectSquare
-
-        // Логируем подробную информацию для отладки
-        console.log(`Проверка фавикона от Google (${faviconUrl}):
-          - размер: ${img.width}x${img.height}px
-          - соотношение сторон: ${aspectRatio.toFixed(2)}
-          - размер соответствует заглушке: ${isDefaultSize ? "Да" : "Нет"}
-          - идеальный квадрат: ${isPerfectSquare ? "Да" : "Нет"}
-          - вердикт: ${isDefaultFavicon ? "это заглушка" : "не заглушка"}
-        `)
-
-        resolve({
-          isValid: !isDefaultFavicon, // Валидный = не заглушка
-          width: img.width,
-          height: img.height,
-          aspectRatio: aspectRatio,
-          isDefaultFavicon: isDefaultFavicon,
-          reason: isDefaultFavicon
-            ? "Определен как заглушка от Google: размер 24x24 или 16x16 с соотношением сторон 1:1"
-            : "Валидный фавикон: не соответствует параметрам заглушки Google",
-        })
-      } catch (e) {
-        console.warn("Ошибка при анализе фавикона:", e)
-        resolve({
-          isValid: true, // В случае ошибки считаем валидным
-          width: img.width,
-          height: img.height,
-          error: e.message,
-          reason: `Произошла ошибка при анализе: ${e.message}. Считаем фавикон валидным.`,
-        })
-      }
-    }
-
-    img.onerror = () => {
-      resolve({
-        isValid: false,
-        error: "Ошибка загрузки фавикона",
-        reason: "Не удалось загрузить изображение фавикона",
-      })
-    }
-
-    // Для изображений с других доменов предотвращаем отправку учетных данных
-    img.crossOrigin = "anonymous"
-    img.src = faviconUrl
-
-    // Таймаут 2 секунды
-    setTimeout(() => {
-      resolve({
-        isValid: false,
-        error: "Таймаут загрузки фавикона",
-        reason: "Превышено время ожидания загрузки фавикона (2 секунды)",
-      })
-    }, 2000)
-  })
-}
-
-// Получает фавикон непосредственно из HTML страницы
+/**
+ * Получает фавикон непосредственно из HTML страницы
+ *
+ * Следует последовательности:
+ * 1. Пробует получить HTML через background script
+ * 2. Анализирует тэги link с разными атрибутами rel
+ * 3. Проверяет стандартные пути
+ */
 async function getFaviconFromHtml(url) {
   try {
     // Запрашиваем HTML страницу через background.js, чтобы обойти ограничения CORS
@@ -996,66 +1019,6 @@ async function getFaviconFromHtml(url) {
         (response) => resolve(response)
       )
     })
-
-    // Проверяем, нужно ли использовать альтернативный подход (получение через Google API)
-    if (response && response.altFetchRequired) {
-      console.log(
-        `Используем альтернативный подход для получения фавикона для ${url}`
-      )
-
-      try {
-        // Извлекаем домен
-        const urlObj = new URL(url)
-        const domain = urlObj.hostname
-
-        // Используем Google S2 с большим размером и проверяем доступность
-        const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-        const isAvailable = await checkImageAvailability(googleFaviconUrl)
-
-        // Проверяем, не является ли это стандартной заглушкой
-        const googleFaviconCheck = await checkGoogleFavicon(googleFaviconUrl)
-
-        if (isAvailable && googleFaviconCheck.isValid) {
-          console.log(
-            `Фавикон для ${domain} получен через Google API и не является заглушкой`
-          )
-          return googleFaviconUrl
-        } else if (isAvailable) {
-          console.log(
-            `Фавикон для ${domain} получен через Google API, но является заглушкой - ищем альтернативу`
-          )
-        }
-
-        // Проверяем стандартные пути
-        const isRootFaviconAvailable = await checkImageAvailability(
-          `https://${domain}/favicon.ico`
-        )
-        if (isRootFaviconAvailable) {
-          return `https://${domain}/favicon.ico`
-        }
-
-        // Если все альтернативные методы не сработали, возвращаем стандартный логотип
-        try {
-          const baseUrl = chrome.runtime.getURL("/")
-          return `${baseUrl}assets/icons/link.svg`
-        } catch (e) {
-          console.warn("Не удалось получить URL для стандартной иконки:", e)
-          return "$EXTENSION_PATH$/assets/icons/link.svg"
-        }
-      } catch (altError) {
-        console.warn(
-          "Ошибка при использовании альтернативного метода:",
-          altError
-        )
-        // Возвращаем стандартный логотип при ошибке
-        try {
-          const baseUrl = chrome.runtime.getURL("/")
-          return `${baseUrl}assets/icons/link.svg`
-        } catch (e) {
-          return "$EXTENSION_PATH$/assets/icons/link.svg"
-        }
-      }
-    }
 
     if (!response || !response.success || !response.htmlContent) {
       console.warn(
@@ -1092,8 +1055,7 @@ async function getFaviconFromHtml(url) {
           }
         }
 
-        // ВАЖНО: Мы НЕ возвращаем Google API здесь, т.к. это может быть заглушка
-        // ВМЕСТО ЭТОГО используем стандартный логотип расширения
+        // ВАЖНО: Используем стандартный логотип расширения, если не нашли
         try {
           const baseUrl = chrome.runtime.getURL("/")
           console.log(
@@ -1140,6 +1102,8 @@ async function getFaviconFromHtml(url) {
       'link[rel="favicon"][href]',
     ]
 
+    console.log(`Найдено ${selectors.length} селекторов для поиска фавиконов`)
+
     // Перебираем селекторы и ищем первую подходящую иконку
     for (const selector of selectors) {
       const iconElement = doc.querySelector(selector)
@@ -1153,7 +1117,7 @@ async function getFaviconFromHtml(url) {
           // Проверяем, что иконка доступна
           const isAvailable = await checkImageAvailability(absoluteUrl)
           if (isAvailable) {
-            // ВАЖНО: Проверяем, что найденный URL не является Google API URL, который может быть заглушкой
+            // Проверяем, что найденный URL не является Google API URL, который может быть заглушкой
             if (absoluteUrl.includes("google.com/s2/favicons")) {
               console.warn(
                 `Найденный фавикон ${absoluteUrl} является URL от Google API, ищем другие варианты`
@@ -1181,7 +1145,7 @@ async function getFaviconFromHtml(url) {
       console.warn("Ошибка при проверке стандартного пути /favicon.ico:", e)
     }
 
-    // Если ничего не найдено, используем стандартный логотип вместо Google Favicon API
+    // Если ничего не найдено, используем стандартный логотип
     try {
       // Пытаемся получить базовый URL расширения
       const baseUrl = chrome.runtime.getURL("/")
@@ -1210,7 +1174,9 @@ async function getFaviconFromHtml(url) {
   }
 }
 
-// Проверяет доступность изображения
+/**
+ * Проверяет доступность изображения
+ */
 function checkImageAvailability(url) {
   return new Promise((resolve) => {
     const img = new Image()
@@ -1358,7 +1324,15 @@ export async function updateBookmarkFavicon(bookmarkId) {
   }
 }
 
-// Быстрый прямой доступ к фавиконам высокого качества без дополнительных проверок
+/**
+ * Быстрый прямой доступ к фавиконам для массового обновления фавиконов
+ * Порядок получения:
+ * 1. Специальные случаи для популярных сервисов
+ * 2. DuckDuckGo как основной источник
+ * 3. Google Favicon Service как резервный
+ * 4. Стандартный путь к favicon.ico
+ * 5. Стандартный логотип расширения
+ */
 export async function getFaviconFast(url) {
   try {
     if (!url) return "/assets/icons/link.svg"
@@ -1368,6 +1342,7 @@ export async function getFaviconFast(url) {
     try {
       urlObj = new URL(url)
     } catch (e) {
+      console.warn(`Некорректный URL: ${url}`)
       return "/assets/icons/link.svg"
     }
 
@@ -1379,6 +1354,14 @@ export async function getFaviconFast(url) {
       window.faviconDirectCache = {}
     }
 
+    // Создаем уникальный ключ для кэша
+    let cacheKey = domain
+
+    // Проверяем кэш
+    if (window.faviconDirectCache[cacheKey]) {
+      return window.faviconDirectCache[cacheKey]
+    }
+
     // Специальные проверки для Google сервисов
     // 1. Google Drive
     if (domain === "drive.google.com") {
@@ -1387,40 +1370,11 @@ export async function getFaviconFast(url) {
 
     // 2. YouTube channels
     if (domain === "www.youtube.com" || domain === "youtube.com") {
-      // Обрабатываем все YouTube URL, включая видео, каналы, плейлисты
-      if (
-        fullPath.includes("/channel/") ||
-        fullPath.includes("/user/") ||
-        fullPath.includes("/c/") ||
-        fullPath.includes("/playlists") ||
-        fullPath.includes("/watch") ||
-        fullPath.includes("/shorts/") ||
-        fullPath.includes("/feed/") ||
-        urlObj.search.includes("list=") || // Добавлена проверка параметра list для плейлистов
-        fullPath.includes("/playlist") || // Добавлена проверка пути playlist
-        fullPath === "/" // Главная страница YouTube
-      ) {
-        return "https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144.png"
-      }
-      // Для любого YouTube URL, который не попал в предыдущие условия
       return "https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144.png"
     }
 
     // 3. Google Docs
     if (domain === "docs.google.com") {
-      // Проверки для простых URL без идентификатора документа
-      if (
-        fullPath === "/" ||
-        fullPath === "/document/" ||
-        fullPath.startsWith("/document") ||
-        fullPath === "/document"
-      ) {
-        return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
-      }
-
-      // Распознаем тип документа Google Docs по URL пути
-      const pathParts = fullPath.split("/").filter((part) => part)
-
       // Проверка на URL с id документа (например, /document/d/{docId}/edit)
       if (fullPath.includes("/document/d/")) {
         return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
@@ -1442,47 +1396,11 @@ export async function getFaviconFast(url) {
         return "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png"
       }
 
-      // Если в пути есть docId, но тип не определен выше
-      if (fullPath.includes("/d/")) {
-        return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
-      }
-
-      // Стандартная обработка по первому сегменту пути
-      if (pathParts.length > 0) {
-        const docType = pathParts[0]
-
-        // Распознаем различные типы документов Google
-        const googleDocsIcons = {
-          document:
-            "https://ssl.gstatic.com/docs/documents/images/kix-favicon-hd-v2.png",
-          spreadsheets:
-            "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico",
-          presentation:
-            "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico",
-          forms:
-            "https://ssl.gstatic.com/docs/forms/device_home/android_192.png",
-          drawings:
-            "https://ssl.gstatic.com/docs/drawings/favicon/favicon-drawing-hd.png",
-        }
-
-        if (googleDocsIcons[docType]) {
-          return googleDocsIcons[docType]
-        }
-      }
-
       // Если не определили точный тип, возвращаем иконку Google Docs по умолчанию
       return "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico"
     }
 
-    // Создаем уникальный ключ для кэша
-    let cacheKey = domain
-
-    // Проверяем кэш
-    if (window.faviconDirectCache[cacheKey]) {
-      return window.faviconDirectCache[cacheKey]
-    }
-
-    // Список специальных случаев для популярных сайтов (оставляем как есть)
+    // Список специальных случаев для популярных сайтов
     const specialCases = {
       // Популярные социальные сети
       "youtube.com":
@@ -1505,55 +1423,11 @@ export async function getFaviconFast(url) {
       "www.linkedin.com":
         "https://static.licdn.com/sc/h/2if24wp7oqlodqdlgei1n1520",
 
-      // Поисковые системы
+      // Google сервисы
       "google.com":
         "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
       "www.google.com":
         "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
-      "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-      "www.bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-      "yandex.ru":
-        "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
-      "www.yandex.ru":
-        "https://yastatic.net/iconostasis/_/8lFaTfLDdj3-1ap-eMeEiQ5d8uI.png",
-
-      // Почтовые сервисы
-      "gmail.com":
-        "https://www.gstatic.com/images/branding/product/1x/gmail_512dp.png",
-      "outlook.com":
-        "https://outlook-1.cdn.office.net/assets/clear.r7KmX24vzmV.png",
-      "www.outlook.com":
-        "https://outlook-1.cdn.office.net/assets/clear.r7KmX24vzmV.png",
-
-      // Популярные магазины
-      "amazon.com": "https://www.amazon.com/favicon.ico",
-      "www.amazon.com": "https://www.amazon.com/favicon.ico",
-      "ebay.com": "https://pages.ebay.com/favicon.ico",
-      "www.ebay.com": "https://pages.ebay.com/favicon.ico",
-
-      // Развлекательные платформы
-      "netflix.com":
-        "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico",
-      "www.netflix.com":
-        "https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico",
-      "twitch.tv":
-        "https://static.twitchcdn.net/assets/favicon-32-d6025c14e900565d6177.png",
-      "www.twitch.tv":
-        "https://static.twitchcdn.net/assets/favicon-32-d6025c14e900565d6177.png",
-
-      // Популярные новостные сайты
-      "cnn.com": "https://www.cnn.com/media/sites/cnn/apple-touch-icon.png",
-      "www.cnn.com": "https://www.cnn.com/media/sites/cnn/apple-touch-icon.png",
-      "bbc.com":
-        "https://static.files.bbci.co.uk/core/website/assets/static/bbc-icon-196.d36e7f0c85ccd9a3e10c2be8964c0d67.png",
-      "www.bbc.com":
-        "https://static.files.bbci.co.uk/core/website/assets/static/bbc-icon-196.d36e7f0c85ccd9a3e10c2be8964c0d67.png",
-
-      // Технологические компании
-      "apple.com": "https://www.apple.com/favicon.ico",
-      "www.apple.com": "https://www.apple.com/favicon.ico",
-      "microsoft.com": "https://c.s-microsoft.com/favicon.ico",
-      "www.microsoft.com": "https://c.s-microsoft.com/favicon.ico",
       "github.com": "https://github.githubassets.com/favicons/favicon.svg",
       "www.github.com": "https://github.githubassets.com/favicons/favicon.svg",
     }
@@ -1565,10 +1439,11 @@ export async function getFaviconFast(url) {
       return specialUrl
     }
 
-    // Пробуем получить фавикон через DuckDuckGo
-    const duckDuckGoUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`
+    // 1. Первый выбор: DuckDuckGo - быстрый и качественный источник фавиконов
     try {
-      // Кэшируем URL DuckDuckGo (без проверки доступности для скорости)
+      const duckDuckGoUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`
+
+      // Кэшируем URL DuckDuckGo и возвращаем его без проверки доступности для скорости
       window.faviconDirectCache[cacheKey] = duckDuckGoUrl
       return duckDuckGoUrl
     } catch (e) {
@@ -1578,24 +1453,31 @@ export async function getFaviconFast(url) {
       )
     }
 
-    // Если не удалось получить через DuckDuckGo, пробуем через Google
+    // 2. Второй выбор: Google Favicon Service как запасной вариант
     try {
       const googleUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+
+      // Кэшируем URL Google и возвращаем его
       window.faviconDirectCache[cacheKey] = googleUrl
       return googleUrl
     } catch (e) {
       console.warn(`Не удалось получить фавикон через Google для ${domain}:`, e)
     }
 
-    // Проверяем стандартные пути
-    const isRootFaviconAvailable = await checkImageAvailability(
-      `https://${domain}/favicon.ico`
-    )
-    if (isRootFaviconAvailable) {
-      return `https://${domain}/favicon.ico`
+    // 3. Третий выбор: Стандартный путь к favicon.ico
+    try {
+      const standardFaviconUrl = `https://${domain}/favicon.ico`
+      const isAvailable = await checkImageAvailability(standardFaviconUrl)
+
+      if (isAvailable) {
+        window.faviconDirectCache[cacheKey] = standardFaviconUrl
+        return standardFaviconUrl
+      }
+    } catch (e) {
+      console.warn(`Ошибка при проверке стандартного favicon.ico:`, e)
     }
 
-    // Если все способы не сработали, используем стандартную иконку расширения
+    // 4. Последний вариант: стандартная иконка расширения
     try {
       const baseUrl = chrome.runtime.getURL("/")
       const standardIcon = `${baseUrl}assets/icons/link.svg`
