@@ -1,3 +1,40 @@
+/**
+ * Функция fetch с ограничением времени ожидания
+ * @param {string} url - URL для запроса
+ * @param {Object} options - Опции для fetch
+ * @returns {Promise} - Promise с результатом fetch
+ */
+function fetchWithTimeout(url, options = {}) {
+  const { timeout = 5000, ...fetchOptions } = options
+
+  return new Promise((resolve, reject) => {
+    // Устанавливаем таймаут
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      console.log(`[Background] fetchWithTimeout: Сработал таймаут для ${url}`)
+      controller.abort()
+    }, timeout)
+
+    // Выполняем fetch с AbortController
+    fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    })
+      .then((response) => {
+        clearTimeout(timeoutId)
+        resolve(response)
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId)
+        console.error(
+          `[Background] fetchWithTimeout: Ошибка при запросе ${url}:`,
+          error.message
+        )
+        reject(error)
+      })
+  })
+}
+
 // Обработка установки расширения
 chrome.runtime.onInstalled.addListener(async () => {
   console.log("[Background] Расширение установлено или обновлено")
@@ -252,115 +289,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[Background] Получено сообщение:", message)
 
   // Обработка запросов на получение HTML содержимого для извлечения фавикона
-  if (message.action === "getHtmlContent" && message.url) {
-    console.log(
-      "[Background] Запрос на получение HTML содержимого:",
-      message.url
-    )
+  if (message.action === "getHtmlContent") {
+    console.log("[Background] Запрос на получение HTML страницы:", message.url)
 
-    try {
-      // Используем fetch для получения HTML-кода страницы (обходя CORS-ограничения)
-      // Добавляем таймаут и дополнительные параметры для более надежного получения HTML
-      const fetchOptions = {
-        method: "GET",
-        headers: {
-          Accept: "text/html,application/xhtml+xml,application/xml",
-          "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
-          "Cache-Control": "no-cache",
-          // Имитируем запрос от обычного браузера
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        },
-        // Не отправляем куки и другие учетные данные
-        credentials: "omit",
-        // Обходим CORS-проверки
-        mode: "no-cors",
-        // Отключаем редиректы, чтобы получить реальный HTML
-        redirect: "follow",
-        // Таймаут запроса 5 секунд
-        timeout: 5000,
-      }
-
-      // Используем Promise с таймаутом для ограничения времени выполнения запроса
-      const fetchWithTimeout = (url, options = {}) => {
-        // Создаем контроллер для возможности прервать запрос
-        const controller = new AbortController()
-        const { timeout } = options
-
-        // Устанавливаем таймаут
-        const timeoutId = setTimeout(() => controller.abort(), timeout || 5000)
-
-        return fetch(url, {
-          ...options,
-          signal: controller.signal,
-        })
-          .then((response) => {
-            clearTimeout(timeoutId)
-            return response
-          })
-          .catch((error) => {
-            clearTimeout(timeoutId)
-            throw error
-          })
-      }
-
-      fetchWithTimeout(message.url, fetchOptions)
-        .then((response) => {
-          if (!response.ok) {
-            console.warn(
-              `[Background] Ответ не OK: ${response.status} ${response.statusText}`
-            )
-
-            // Если получили Error 4xx или 5xx, попробуем получить HTML через альтернативный подход с веб-api
-            // Сначала создаем активную вкладку и пытаемся получить контент напрямую
-            return { altFetch: true, status: response.status }
-          }
-          return response.text().then((html) => ({ html }))
-        })
-        .then((result) => {
-          if (result.altFetch) {
-            // Если основной запрос не удался, попробуем получить фавикон напрямую через Google
-            console.log(
-              "[Background] Основной запрос не удался, возвращаем статус для альтернативного подхода"
-            )
-            sendResponse({
-              success: false,
-              error: `HTTP error: ${result.status}`,
-              altFetchRequired: true, // Флаг для клиента что нужно использовать альтернативный метод
-            })
-            return
-          }
-
-          if (result.html) {
-            console.log(
-              "[Background] HTML получен успешно, размер:",
-              result.html.length
-            )
-            sendResponse({ success: true, htmlContent: result.html })
-          } else {
-            console.warn("[Background] Получен пустой HTML")
-            sendResponse({ success: false, error: "Получен пустой HTML" })
-          }
-        })
-        .catch((error) => {
-          console.error("[Background] Ошибка при получении HTML:", error)
-          sendResponse({
-            success: false,
-            error: error.message,
-            isAborted: error.name === "AbortError",
-            altFetchRequired: true, // Просим клиента использовать Google напрямую
-          })
-        })
-    } catch (error) {
-      console.error("[Background] Исключение при выполнении запроса:", error)
-      sendResponse({
-        success: false,
-        error: "Внутренняя ошибка при выполнении запроса: " + error.message,
-        altFetchRequired: true,
+    // Используем функцию fetchWithTimeout для ограничения времени ожидания
+    fetchWithTimeout(message.url, {
+      method: "GET",
+      headers: {
+        Accept: "text/html",
+        "User-Agent": "Mozilla/5.0 (compatible; BookmarkExtension/1.0)",
+      },
+      timeout: 3000, // 3 секунды таймаут
+    })
+      .then((response) => {
+        if (!response.ok) {
+          console.log(
+            `[Background] HTTP ошибка при получении HTML: ${response.status}, ${response.statusText}`
+          )
+          throw new Error(`HTTP error: ${response.status}`)
+        }
+        return response.text()
       })
-    }
+      .then((html) => {
+        console.log(`[Background] Успешно получен HTML (${html.length} байт)`)
+        sendResponse({ success: true, htmlContent: html })
+      })
+      .catch((error) => {
+        console.error("[Background] Ошибка при получении HTML:", error.message)
+        sendResponse({ success: false, error: error.message })
+      })
 
-    // Возвращаем true для поддержки асинхронного ответа
+    // Возвращаем true для указания, что sendResponse будет вызван асинхронно
     return true
   }
 
@@ -403,6 +362,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         })
     })
+
+    return true
+  }
+
+  // Обработка запроса на проверку доступности фавикона
+  if (message.action === "checkFaviconAvailability" && message.url) {
+    console.log("[Background] Проверка доступности фавикона:", message.url)
+
+    // Используем HEAD запрос для проверки доступности
+    fetchWithTimeout(message.url, {
+      method: "HEAD",
+      timeout: 1500,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; BookmarkExtension/1.0)",
+      },
+    })
+      .then((response) => {
+        console.log(
+          `[Background] Проверка фавикона ${message.url}: статус ${response.status}`
+        )
+
+        // Считаем успешными статусы 200-299
+        const success = response.ok
+        sendResponse({
+          success: success,
+          status: response.status,
+        })
+      })
+      .catch((error) => {
+        console.error(
+          `[Background] Ошибка при проверке фавикона ${message.url}:`,
+          error.message
+        )
+        sendResponse({
+          success: false,
+          error: error.message,
+        })
+      })
 
     return true
   }
