@@ -978,6 +978,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
+  // опция открытия страницы для получения фавикона⬇️
   // Обработка запроса на обновление фавикона из страницы (новый подход для ручного обновления фавикона 980-1050 и 1373-1542 - рабочий вариант)
   if (message.action === "updateFaviconFromPage") {
     console.log(
@@ -1044,7 +1045,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Возвращаем true для асинхронного ответа
     return true
-  }
+  } // опция открытия страницы для получения фавикона⬆️
 
   // Для других сообщений
   return false
@@ -1396,6 +1397,7 @@ function waitForTabLoad(tabId) {
 }
 
 /**
+ * опция открытия страницы для получения фавикона 2 часть⬇️
  * Функция для извлечения фавикона из DOM страницы
  * Выполняется в контексте страницы через chrome.scripting.executeScript
  */
@@ -1539,3 +1541,4 @@ async function updateBookmarkFaviconInStorage(bookmarkId, faviconUrl) {
     })
   })
 }
+// опция открытия страницы для получения фавикона 2 часть⬆️
